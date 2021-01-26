@@ -4,6 +4,7 @@ namespace Orkester\Database;
 
 use Doctrine\DBAL;
 use Exception;
+use Orkester\Exception\EDBException;
 use Orkester\Exception\ERuntimeException;
 use Orkester\Manager;
 use Orkester\Utils\MArrayHelper;

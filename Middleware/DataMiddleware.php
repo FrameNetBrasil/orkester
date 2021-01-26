@@ -36,14 +36,16 @@ class DataMiddleware implements Middleware
                 // handle _ or _* : https://github.com/typicode/json-server
                 if (($name[0] == '_') || ($name == '_')) {
                     $data->pagination = $data->pagination ?? (object)[];
+                    $data->relationship = $data->relationship ?? (object)[];
                     match($name) {
-                        '_embed' => $data->pagination->embed = $value,
                         '_page' => $data->pagination->page = $value,
                         '_limit' => $data->pagination->rows = $value,
                         '_sort' => $data->pagination->sort = $value,
                         '_order' => $data->pagination->order = $value,
                         '_start' => $data->pagination->start = $value,
                         '_end' => $data->pagination->end = $value,
+                        '_embed' => $data->relationship->embed = $value,
+                        '_expand' => $data->relationship->expand = $value,
                         default => '',
                     };
                 } else {

@@ -143,13 +143,14 @@ class MFrontController
         //return $this->response->sendResponse($this->result);
     }
 
-    public function setData($value)
+    /*
+    public function setData($dataValue)
     {
         $data = new \stdClass;;
         // se for o $_REQUEST, converte para objeto
-        $valid = (is_object($value)) || (is_array($value) && count($value));
+        $valid = (is_object($dataValue)) || (is_array($dataValue) && count($dataValue));
         if ($valid) {
-            foreach ($value as $name => $value) {
+            foreach ($dataValue as $name => $value) {
                 // handle _ or _* : https://github.com/typicode/json-server
                 if (($name[0] == '_') || ($name == '_')) {
                     match($name) {
@@ -159,6 +160,8 @@ class MFrontController
                         '_order' => $data->pagination->order = $value,
                         '_start' => $data->pagination->start = $value,
                         '_end' => $data->pagination->end = $value,
+                        '_embed' => $data->relationship->embed = $value,
+                        '_expand' => $data->relationship->expand = $value,
                         default => '',
                     };
                 } else {
@@ -187,6 +190,7 @@ class MFrontController
         }
         Manager::setData($data);
     }
+    */
 
     /*
     public function getContext(): MContext
