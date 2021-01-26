@@ -137,6 +137,12 @@ class PersistentObject
         return strip_tags($value);
     }
 
+    public function save()
+    {
+        Manager::getPersistentManager()->saveObject($this);
+    }
+
+
     /*
         private $isPersistent;
         private $manager;

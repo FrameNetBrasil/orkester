@@ -1,7 +1,5 @@
 <?php
-namespace Orkester\Database;
-
-use Orkester\Exception\EMException;
+namespace Orkester\Exception;
 
 class EDBException extends EMException {
 
