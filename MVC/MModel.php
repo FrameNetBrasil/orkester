@@ -24,7 +24,6 @@ class MModel extends PersistentObject implements JsonSerializable, Serializable
         if (method_exists($this, $method )) {
             return $this->$method();
         }
-        mdump(mtracestack());
         throw new ERuntimeException("Class " . $this::class . ': method ' . $method . "doesn't exist.");
     }
 
