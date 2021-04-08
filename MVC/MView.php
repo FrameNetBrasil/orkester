@@ -60,18 +60,7 @@ class MView
 
     protected function processPHP()
     {
-        /*
-        $page = Manager::getObject(MPage::class);
-        $viewName = basename($this->viewFile, '.php');
-        include_once $this->viewFile;
-        $control = new $viewName();
-        $control->setView($this);
-        $control->load();
-        $container = $page->getControl();
-        $container->setView($this);
-        $container->addControl($control);
-        return (Manager::isAjaxCall() ? $page->generate() : $page->render());
-        */
+        $this->baseName = basename($this->viewFile, '.blade.php');
         return $this->processTemplate();
     }
 
@@ -129,23 +118,6 @@ class MView
     protected function processVue()
     {
         $this->baseName = basename($this->viewFile, '.vue');
-        /*
-        $page = Manager::getObject(MPage::class);
-        $template = new MTemplate(dirname($this->viewFile));
-        //$template->context('manager', Manager::getInstance());
-        $template->context('page', $page);
-        $template->context('view', $this);
-        $template->context('data', Manager::getData());
-        $template->context('components', Manager::getAppPath() . "/Components");
-        $template->context('appURL', Manager::getAppURL());
-        $template->context('template', $template);
-        $content = $template->fetch($this->baseName);
-        //$content = str_replace("<template","<script", $content);
-        //$content = str_replace("</template","</script", $content);
-        //$content = str_replace("script id","script type=\"text/x-template\" id", $content);
-        $page->setContent($content);
-        return (Manager::isAjaxCall() ? $page->generate() : $page->render());
-        */
         return $this->processTemplate();
     }
 
