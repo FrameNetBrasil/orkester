@@ -208,7 +208,7 @@ class ClassMap
         $associationMap = NULL;
         $classMap = $this;
         do {
-            $associationMap = $classMap->associationMaps[$name];
+            $associationMap = $classMap->associationMaps[$name] ?? NULL;
             if ($associationMap != NULL) {
                 $associationMap->setKeysAttributes();
             }

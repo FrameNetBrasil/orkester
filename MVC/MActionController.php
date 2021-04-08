@@ -18,7 +18,7 @@ class MActionController extends MController
      * Route pattern: /api/module/controller/action/id
      * @param Request $request
      */
-    protected function parseRoute(Request $request)
+    protected function parseRoute(Request $request, Response $response)
     {
         $this->request = $request;
         $routeContext = RouteContext::fromRequest($request);
@@ -34,7 +34,7 @@ class MActionController extends MController
 
     public function __invoke(Request $request, Response $response): Response
     {
-        $this->parseRoute($request);
+        $this->parseRoute($request, $response);
         $controllerClass = "App\\Modules\\{$this->module}\\Controllers\\{$this->controller}Controller";
         mdump('==== '. $controllerClass);
         $controller = Manager::getContainer()->make($controllerClass);

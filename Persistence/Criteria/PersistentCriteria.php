@@ -341,7 +341,7 @@ class PersistentCriteria extends BaseCriteria
 
     private function checkAttributesToSkip($attribute)
     {
-        return ($attribute[0] == ':') || (in_array(trim($attribute), ['', '=', '?', '(', ')', 'and', 'or', 'not']));
+        return (($attribute[0] ?? '') == ':') || (in_array(trim($attribute), ['', '=', '?', '(', ')', 'and', 'or', 'not']));
     }
 
     /*
