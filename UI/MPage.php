@@ -37,7 +37,7 @@ class MPage
      */
     private MTemplate $template;
     private string $templateName;
-    private object $content;
+    private string|object $content;
     private string $id;
 
     public function __construct()
@@ -95,12 +95,15 @@ class MPage
      */
     public function setTemplate()
     {
+        /*
         $basePath = Manager::getHome() . Manager::getOptions('templatePath');
         $paths = [
             $basePath . '/Templates/Page',
             $basePath . '/Templates/Controls',
             $basePath . '/Components',
         ];
+        */
+        $paths = [];//Manager::getOptions('templatePath');
         $this->template = new MTemplate($paths);
         //$this->template->context('manager', \Maestro\Manager);
         $this->template->context('page', $this);
@@ -466,7 +469,7 @@ class MPage
         //$html = MBasePainter::generateToString($this->container->getInner());
         //return $html;
         //return $this->container->generate();
-        return $this->content->generate();
+        return is_string($this->content) ? $this->content : $this->content->generate();
     }
 
 }

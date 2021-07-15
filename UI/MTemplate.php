@@ -15,8 +15,8 @@ class MTemplate
 
     public function __construct(array|string $paths)
     {
-        $this->paths = $paths;
-        //mdump('== template path: '.$path);
+        $paths = (is_array($paths) ? $paths : (array)$paths);
+        $this->paths = array_merge($paths, Manager::getOptions('templatePath'));
         $cachePath = Manager::getOptions('tmpPath') . '/templates';
         $this->engine = new Blade($this->paths, $cachePath);
         $this->engine->addExtension('xml','blade');

@@ -4,16 +4,13 @@ namespace Orkester\MVC;
 
 use Orkester\Manager;
 use JsonSerializable;
+use Serializable;
 use Orkester\Persistence\Criteria\DeleteCriteria;
 use Orkester\Persistence\Criteria\InsertCriteria;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Criteria\UpdateCriteria;
-use Orkester\Persistence\Map\AssociationMap;
-use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\PersistenceTransaction;
-use Orkester\Persistence\PersistentObject;
-use Serializable;
 
 class MModelMaestro // extends PersistentObject implements JsonSerializable, Serializable
 {
@@ -23,6 +20,10 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
     public static string $entityClass = '';
 
     public static function init(): void
+    {
+    }
+
+    public static function validate(object $object): void
     {
     }
 
@@ -39,28 +40,6 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
     public static function getClassMap(): ClassMap
     {
         return Manager::getPersistentManager()->getClassMap(get_called_class());
-    }
-
-    public static function save(MEntityMaestro $entity): void
-    {
-        $entity->validate();
-        $classMap = static::getClassMap();
-        $object = $entity->getObject();
-        Manager::getPersistentManager()->saveObject($classMap, $object);
-    }
-
-    public static function saveObject(object $object): void
-    {
-        $entity = Manager::instantiate(static::$entityClass, $object);
-        $entity->validate();
-        $classMap = static::getClassMap();
-        Manager::getPersistentManager()->saveObject($classMap, $object);
-    }
-
-    public static function delete(int $id): void
-    {
-        $classMap = static::getClassMap();
-        Manager::getPersistentManager()->deleteObject($classMap, $id);
     }
 
     public static function getCriteria(ClassMap $classMap = null): RetrieveCriteria
@@ -95,17 +74,27 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         return Manager::getPersistentManager()->getDeleteCriteria($classMap);
     }
 
-    public static function getById(int $id): MEntityMaestro|null
+    public static function getById(int $id): object|null
     {
         $classMap = static::getClassMap();
         $object = Manager::getPersistentManager()->retrieveObjectById($classMap, $id);
-        if ($object) {
-            return Manager::instantiate(static::$entityClass, $object);
-        }
-        return null;
+        return $object;
     }
 
-    private static function getAssociatonRows(ClassMap $classMap, string $associationChain, int $id): array
+    public static function save(object $object): void
+    {
+        static::validate($object);
+        $classMap = static::getClassMap();
+        Manager::getPersistentManager()->saveObject($classMap, $object);
+    }
+
+    public static function delete(int $id): void
+    {
+        $classMap = static::getClassMap();
+        Manager::getPersistentManager()->deleteObject($classMap, $id);
+    }
+
+    private static function getAssociationRows(ClassMap $classMap, string $associationChain, int $id): array
     {
         $associationChain .= '.*';
         return Manager::getPersistentManager()->retrieveAssociationById($classMap, $associationChain, $id);
@@ -114,27 +103,13 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
     public static function getAssociation(string $associationChain, int $id): array
     {
         $classMap = static::getClassMap();
-        $modelClass = Manager::getPersistentManager()->getLastClassFromChain($classMap, $associationChain);
-        $entityClass = $modelClass::$entityClass;
-        $rows = self::getAssociatonRows($classMap, $associationChain, $id);
-        $result = [];
-        foreach ($rows as $row) {
-            $result[] = Manager::instantiate($entityClass, $row);
-        }
-        return $result;
+        return self::getAssociationRows($classMap, $associationChain, $id);
     }
 
-    public static function getAssociationOne(string $associationChain, int $id): MEntityMaestro|null
+    public static function getAssociationOne(string $associationChain, int $id): object|null
     {
-        $classMap = static::getClassMap();
-        $modelClass = Manager::getPersistentManager()->getLastClassFromChain($classMap, $associationChain);
-        $entityClass = $modelClass::$entityClass;
-        //$associationChain = $classMap->getTableName() . '.' . $associationChain;
-        $rows = self::getAssociatonRows($classMap, $associationChain, $id);
-        if (count($rows) > 0) {
-            return Manager::instantiate($entityClass, $rows[0]);
-        }
-        return null;
+        $rows = static::getAssociation($associationChain, $id);
+        return $rows[0][0];
     }
 
 
