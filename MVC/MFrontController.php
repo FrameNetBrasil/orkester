@@ -3,6 +3,7 @@
 namespace Orkester\MVC;
 
 use Orkester\Manager;
+use Orkester\Middleware\CorsMiddleware;
 use Orkester\Services\Http\MRequest;
 use Orkester\Services\Http\MResponse;
 use Orkester\Services\Http\MAjax;

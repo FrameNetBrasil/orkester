@@ -5,6 +5,8 @@ use Orkester\Manager;
 use Orkester\Services\Http\MRequest;
 use Orkester\Services\Http\MResponse;
 use Orkester\Services\Http\MStatusCode;
+use Slim\Psr7\Request;
+use Slim\Psr7\Response;
 
 /**
  * MNotFound.
@@ -27,23 +29,16 @@ class MNotFound extends MResult
         return $this->message;
     }
 
-    public function apply(MRequest $request, MResponse $response)
+    public function apply(Request $request, Response $response): Response
     {
-        $response->setStatus(MStatusCode::NOT_FOUND);
         $html = $this->getTemplate('404');
-        try {
-            if ($request->isAjax()) {
-                $this->ajax->setId('error');
-                $this->ajax->setType('page');
-                $this->ajax->setData($html);
-                $out = $this->ajax->returnData();
-            } else {
-                $out = $html;
-            }
-            $response->setOut($out);
-        } catch (\Exception $e) {
-            Manager::logError($e->getMessage());
-        }
+        $payload = $html;
+        $body = $response->getBody();
+        $body->write($payload);
+        return $response
+            ->withHeader('Content-Type', 'text/html; charset=UTF-8')
+            ->withStatus(MStatusCode::NOT_FOUND);
     }
+
 }
 

@@ -3,19 +3,24 @@
 namespace Orkester\Security;
 
 use Orkester\Manager;
-use App\Models\User;
 
 class MAuth
 {
-    protected User $user;
+    protected MUser $user;
 
-    public function getUser(): User
+    public function getUser(): MUser
     {
         return $this->user;
     }
 
-    public function registerLogin(User $user): void {
+    public function registerLogin(object $objUser, array $groups = []): void {
+        $user = new MUser(
+            $objUser->login ?? '',
+            $objUser->name ?? '',
+            $objUser->idUser
+        );
         $objLogin = new MLogin($user);
+        $objLogin->setGroups($groups);
         $this->user = $user;
         $session = Manager::getSession();
         $session->setValue('__sessionLogin', $objLogin);

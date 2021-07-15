@@ -3,139 +3,194 @@
 namespace Orkester\Persistence;
 
 use Orkester\Manager;
+use Orkester\MVC\MModelMaestro;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 
-class PHPConfigLoader
+class PHPConfigLoader extends PersistentConfigLoader
 {
 
-    private $manager;
     private $phpMaps = [];
-    private $classMaps = [];
-
-    public function __construct($manager)
-    {
-        $this->manager = $manager;
-    }
+    private ClassMap $classMap;
+    private string $className;
 
     public function getSignature(string $className)
     {
-        $map = $className::$ORMMap;
+        $class = $className;
+        /** @var MModelMaestro $class */
+        $map = $class::$map;
         return md5($className . serialize($map));
     }
 
-    public function getORMMap(string $className): array
+    public function getMap(string $className): array
     {
-        $this->phpMaps[$className] = $className::$ORMMap;
+        $class = $className;
+        /** @var MModelMaestro $class */
+        $this->phpMaps[$className] = $class::$ORMMap;
         return $this->phpMaps[$className];
     }
 
     public function getClassMap(string $className): ?ClassMap
     {
-        $map = $this->getORMMap($className);
+        $this->className = $className;
+        /** @var MModelMaestro $className */
+        $map = $className::getMap();
         //mdump($map);
         $databaseName = $map['database'] ?? Manager::getOptions('db');
-        $classMap = new ClassMap($className, $databaseName);
-        $classMap->setTableName($map['table']);
+        $this->classMap = new ClassMap($this->className);
+        $this->classMap->setTableName($map['table']);
         if (isset($map['extends'])) {
-            $classMap->setSuperClassName($map['extends']);
+            $this->classMap->setSuperClassName($map['extends']);
         }
-        $config = $className::$config;
-        $attributes = $map['attributes'];
-        $referenceAttribute = false;
+        $attributes = $map['attributes'] ?? [];
         foreach ($attributes as $attributeName => $attr) {
-            $attributeMap = new AttributeMap($attributeName, $classMap);
-            if (isset($attr['index'])) {
-                $attributeMap->setIndex($attr['index']);
-            }
-
-            $type = isset($attr['type']) ? strtolower($attr['type']) : 'string';
-            $attributeMap->setType($type);
-            $platformTypedAttributes = $this->manager->getConnection($databaseName)->getPlatform()->getTypedAttributes();
-            $attributeMap->setHandled(str_contains($platformTypedAttributes, $type));
-            if (isset($config['converters'][$attributeName])) {
-                $attributeMap->setConverter($config['converters'][$attributeName]);
-            }
-
-            $attributeMap->setColumnName($attr['column'] ?? $attributeName);
-            $attributeMap->setAlias($attr['alias'] ?? $attributeName);
-            $attributeMap->setKeyType($attr['key'] ?? 'none');
-            $attributeMap->setIdGenerator($attr['idgenerator'] ?? NULL);
-
-            if (isset($attr['key']) && ($attr['key'] == 'reference') && ($classMap->getSuperClassMap() != NULL)) {
-                $referenceAttribute = $classMap->getSuperClassMap()->getAttributeMap($attributeName);
-                if ($referenceAttribute) {
-                    $attributeMap->setReference($referenceAttribute);
-                }
-            }
-            $classMap->addAttributeMap($attributeMap);
+            $this->addAttribute($attributeName, $attr);
         }
 
-        $this->classMaps[$className] = $classMap;
-
-        if ($referenceAttribute) {
-            // set superAssociationMap
-            $attributeName = $referenceAttribute->getName();
-            $superClassName = $classMap->getSuperClassMap()->getName();
-            $superAssociationMap = new AssociationMap($classMap, $superClassName);
-            $superAssociationMap->setToClassName($superClassName);
-            $superAssociationMap->setToClassMap($classMap->getSuperClassMap());
-            $superAssociationMap->setCardinality('oneToOne');
-            $superAssociationMap->addKeys($attributeName, $attributeName);
-            $superAssociationMap->setKeysAttributes();
-            $classMap->setSuperAssociationMap($superAssociationMap);
-        }
-
-        $associations = $map['associations'];
+        $associations = $map['associations'] ?? [];
         if (isset($associations)) {
-
-            $fromClassMap = $classMap;
             foreach ($associations as $associationName => $association) {
-                $toClass = $association['toClass'];
-                $associationMap = new AssociationMap($classMap, $associationName);
-                $associationMap->setToClassName($toClass);
-
-                $associationMap->setDeleteAutomatic(!empty($association['deleteAutomatic']));
-                $associationMap->setSaveAutomatic(!empty($association['saveAutomatic']));
-                $associationMap->setRetrieveAutomatic(!empty($association['retrieveAutomatic']));
-
-                $autoAssociation = (strtolower($className) == strtolower($toClass));
-                if (!$autoAssociation) {
-                    $autoAssociation = (strtolower($className) == strtolower(substr($toClass, 1)));
+                if ($association['type'] == 'one') {
+                    $this->hasOne($associationName, $association);
+                } elseif ($association['type'] == 'many') {
+                    $this->hasMany($associationName, $association);
+                } elseif ($association['type'] == 'associative') {
+                    $this->hasMany($associationName, $association);
                 }
-                $associationMap->setAutoAssociation($autoAssociation);
-                if (isset($association['index'])) {
-                    $associationMap->setIndexAttribute($association['index']);
-                }
-                $associationMap->setCardinality($association['cardinality']);
-                if ($association['cardinality'] == 'manyToMany') {
-                    $associationMap->setAssociativeTable($association['associative']);
-                } else {
-                    $arrayKeys = explode(',', $association['keys']);
-                    foreach ($arrayKeys as $keys) {
-                        $key = explode(':', $keys);
-                        $associationMap->addKeys($key[0], $key[1]);
-                    }
-                }
-
-                if (isset($association['order'])) {
-                    $order = array();
-                    $orderAttributes = explode(',', $association['order']);
-                    foreach ($orderAttributes as $orderAttr) {
-                        $o = explode(' ', $orderAttr);
-                        $ascend = (substr($o[1], 0, 3) == 'asc');
-                        $order[] = array($o[0], $ascend);
-                    }
-                    if (count($order)) {
-                        $associationMap->setOrder($order);
-                    }
-                }
-
-                $fromClassMap->putAssociationMap($associationMap);
             }
         }
-        return $classMap;
+
+        $conditions = $map['conditions'] ?? [];
+        if (isset($conditions)) {
+            foreach($conditions as $condition) {
+                $this->classMap->addCondition($condition);
+            }
+        }
+
+        return $this->classMap;
+    }
+
+    public function addAttribute(string $attributeName, array $attr = [])
+    {
+        $attributeMap = new AttributeMap($attributeName, $this->classMap);
+        if (isset($attr['index'])) {
+            $attributeMap->setIndex($attr['index']);
+        }
+        $key = $attr['key'] ?? 'none';
+        if ($key == 'primary') {
+            $attr['type'] = 'integer';
+            $attr['idgenerator'] = 'identity';
+        }
+        $type = isset($attr['type']) ? strtolower($attr['type']) : 'string';
+        $attributeMap->setType($type);
+        $attributeMap->setHandled(false);
+        if (isset($attr['converter'])) {
+            $attributeMap->setConverter($attr['converter']);
+        }
+        $attributeMap->setColumnName($attr['column'] ?? $attributeName);
+        $attributeMap->setAlias($attr['alias'] ?? $attributeName);
+        $attributeMap->setReference($attr['ref'] ?? '');
+        $attributeMap->setKeyType($key);
+        $attributeMap->setIdGenerator($attr['idgenerator'] ?? NULL);
+        $attributeMap->setDefault($attr['default'] ?? NULL);
+        $this->classMap->addAttributeMap($attributeMap);
+    }
+
+    public function hasOne(string $associationName, array $association = [])
+    {
+        $fromClassMap = $this->classMap;
+        $toClass = $association['toClass'] ?? $association['model'];
+        $associationMap = new AssociationMap($associationName, $this->classMap);
+        $associationMap->setToClassName($toClass);
+        $associationMap->setDeleteAutomatic(!empty($association['deleteAutomatic']));
+        $associationMap->setSaveAutomatic(!empty($association['saveAutomatic']));
+        $associationMap->setRetrieveAutomatic(!empty($association['retrieveAutomatic']));
+        $associationMap->setCardinality('oneToOne');
+        $autoAssociation = (strtolower($this->className) == strtolower($toClass));
+        $associationMap->setAutoAssociation($autoAssociation);
+        if (isset($association['index'])) {
+            $associationMap->setIndexAttribute($association['index']);
+        }
+
+        if (isset($association['key'])) {
+            $key = $association['key'];
+            $associationMap->addKeys($key, $key);
+        } elseif (isset($association['keys'])) {
+            $keys = explode(':', $association['keys']);
+            $key = $keys[0];
+            $associationMap->addKeys($keys[0], $keys[1]);
+        } else {
+            $key = $this->classMap->getKeyAttributeName();
+            $associationMap->addKeys($key, $key);
+        }
+        if (!$this->classMap->hasAttribute($key)) {
+            $this->addAttribute($key, ['type' => 'integer']);
+        }
+
+        if (isset($association['order'])) {
+            $arrayOrder = '';
+            $orderAttributes = explode(',', $association['order']);
+            foreach ($orderAttributes as $orderAttr) {
+                $o = explode(' ', $orderAttr);
+                $ascend = (substr($o[1], 0, 3) == 'asc');
+                $arrayOrder[] = [$o[0], $ascend];
+            }
+            if (count($arrayOrder)) {
+                $associationMap->setOrder(implode(',', $arrayOrder));
+            }
+        }
+        $fromClassMap->putAssociationMap($associationMap);
+    }
+
+    public function hasMany(string $associationName, array $association = [])
+    {
+        $fromClassMap = $this->classMap;
+        $toClass = $association['toClass'] ?? $association['model'];
+        $associationMap = new AssociationMap($associationName, $this->classMap);
+        $associationMap->setToClassName($toClass);
+        $associationMap->setDeleteAutomatic(!empty($association['deleteAutomatic']));
+        $associationMap->setSaveAutomatic(!empty($association['saveAutomatic']));
+        $associationMap->setRetrieveAutomatic(!empty($association['retrieveAutomatic']));
+        $autoAssociation = (strtolower(self::class) == strtolower($toClass));
+        $associationMap->setAutoAssociation($autoAssociation);
+        if (isset($association['index'])) {
+            $associationMap->setIndexAttribute($association['index']);
+        }
+        $associative = ($association['table'] ?? '');
+        $cardinality = ($associative != '') ? 'manyToMany' : 'oneToMany';
+        $associationMap->setCardinality($cardinality);
+        if ($cardinality == 'manyToMany') {
+            $associationMap->setAssociativeTable($associative);
+        }
+        if (isset($association['key'])) {
+            $key = $association['key'];
+            $associationMap->addKeys($key, $key);
+        } elseif (isset($association['keys'])) {
+            $keys = explode(':', $association['keys']);
+            $key = $keys[0];
+            $associationMap->addKeys($keys[0], $keys[1]);
+        } else {
+            $key = $this->classMap->getKeyAttributeName();
+            $associationMap->addKeys($key, $key);
+        }
+        if (!$this->classMap->hasAttribute($key)) {
+            $this->addAttribute($key, ['type' => 'integer']);
+        }
+
+        if (isset($association['order'])) {
+            $arrayOrder = '';
+            $orderAttributes = explode(',', $association['order']);
+            foreach ($orderAttributes as $orderAttr) {
+                $o = explode(' ', $orderAttr);
+                $ascend = (substr($o[1], 0, 3) == 'asc');
+                $arrayOrder[] = [$o[0], $ascend];
+            }
+            if (count($arrayOrder)) {
+                $associationMap->setOrder(implode(',', $arrayOrder));
+            }
+        }
+        $fromClassMap->putAssociationMap($associationMap);
     }
 
 }

@@ -2,10 +2,9 @@
 
 namespace Orkester\Results;
 
-use Orkester\Manager;
-use Orkester\Services\Http\MRequest;
-use Orkester\Services\Http\MResponse;
 use Orkester\Services\Http\MStatusCode;
+use Slim\Psr7\Request;
+use Slim\Psr7\Response;
 
 /**
  * MInternalError.
@@ -30,24 +29,15 @@ class MInternalError extends MResult
         return $this->message;
     }
 
-    public function apply(MRequest $request, MResponse $response)
+    public function apply(Request $request, Response $response): Response
     {
-        $response->setStatus(MStatusCode::INTERNAL_ERROR);
-        mtrace('InternalError: ' . $this->message);
         $html = $this->getTemplate('500');
-        try {
-            if ($request->isAjax()) {
-                $this->ajax->setId('error');
-                $this->ajax->setType('page');
-                $this->ajax->setData($html);
-                $out = $this->ajax->returnData();
-            } else {
-                $out = $html;
-            }
-            $response->setOut($out);
-        } catch (\Exception $e) {
-            Manager::logError($e->getMessage());
-        }
+        $payload = $html;
+        $body = $response->getBody();
+        $body->write($payload);
+        return $response
+            ->withHeader('Content-Type', 'text/html; charset=UTF-8')
+            ->withStatus(MStatusCode::INTERNAL_ERROR);
     }
 
 }

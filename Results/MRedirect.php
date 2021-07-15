@@ -2,10 +2,8 @@
 
 namespace Orkester\Results;
 
-use Orkester\Manager;
-use Orkester\Services\Http\MRequest;
-use Orkester\Services\Http\MResponse;
-use Orkester\Services\Http\MStatusCode;
+use Slim\Psr7\Request;
+use Slim\Psr7\Response;
 
 /**
  * MNotFound.
@@ -15,33 +13,18 @@ use Orkester\Services\Http\MStatusCode;
 class MRedirect extends MResult
 {
 
-    public $view;
-
-    public function __construct($view, $content)
+    public function __construct($url)
     {
         mtrace('Executing MRedirect');
         parent::__construct();
-        $this->content = $content;
-        $this->view = $view;
+        $this->content = $url;
     }
 
-    public function apply(MRequest $request, MResponse $response)
+    public function apply(Request $request, Response $response): Response
     {
-        $response->setStatus(MStatusCode::OK);
-        try {
-            if ($request->isAjax()) {
-                $id = 'redirect' . uniqid();
-                $this->ajax->setId($id);
-                $this->ajax->setType('redirect');
-                $this->ajax->setData($this->content);
-                $this->ajax->setResponseType('JSON');
-                $this->content = $this->ajax->returnData();
-            } else {
-                $response->setHeader('Location', 'Location:' . $this->content);
-            }
-        } catch (\Exception $e) {
-            Manager::logError($e->getMessage());
-        }
+        return $response
+            ->withHeader('Location', $this->content)
+            ->withStatus(302);
     }
 
 }

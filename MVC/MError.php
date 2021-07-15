@@ -29,13 +29,25 @@ class MError implements JsonSerializable
     private $description;
 
     /**
+     * @var string
+     */
+    private $file;
+
+    /**
+     * @var string
+     */
+    private $line;
+
+    /**
      * @param string        $type
      * @param string|null   $description
      */
-    public function __construct(string $type, ?string $description)
+    public function __construct(string $type, ?string $description, ?string $file, ?string $line)
     {
         $this->type = $type;
         $this->description = $description;
+        $this->file = $file;
+        $this->line = $line;
     }
 
     /**
@@ -82,6 +94,8 @@ class MError implements JsonSerializable
         $payload = [
             'type' => $this->type,
             'description' => $this->description,
+            'file' => $this->file,
+            'line' => $this->line,
         ];
 
         return $payload;

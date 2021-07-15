@@ -46,6 +46,7 @@ class DataMiddleware implements Middleware
                         '_end' => $data->pagination->end = $value,
                         '_embed' => $data->relationship->embed = $value,
                         '_expand' => $data->relationship->expand = $value,
+                        '_filter' => $data->filter = json_decode($value), // primevue
                         default => '',
                     };
                 } else {
@@ -60,12 +61,6 @@ class DataMiddleware implements Middleware
                             $data->{$obj} = (object)[];
                         }
                         $data->{$obj}->{$name} = $value;
-                    //} elseif (str_contains($name, '_')) {
-                    //    list($obj, $name) = explode('_', $name);
-                    //    if (!isset($data->{$obj})) {
-                    //        $data->{$obj} = (object)[];
-                    //    }
-                    //    $data->{$obj}->{$name} = $value;
                     } else {
                         $data->{$name} = $value;
                     }

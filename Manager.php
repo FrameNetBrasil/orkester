@@ -2,6 +2,7 @@
 
 namespace Orkester;
 
+use Atk4\Data\Persistence;
 use Orkester\Handlers\HttpErrorHandler;
 use Composer\Script\Event;
 
@@ -22,6 +23,7 @@ use Orkester\Services\Http\MRequest;
 use Orkester\Services\Http\MResponse;
 use Orkester\Services\MLog;
 use Orkester\Services\MSession;
+use Orkester\UI\MBasePainter;
 use Orkester\Utils\MUtil;
 use Phpfastcache\Helper\Psr16Adapter;
 use Slim\Factory\AppFactory;
@@ -47,17 +49,6 @@ define('A_EXECUTE', 15); // 001111
 define('A_SYSTEM', 31);  // 011111
 define('A_ADMIN', 31);   // 011111
 define('A_DEVELOP', 32); // 100000
-
-/**
- * Actions.php index
- */
-define('ACTION_CAPTION', 0);
-define('ACTION_PATH', 1);
-define('ACTION_ICON', 2);
-define('ACTION_TRANSACTION', 3);
-define('ACTION_ACCESS', 4);
-define('ACTION_ACTIONS', 5);
-define('ACTION_GROUP', 6);
 
 /**
  * PDO fetch constants
@@ -89,7 +80,7 @@ class Manager
     static private MAjax $ajax;
     static private MFrontController $frontController;
     static private bool $isAjax = false;
-    static private MLog $log;
+    static private ?MLog $log = NULL;
     static private MAuth $auth;
     static private object $data;
     static private array $databases = [];
@@ -111,6 +102,7 @@ class Manager
      */
     private static MSession $session;
     private static $returnType;
+    private static $persistence;
 
     /**
      * Cria (se não existe) e retorna a instância singleton da class Manager.
@@ -124,24 +116,26 @@ class Manager
         return self::$instance;
     }
 
-    public static  function process() {
+    public static function process()
+    {
         self::init();
         return self::handler();
     }
 
-    public static  function terminate() {
+    public static function terminate()
+    {
 
     }
 
     public static function init()
     {
-        $basePath = realpath(__DIR__ .'/../');
+        $basePath = realpath(__DIR__ . '/../');
         self::$basePath = $basePath;
         self::$appPath = $basePath . '/app';
         self::$confPath = $basePath . '/conf';
         self::$publicPath = $basePath . '/public';
-        self::$classPath = $basePath . '/maestro';
-        self::$varPath = $basePath . '/app';
+        self::$classPath = $basePath . '/orkester';
+        self::$varPath = $basePath . '/var';
         self::loadConf(self::$confPath . '/conf.php');
         self::$mode = self::getOptions("mode");
         // Instantiate PHP-DI ContainerBuilder
@@ -174,12 +168,22 @@ class Manager
         if (!file_exists($tmpPath . '/templates')) {
             mkdir($tmpPath . '/templates');
         }
+        if (!file_exists($tmpPath . '/files')) {
+            mkdir($tmpPath . '/files');
+        }
         $logsPath = self::getConf('logs.path');
         if (!file_exists($logsPath)) {
             mkdir($logsPath);
         }
-        self::loadConf(self::$confPath . '/db.php');
-        self::loadConf(self::$confPath . '/arangodb.php');
+        if (file_exists(self::$confPath . '/db.php')) {
+            self::loadConf(self::$confPath . '/db.php');
+        }
+        if (file_exists(self::$confPath . '/actions.php')) {
+            self::loadConf(self::$confPath . '/actions.php');
+        }
+        if (file_exists(self::$confPath . '/arangodb.php')) {
+            self::loadConf(self::$confPath . '/arangodb.php');
+        }
 
         Manager::$data = (object)[];
 
@@ -299,6 +303,11 @@ class Manager
         return self::$conf['options'][$key] ?: '';
     }
 
+    public static function setOptions(string $key, string $value)
+    {
+        self::$conf['options'][$key] = $value;
+    }
+
     public static function getContainer(): Container
     {
         return self::$container;
@@ -312,6 +321,7 @@ class Manager
     public static function getCache(): Psr16Adapter
     {
         if (is_null(self::$cache)) {
+            mdump('=== creating cache');
             $driver = self::$conf['cache']['type'] ?: 'apcu';
             $cacheObj = new MCacheFast($driver);
             self::$cache = $cacheObj->getCache();
@@ -319,7 +329,7 @@ class Manager
         return self::$cache;
     }
 
-    public static function getLog(): MLog
+    public static function getLog(): ?MLog
     {
         return self::$log;
     }
@@ -355,6 +365,21 @@ class Manager
         self::$auth = $value;
     }
 
+    public static function checkLogin(bool $generateException): bool
+    {
+        return self::$auth->checkLogin();
+    }
+
+    public static function checkAccess(string $group): bool
+    {
+        $result = false;
+        if (self::$isLogged) {
+            $login = self::$login;
+            $result = $login->checkAccess($group);
+        }
+        return $result;
+    }
+
     public static function getMode(): string
     {
         return strtoupper(self::$mode);
@@ -368,7 +393,7 @@ class Manager
 
     public static function getDatabase($databaseName): ?MDatabase
     {
-        if(!isset(self::$databases[$databaseName])) {
+        if (!isset(self::$databases[$databaseName])) {
             self::$databases[$databaseName] = self::$container->make(MDatabase::class, [
                 'databaseName' => $databaseName
             ]);
@@ -376,6 +401,10 @@ class Manager
         return self::$databases[$databaseName];
     }
 
+    public static function getPainter(): ?MBasePainter
+    {
+        return self::$container->get("Painter");
+    }
 
     /**
      * Carrega ações a partir de um arquivo actions.php.
@@ -412,7 +441,7 @@ class Manager
 
     public static function getModel(string $modelClass, object|int|null $data = NULL): MModel
     {
-        $class =  (strrpos($modelClass, '\\') > 0) ? $modelClass : "App\\Models\\" . $modelClass;
+        $class = (strrpos($modelClass, '\\') > 0) ? $modelClass : "App\\Models\\" . $modelClass;
         $model = new $class;
         if (!is_null($data)) {
             $pm = self::getPersistentManager();
@@ -430,9 +459,42 @@ class Manager
         return $model;
     }
 
-    public static function getPersistentManager()
+    public static function getPersistentManager(string $datasource = 'orkester')
     {
-        return self::$container->get('PersistentManager');
+        if (!isset(self::$persistence[$datasource])) {
+            if (!isset(self::$persistence[$datasource])) {
+                $config = Manager::getConf("db.{$datasource}");
+                $level = Manager::getConf("logs.level");
+                self::$persistence[$datasource] = self::$container->get('PersistentManager');
+            }
+        }
+        return self::$persistence[$datasource];
+    }
+
+    public static function getPersistence(string $datasource)
+    {
+        if (!isset(self::$persistence[$datasource])) {
+            $config = Manager::getConf("db.{$datasource}");
+            $level = Manager::getConf("logs.level");
+            if ($level >= 2) {
+                //$dsn = "dumper:{$config['db']}:host={$config['host']};dbname={$config['dbname']}";
+                $dsn = "{$config['db']}:host={$config['host']};dbname={$config['dbname']}";
+                $callback = function($expr, $took) use ($datasource) {
+                    Manager::getLog()->logSQL($expr->getDebugQuery(), $datasource);
+                };
+                $args = [];//['callback' => $callback];
+            } else {
+                $dsn = "{$config['db']}:host={$config['host']};dbname={$config['dbname']}";
+                $args = [];
+            }
+            self::$persistence[$datasource] = Persistence::connect(
+                $dsn,
+                $config['user'],
+                $config['password'],
+                $args
+            );
+        }
+        return self::$persistence[$datasource];
     }
 
     public static function setSession(MSession $session): void
@@ -483,6 +545,48 @@ class Manager
     public static function getData(): object
     {
         return self::$data;
+    }
+
+    public static function addData(string $field, $value): object
+    {
+        self::$data->$field = $value;
+        return self::$data;
+    }
+
+    public static function instantiate(string $class, mixed $data): mixed
+    {
+        if (is_object($data)) {
+            $data = get_object_vars($data);
+        }
+        $ref = new \ReflectionClass($class);
+        $constructor = $ref->getConstructor();
+        $missing = [];
+        $provided = [];
+        foreach ($constructor->getParameters() as $param) {
+            $name = $param->getName();
+            $type = (string)$param->getType();
+            if (array_key_exists($name, $data)) {
+                if (class_exists($type)) {
+                    $value = self::instantiate($type, $data[$name]);
+                } else {
+                    $value = $data[$name];
+                }
+                $provided[$name] = $value;
+            } else if (str_starts_with($type, '?')) {
+                $provided[$name] = null;
+            } else {
+                $missing[$param->getName()] = $param->getType();
+            }
+        }
+        if (empty($missing)) {
+            return $ref->newInstanceArgs($provided);
+        } else {
+            $str = '';
+            foreach ($missing as $key => $value) {
+                $str = "$key ($value), ";
+            }
+            throw new \InvalidArgumentException("Parâmetros ausentes: $str");
+        }
     }
 
     /**
@@ -542,69 +646,70 @@ class Manager
             && strpos($errstr, 'Declaration of') === 0;
     }
 
-    public static function createRoutes(Event $event)
+    public static function postAutoloadDump(Event $event)
+    {
+        $vendorDir = $event->getComposer()->getConfig()->get('vendor-dir');
+        $baseDir = dirname($vendorDir);
+        $sysTime = self::getSysTime();
+        $map = require($vendorDir . '/composer/autoload_classmap.php');
+        $newMap = "<?php\n// autoload_manager.php @generated by Manager::postAutoloadDump running as a Composer script @{$sysTime}.\n\n";
+        $newMap .= "\$baseDir = dirname(dirname(__FILE__));\n\n";
+        $newMap .= "return array(\n";
+        foreach ($map as $className => $file) {
+            if (strpos($className, "\\") === false) {
+                if (strpos($className, "_") === false) {
+                    $className = strtolower($className);
+                    //$file = realpath($file);
+                    $file = str_replace($baseDir, '', $file);
+                    $newMap .= "    '{$className}' => \$baseDir . '{$file}',\n";
+                }
+            }
+        }
+        $newMap .= ");";
+        file_put_contents($vendorDir . '/autoload_manager.php', $newMap);
+    }
+
+    public static function createFileMap(Event $event)
     {
         $vendorDir = $event->getComposer()->getConfig()->get('vendor-dir');
         var_dump($vendorDir);
-        $appDir = dirname($vendorDir) . DIRECTORY_SEPARATOR . 'app';
+        $app = getenv('MAESTRO_APP');
+        //$baseDir = dirname($vendorDir) . DIRECTORY_SEPARATOR . 'apps' . DIRECTORY_SEPARATOR . $app;
+        $baseDir = dirname($vendorDir) . DIRECTORY_SEPARATOR . 'app';
         $sysTime = self::getSysTime();
-        $newMap = "<?php\n// routes.php @generated by Manager::createRoutes running as a Composer script @{$sysTime}.\n\n";
-        $newMap .= "\$appDir = dirname(dirname(__FILE__))" . ";\n\n";
-        $newMap .= "return [\n";
-        $newMap .= self::getHandlerAppFiles($appDir);
-        $base = $appDir . DIRECTORY_SEPARATOR . 'modules';
+        $newMap = "<?php\n// autoload_manager.php @generated by Manager::createFileMap running as a Composer script @{$sysTime}.\n\n";
+        //$newMap .= "\$baseDir = dirname(dirname(__FILE__));\n\n";
+        $newMap .= "\$baseDir = '{$baseDir}';\n\n";
+        $newMap .= "return array(\n";
+        $newMap .= self::getHandlerFiles($baseDir);
+        $base = $baseDir . DIRECTORY_SEPARATOR . 'Modules';
         if (file_exists($base)) {
             $scandir = scandir($base) ?: [];
             $scandir = array_diff($scandir, ['..', '.']);
             foreach ($scandir as $path) {
-                $module = $path;
-                $newMap .= self::getHandlerModuleFiles($base . DIRECTORY_SEPARATOR . $path, $module);
+                $module = strtolower($path);
+                $newMap .= self::getHandlerFiles($base . DIRECTORY_SEPARATOR . $path, $module);
             }
         }
-        $newMap .= "];";
-        file_put_contents($appDir . '/Conf/routes.php', $newMap);
+        $newMap .= ");";
+        file_put_contents($vendorDir . '/filemap.php', $newMap);
     }
 
-    private static function getHandlerAppFiles(string $path): string
+    private static function getHandlerFiles($path, $module = '')
     {
         var_dump($path);
         $map = '';
-        $base = $path . DIRECTORY_SEPARATOR . 'Components';
+        $base = str_replace("/var/www/html/", "", $path . DIRECTORY_SEPARATOR . 'Controllers');
         if (file_exists($base)) {
             $scandir = scandir($base) ?: [];
             $scandir = array_diff($scandir, ['..', '.']);
             foreach ($scandir as $filePath) {
-                if (fnmatch("*.php", $filePath)) {
-                    $ns = strtolower("components\\\\" . basename($filePath, '.php'));
-                    $fullPath = "/Components/" . $filePath;
-                    $map .= "    '{$ns}' =>  \$appDir . '{$fullPath}',\n";
-                }
-                if (fnmatch("*.latte", $filePath)) {
-                    $ns = strtolower("components\\\\" . basename($filePath, '.latte'));
-                    $fullPath = "/Components/" . $filePath;
-                    $map .= "    '{$ns}' =>  \$appDir . '{$fullPath}',\n";
-                }
-                if (fnmatch("*.vue", $filePath)) {
-                    $ns = strtolower("components\\\\" . basename($filePath, '.vue'));
-                    $fullPath = "/Components/" . $filePath;
-                    $map .= "    '{$ns}' =>  \$appDir . '{$fullPath}',\n";
-                }
-            }
-        }
-        return $map;
-    }
-
-    private static function getHandlerModuleFiles(string $path, string $module): string
-    {
-        var_dump($path);
-        $map = '';
-        $base = $path . DIRECTORY_SEPARATOR . 'Controllers';
-        if (file_exists($base)) {
-            $scandir = scandir($base) ?: [];
-            $scandir = array_diff($scandir, ['..', '.']);
-            foreach ($scandir as $filePath) {
-                $ns = strtolower($module . '\\\\' . "controllers\\\\" . basename($filePath, '.php'));
-                $fullPath = "App\\Modules\\" . $module . "\\Controllers\\" .  basename($filePath, '.php');
+                //$ns = strtolower(($module ? $module . '\\\\' : '') . "controllers\\\\" . basename($filePath, '.php'));
+                $basename = basename($filePath, '.php');
+                $ns = strtolower(($module ? $module . '\\\\' : '') . str_replace('controller', '', $basename));
+                //$fullPath = "/" . ($module ? 'modules/' . $module . '/' : '') . "controllers/" . $filePath;
+                $fullPath = $base . '/' . $basename;
+                //$map .= "    '{$ns}' => \$baseDir . '{$fullPath}',\n";
                 $map .= "    '{$ns}' => '{$fullPath}',\n";
             }
         }
@@ -613,14 +718,28 @@ class Manager
             $scandir = scandir($base) ?: [];
             $scandir = array_diff($scandir, ['..', '.']);
             foreach ($scandir as $filePath) {
-                $ns = strtolower($module . '\\\\' . "services\\\\" . basename($filePath, '.php'));
-                $fullPath = "App\\Modules\\" . $module . "\\Services\\" .  basename($filePath, '.php');
+                $ns = strtolower(($module ? $module . '\\\\' : '') . "services\\\\" . basename($filePath, '.php'));
+                //$fullPath = "/" . ($module ? 'modules/' . $module . '/' : '') . "services/" . $filePath;
+                $fullPath = $base . '/' . $filePath;
+                //$map .= "    '{$ns}' =>  \$baseDir . '{$fullPath}',\n";
                 $map .= "    '{$ns}' => '{$fullPath}',\n";
+            }
+        }
+        $base = $path . DIRECTORY_SEPARATOR . 'Components';
+        if (file_exists($base)) {
+            $scandir = scandir($base) ?: [];
+            $scandir = array_diff($scandir, ['..', '.']);
+            foreach ($scandir as $filePath) {
+                if (fnmatch("*.php", $filePath)) {
+                    $ns = strtolower(($module ? $module . '\\\\' : '') . "components\\\\" . basename($filePath, '.php'));
+                    //$fullPath = "/" . ($module ?  'modules/' . $module . '/' : '') . "components/" . $filePath;
+                    $fullPath = $base . '/' . $filePath;
+                    //$map .= "    '{$ns}' =>  \$baseDir . '{$fullPath}',\n";
+                    $map .= "    '{$ns}' => '{$fullPath}',\n";
+                }
             }
         }
         return $map;
     }
 
 }
-
-

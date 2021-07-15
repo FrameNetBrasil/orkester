@@ -5,10 +5,8 @@ namespace Orkester\MVC;
 
 use Orkester\Manager;
 use Orkester\Results\MResultNull;
-use Psr\Http\Message\ResponseInterface as Response;
 
 use Orkester\Results\MResult;
-use Psr\Http\Message\ServerRequestInterface as Request;
 
 class MHandlerComponent extends MHandler
 {
@@ -25,7 +23,8 @@ class MHandlerComponent extends MHandler
         if (file_exists($fileComponent)) {
             $view = new MView($fileComponent);
             mtrace('HandlerComponent ' . $fileComponent);
-            return $view->getResult($request);
+            $this->result = $view->getResult('GET', 'html');
+            return $this->result->apply($request, $response);
         } else {
             return new MResultNull;
         }

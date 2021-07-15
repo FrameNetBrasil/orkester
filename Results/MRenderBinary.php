@@ -1,8 +1,8 @@
 <?php
 namespace Orkester\Results;
 
-use Orkester\Services\Http\MRequest;
-use Orkester\Services\Http\MResponse;
+use Slim\Psr7\Request;
+use Slim\Psr7\Response;
 
 /**
  * MRenderBinary.
@@ -45,10 +45,49 @@ class MRenderBinary extends MResult
         return $this->filePath;
     }
 
-    public function apply(MRequest $request, MResponse $response)
+    public function apply(Request $request, Response $response): Response
     {
+        $filePath = $this->getFilePath();
+        if ($filePath != '') {
+            if (file_exists($filePath)) {
+                $fileName = $this->getFileName() ?: 'download';
+                header('Expires: 0');
+                header('Pragma: public');
+                header("Content-Type: application/save");
+                header("Content-Length: " . filesize($filePath));
+                if ($this->getInline()) {
+                    header("Content-Disposition: inline; filename=" . $fileName);
+                } else {
+                    header("Content-Disposition: attachment; filename=" . $fileName);
+                }
+                header("Cache-Control: cache"); // HTTP/1.1
+                header("Content-Transfer-Encoding: binary");
 
+                $fp = fopen($filePath, "r");
+                fpassthru($fp);
+                fclose($fp);
+            }
+        } else {
+            $fileName = $this->getFileName() ?: 'download';
+            $stream = $this->getStream();
+            if ($fileName != 'raw') {
+                header('Expires: 0');
+                header('Pragma: public');
+                header("Content-Type: application/save");
+                header("Content-Length: " . strlen($stream));
+                if ($this->getInline()) {
+                    header("Content-Disposition: inline; filename=" . $fileName);
+                } else {
+                    header("Content-Disposition: attachment; filename=" . $fileName);
+                }
+                header("Cache-Control: cache"); // HTTP/1.1
+                header("Content-Transfer-Encoding: binary");
+            }
+            echo $stream;
+        }
+        exit;
     }
+
 
 }
 

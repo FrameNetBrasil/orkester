@@ -1,44 +1,32 @@
 <?php
+namespace Orkester\Persistence\Criteria;
 
-/* Copyright [2011, 2013, 2017] da Universidade Federal de Juiz de Fora
- * Este arquivo é parte do programa Framework Maestro.
- * O Framework Maestro é um software livre; você pode redistribuí-lo e/ou
- * modificá-lo dentro dos termos da Licença Pública Geral GNU como publicada
- * pela Fundação do Software Livre (FSF); na versão 2 da Licença.
- * Este programa é distribuído na esperança que possa ser  útil,
- * mas SEM NENHUMA GARANTIA; sem uma garantia implícita de ADEQUAÇÃO a qualquer
- * MERCADO ou APLICAÇÃO EM PARTICULAR. Veja a Licença Pública Geral GNU/GPL
- * em português para maiores detalhes.
- * Você deve ter recebido uma cópia da Licença Pública Geral GNU, sob o título
- * "LICENCA.txt", junto com este programa, se não, acesse o Portal do Software
- * Público Brasileiro no endereço www.softwarepublico.gov.br ou escreva para a
- * Fundação do Software Livre(FSF) Inc., 51 Franklin St, Fifth Floor, Boston, MA
- * 02110-1301, USA.
- */
+use Orkester\Persistence\Map\ClassMap;
+use Orkester\Persistence\PersistenceTransaction;
 
 class DMLCriteria extends PersistentCriteria
 {
-    protected $transaction;
+    protected ?PersistenceTransaction $transaction;
 
-    public function __construct($classMap, $manager)
+    public function __construct(ClassMap $classMap)
     {
-        parent::__construct($classMap, $manager);
+        parent::__construct($classMap);
         $this->transaction = NULL;
     }
 
-    public function setTransaction($transaction)
+    public function setTransaction(PersistenceTransaction $transaction)
     {
         $this->transaction = $transaction;
     }
 
-    public function getTransaction()
+    public function getTransaction(): PersistenceTransaction
     {
         return $this->transaction;
     }
 
     public function where($op1, $operator = '', $op2 = NULL)
     {
-        $this->whereCondition->and_($op1, $operator, $op2);
+        $this->whereConditionCriteria->and_($op1, $operator, $op2);
         return $this;
     }
 
@@ -49,7 +37,14 @@ class DMLCriteria extends PersistentCriteria
 
     public function or_($op1, $operator = '', $op2 = NULL)
     {
-        $this->whereCondition->or_($op1, $operator, $op2);
+        $this->whereConditionCriteria->or_($op1, $operator, $op2);
         return $this;
     }
+
+    public function parameters(array $parameters = [])
+    {
+        $this->parameters = $parameters;
+        return $this;
+    }
+
 }

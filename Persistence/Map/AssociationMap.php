@@ -3,6 +3,7 @@
 namespace Orkester\Persistence\Map;
 
 use Orkester\Database\MSql;
+use Orkester\Manager;
 use Orkester\Persistence\Criteria\OperandArray;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\PersistentManager;
@@ -23,14 +24,14 @@ class AssociationMap
     private bool $inverse = FALSE;
     private string $fromKey;
     private string $toKey;
-    private AttributeMap $fromAttributeMap;
-    private AttributeMap $toAttributeMap;
+    private ?AttributeMap $fromAttributeMap;
+    private ?AttributeMap $toAttributeMap;
     private string $order = '';
     private string $orderAttributes = '';
     private string $indexAttribute = '';
     private bool $autoAssociation = FALSE;
 
-    public function __construct(ClassMap $fromClassMap, string $name)
+    public function __construct(string $name, ClassMap $fromClassMap)
     {
         $this->fromClassMap = $fromClassMap;
         $this->fromClassName = $fromClassMap->getName();
@@ -67,7 +68,7 @@ class AssociationMap
     {
         $toClassMap = $this->toClassMap;
         if ($toClassMap == NULL) {
-            $toClassMap = $this->toClassMap = $this->fromClassMap->getManager()->getClassMap($this->toClassName);
+            $toClassMap = $this->toClassMap = Manager::getPersistentManager()->getClassMap($this->toClassName);
         }
         return $toClassMap;
     }
@@ -95,8 +96,8 @@ class AssociationMap
             $this->getToClassMap();
         }
         if ($this->cardinality == 'manyToMany') {
-            $this->fromAttributeMap = $this->fromClassMap->getKeyAttributeMap(0);
-            $this->toAttributeMap = $this->toClassMap->getKeyAttributeMap(0);
+            $this->fromAttributeMap = $this->fromClassMap->getKeyAttributeMap();
+            $this->toAttributeMap = $this->toClassMap->getKeyAttributeMap();
         } else {
             $this->fromAttributeMap = $this->fromClassMap->getAttributeMap($this->fromKey);
             $this->toAttributeMap = $this->toClassMap->getAttributeMap($this->toKey);

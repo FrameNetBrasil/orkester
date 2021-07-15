@@ -2,6 +2,9 @@
 
 namespace Orkester\Database\Platforms\PDOMySql;
 
+use Orkester\Manager;
+use Orkester\Types\MRange;
+
 class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
 
     public $db;
@@ -86,7 +89,7 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
         return $type;
     }
 
-    public function getSQLRange(\MRange $range) {
+    public function getSQLRange(MRange $range) {
         return "LIMIT " . $range->offset . "," . $range->rows;
     }
 
@@ -111,12 +114,6 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             return $value->format('Y-m-d H:i:s');
         } elseif (($type == 'decimal') || ($type == 'float')) {
             return str_replace(',', '.', $value);
-        } elseif ($type == 'currency') {
-            return str_replace(',', '.', $value->getValue());
-        } elseif ($type == 'cpf') {
-            return $value->getPlainValue();
-        } elseif ($type == 'cnpj') {
-            return $value->getPlainValue();
         } elseif ($type == 'blob') {
             $value = base64_encode($value->getValue());
             $bindingType = 3; //PDO::PARAM_LOB
@@ -128,15 +125,9 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
 
     public function convertToPHPValue($value, $type) {
         if ($type == 'date') {
-            return \Manager::Date($value);
+            return Manager::Date($value);
         } elseif ($type == 'timestamp') {
-            return \Manager::Timestamp($value);
-        } elseif ($type == 'currency') {
-            return \Manager::currency($value);
-        } elseif ($type == 'cnpj') {
-            return \MCNPJ::create($value);
-        } elseif ($type == 'cpf') {
-            return \MCPF::create($value);
+            return Manager::Timestamp($value);
         } elseif ($type == 'blob') {
             if ($value) {
                 $value = base64_decode($value);

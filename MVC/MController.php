@@ -3,7 +3,11 @@
 namespace Orkester\MVC;
 
 use Orkester\Manager;
+use Orkester\Results\MBrowserFile;
+use Orkester\Results\MNotFound;
 use Orkester\Results\MRedirect;
+use Orkester\Results\MRenderBinary;
+use Orkester\Results\MRenderPage;
 use Orkester\Results\MResult;
 use Orkester\Results\MResultNull;
 use Orkester\Results\MResultObject;
@@ -12,6 +16,7 @@ use Orkester\Results\MResultResponse;
 use Orkester\Security\MSSL;
 use Orkester\Exception\ERuntimeException;
 use Orkester\Exception\ESecurityException;
+use Orkester\Types\MFile;
 use Slim\Exception\HttpNotFoundException;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
@@ -34,35 +39,12 @@ class MController
     protected ?string $id;
     protected ?string $relationship;
 
-    /*
-    private $logger;
-    private $encryptedFields = array();
-    private $annotationReader;
-
-    protected $name;
-    protected $application;
-    protected $module;
-    protected $action;
-    protected $data;
-    protected $params;
-    protected $resultFormat;
-    protected $page;
-    protected $context;
-
-    public $renderArgs = array();
-    */
-
     public function __construct()
     {
-        //$this->httpMethod = Manager::getContext()->getMethod();
-        //$this->resultFormat = Manager::getContext()->getResultFormat();
-        //$this->data = Manager::getData();
-        //$this->setData($_REQUEST);
-        //mtrace('DTO Data:');
-        //mtrace(Manager::getData());
         mtrace('MController::construct');
         $this->data = Manager::getData();
         $this->resultFormat();
+        $this->init();
     }
 
     public function __call($name, $arguments)
@@ -78,19 +60,21 @@ class MController
         $this->response = $response;
         $routeContext = RouteContext::fromRequest($request);
         $route = $routeContext->getRoute();
-        $pattern = explode('/', $route->getPattern());
-        $this->prefix = $pattern[0] ?? '';
-        $this->resource = $pattern[1] ?? '';
-        $this->id = $pattern[2] ?? NULL;
-        $this->relationship = $pattern[3] ?? '';
+        $arguments = $route->getArguments();
+        //$pattern = explode('/', $route->getPattern());
+        //mdump($arguments);
+        //$this->prefix = $pattern[1] ?? '';
+        //$this->resource = $pattern[2] ?? '';
+        //$this->relationship = $pattern[4] ?? '';
         $this->httpMethod = $route->getMethods()[0];
-        $this->addParameters($route->getArguments());
-
-        //mdump($route->getMethods());
-        //mdump($route->getArguments());
-        //mdump($route->getPattern());
+        //$this->addParameters($route->getArguments());
+        $this->module = $arguments['module'] ?? 'Main';
+        $this->controller =  $arguments['controller'] ?? 'Main';
+        $this->action =  $arguments['action'] ?? 'main';
+        $this->id = $arguments['id'] ?? NULL;
     }
 
+    /*
     public function __invoke(Request $request, Response $response): Response
     {
         $this->parseRoute($request, $response);
@@ -98,54 +82,16 @@ class MController
         $result = $this->dispatch($action);
         return $result->apply($request, $response);
     }
-
-
-    /*
-    public function setName($name)
-    {
-        $this->name = $name;
-    }
-
-    public function getName()
-    {
-        return $this->name;
-    }
-
-    public function setApplication($application)
-    {
-        $this->application = $application;
-    }
-
-    public function getApplication()
-    {
-        return $this->application;
-    }
-
-    public function setModule($module)
-    {
-        $this->module = $module;
-    }
-
-    public function getModule()
-    {
-        return $this->module;
-    }
-
-    public function getAction()
-    {
-        return $this->action;
-    }
-
-    public function setEncryptedFields(array $fields)
-    {
-        $this->encryptedFields = $fields;
-    }
-
-    public function isPost()
-    {
-        return \Manager::getRequest()->isPostBack();
-    }
     */
+
+    public function route(Request $request, Response $response): Response
+    {
+        $this->parseRoute($request, $response);
+        if ($this->action == 'view') {
+            return $this->downloadView($this->id);
+        }
+        return $this->dispatch($this->action);
+    }
 
     public function init()
     {
@@ -156,26 +102,25 @@ class MController
         $this->httpMethod = $method;
     }
 
-    public function dispatch(string $action): MResult
+    public function dispatch(string $action): Response
     {
         mtrace('mcontroller::dispatch = ' . $action);
         $this->result = new MResultNull;
         $this->decryptData();
-        $this->action = $action;
-
         if (!method_exists($this, $this->action)) {
             throw new HttpNotFoundException($this->request, 'Action ' . $this::class . ':' . $action . ' not found!');
         } else {
-            $this->callAction($this->action);
+            $response = $this->callAction($this->action);
+            return $response;
         }
-        return $this->result;
     }
 
-    private function callAction(string $action)
+    private function callAction(string $action): Response
     {
         mtrace('executing = ' . $action);
         try {
-            call_user_func([$this, $action]);
+            $response = $this->$action();
+            return $response;
         } catch (\Exception $e) {
             mtrace('callAction exception = ' . $e->getMessage());
             $this->handleException($e, $action);
@@ -223,7 +168,7 @@ class MController
         }
         $msg = "{$e->getFile()}({$e->getLine()}): {$e->getMessage()}";
         if (Manager::getLogin()) {
-            $msg .= ' idUser = ' . Manager::getLogin()->getIdUser() . ', profile = ' . Manager::getLogin()->getProfile();
+            $msg .= ' idUser = ' . Manager::getLogin()->getIdUser() . ', profile = ' . Manager::getLogin()->getLogin();
         }
 
         mtrace('Controller::dispatch exception: ' . $e->getMessage());
@@ -238,53 +183,37 @@ class MController
 
     }
 
-    public function addParameters(array $parameters = [])
-    {
-        foreach ($parameters as $name => $value) {
-            $this->data->$name = $value;
-        }
-    }
-
     public function resultFormat()
     {
-
         if ($this->resultFormat != null) {
             return;
         }
-
         $accept = $_SERVER['HTTP_ACCEPT'];
-
         if ($accept == '') {
             $this->resultFormat = "html";
-            return;
-        }
-
-        if (str_contains($accept, "application/xhtml") || str_contains($accept, "text/html") || substr($accept,
+        } else if (str_contains($accept, "application/xhtml") || str_contains($accept, "text/html") || substr($accept,
                 0, 3) == "*/*") {
             $this->resultFormat = "html";
-            return;
-        }
-
-        if (str_contains($accept, "application/xml") || str_contains($accept, "text/xml")) {
-            $this->resultFormat = "xml";
-            return;
-        }
-
-        if (str_contains($accept, "text/plain")) {
-            $this->resultFormat = "txt";
-            return;
-        }
-
-        if (str_contains($accept, "application/json") || str_contains($accept, "text/javascript")) {
+        } else if (str_contains($accept, "application/json") || str_contains($accept, "text/javascript")) {
             $this->resultFormat = "json";
-            return;
-        }
-
-        if (substr($accept, 0, -3) == "*/*") {
+        } else if (str_contains($accept, "application/xml") || str_contains($accept, "text/xml")) {
+            $this->resultFormat = "xml";
+        } else if (str_contains($accept, "text/plain")) {
+            $this->resultFormat = "txt";
+        } else if (substr($accept, 0, -3) == "*/*") {
             $this->resultFormat = "html";
-            return;
         }
     }
+
+    /*
+    public function renderView(string $viewClass, array $parameters = []): Response
+    {
+        $view = new $viewClass;
+        $output = $view->getOutput();
+        $this->result = new MRenderPage($output);
+        return $this->result->apply($this->request, $this->response);
+    }
+*/
 
     /**
      * Obtem o conteúdo da view e passa para uma classe Result:
@@ -293,12 +222,13 @@ class MController
      * @param string $viewName Nome da view. Se não informado, assume que é o nome da action.
      * @param object $parameters Objeto Data.
      */
-    public function render(string $viewName = '', array $parameters = [])
+    public function render(string $viewName = '', array $parameters = []): Response
     {
         $this->encryptData();
         $viewFile = $this->getViewFile($viewName, $parameters);
         $view = new MView($viewFile);
         $this->result = $view->getResult($this->httpMethod, $this->resultFormat);
+        return $this->result->apply($this->request, $this->response);
     }
 
     /**
@@ -315,12 +245,12 @@ class MController
         if ($view == '') {
             $view = $this->action;
         }
-        $this->addParameters($parameters);
+        //$this->addParameters($parameters);
         $base = str_replace("App\\", "", $controller);
         $base = str_replace("Controllers", "Views", $base);
         $base = str_replace("Controller", "", $base);
         $path = str_replace("\\", "/", Manager::getAppPath() . "/" . $base . '/' . $view);
-        $extensions = ['.vue', '.blade.php', '.js', '.html'];
+        $extensions = ['.blade.php', '.js', '.vue'];
         $viewFile = '';
         foreach ($extensions as $extension) {
             $fileName = $path . $extension;
@@ -330,6 +260,22 @@ class MController
             }
         }
         return $viewFile;
+    }
+
+    private function downloadView(string $viewName): Response
+    {
+        $controller = get_class($this);
+        $view = $viewName;
+        if ($view == '') {
+            $view = $this->action;
+        }
+        //$this->addParameters($parameters);
+        $base = str_replace("App\\", "", $controller);
+        $base = str_replace("Controllers", "Views", $base);
+        $base = str_replace("Controller", "", $base);
+        $path = str_replace("\\", "/", Manager::getAppPath() . "/" . $base . '/' . $view);
+        $stream = fopen($path, 'r');
+        return $this->renderStream($stream);
     }
 
     /**
@@ -343,29 +289,6 @@ class MController
      */
     public function renderPrompt($type, $message = '', $action1 = '', $action2 = '')
     {
-        /*
-        if (is_string($type)) {
-            $prompt = new MPromptData($type, $message, $action1, $action2);
-        } elseif (is_object($type)) {
-            $prompt = new MPromptData();
-            $prompt->setObject($type);
-        } else {
-            throw new ERuntimeException("Invalid parameter for MController::renderPrompt.");
-        }
-        $view = new MView();
-        $view->processPrompt($prompt);
-        if (Manager::isAjaxCall()) {
-            $type = strtoupper(Manager::getAjax()->getResponseType());
-            if ($type != 'JSON') {
-                $this->setResult(new MRenderText($prompt->getContent()));
-            } else {
-                $this->setResult(new MRenderPrompt($prompt));
-            }
-        } else {
-            $this->setResult(new MRenderPage($prompt->getContent()));
-        }
-        */
-
     }
 
     /**
@@ -384,19 +307,6 @@ class MController
         return $this->result->apply($this->request, $this->response);
     }
 
-    public function renderJSON($json = null)
-    {
-        /*
-        if (!Manager::isAjaxCall()) {
-            Manager::$ajax = new MAjax();
-            Manager::$ajax->initialize(Manager::getOptions('charset'));
-        }
-        $ajax = Manager::getAjax();
-        $ajax->setData($this->data);
-        $this->setResult(new MRenderJSON($json));
-        */
-    }
-
     /**
      * Envia um objeto JSON como resposta para o cliente.
      * Usado quando o cliente faz uma chamada AJAX diretamente e quer tratar o retorno.
@@ -406,105 +316,44 @@ class MController
      */
     public function renderResponse(string $status, string|object|array $message, int $code): Response
     {
+        mdump('== ' . $code);
         $response = (object)[
             'status' => $status,
             'message' => $message,
             'code' => $code
         ];
-        $this->result = new MResultResponse($response);
+        $this->result = new MResultResponse($response, $code);
         return $this->result->apply($this->request, $this->response);
     }
 
-    public function renderError(string $error, string|object|array $message, int $code): void
+    public function renderSuccess(string|object|array $message = ''): Response
     {
-        $response = (object)[
-            'error' => new MError($error, $message),
-            'code' => $code
-        ];
-        $this->result = new MResultResponse($response);
+        return $this->renderResponse('success', $message, 200);
     }
 
-    protected function jsonResponse(
-        Response $response,
-        string $status,
-        array|object|string|null $message,
-        int $code
-    ): Response
+    public function renderError(string|object|array $message = '', int $code = 200): Response
     {
-        $result = [
-            'code' => $code,
-            'status' => $status,
-            'message' => $message,
-        ];
-
-        $payload = json_encode($result, JSON_PRETTY_PRINT);
-        $body = $response->getBody();
-        $body->write($payload);
-        return $response
-            ->withHeader('Content-Type', 'application/json')
-            ->withStatus($code);
-
-    }
-
-    protected function jsonObject(
-        Response $response,
-        array|object|string|null $object
-    ): Response
-    {
-        $payload = json_encode($object, JSON_PRETTY_PRINT);
-        $body = $response->getBody();
-        $body->write($payload);
-        return $response
-            ->withHeader('Content-Type', 'application/json')
-            ->withStatus(200);
-    }
-
-
-    /**
-     * @param string $viewName
-     * @param array $parameters
-     */
-    public function renderPartial($viewName = '', $parameters = array())
-    {
-        if (($view = $viewName) == '') {
-            $view = $this->action;
-        }
-        $this->getParameters($parameters);
-        $controller = strtolower($this->name);
-        $this->getContent($controller, $view, $this->data);
-    }
-
-    /**
-     * Processa o conteudo da view e abre nova janela/tab do browser através da classe Result MBrowserWindow.
-     * É esperado que a aplicação defina uma clase MView, que estende de MBaseView, que forneça a url a ser usada.
-     * @param string $viewName Nome da view.
-     * @param array $parameters Objeto Data.
-     */
-    public function renderWindow($viewName = '', $parameters = array())
-    {
-        $this->renderContent($viewName, $parameters);
-        $view = Manager::getView();
-        $url = $view->processWindow();
-        $this->setResult(new MBrowserWindow($url));
+        return $this->renderResponse('error', $message, $code);
     }
 
     /**
      * Download de arquivo via browser.
      * @param MFile $file Arquivo a ser enviado para o browser.
      */
-    public function renderFile(MFile $file)
+    public function renderFile(MFile $file): Response
     {
-        //Manager::getPage()->window($file->getURL());
-        $this->setResult(new MBrowserFile($file));
+        $this->result = new MBrowserFile($file);
+        return $this->result->apply($this->request, $this->response);
     }
 
     /**
      * Renderiza um stream binário inline através da classe Result MRenderBinary.
-     * @param $stream Stream binário.
+     * @param $stream stream binário.
      */
-    public function renderStream($stream)
+    public function renderStream($stream): Response
     {
-        $this->setResult(new MRenderBinary($stream, true, 'raw'));
+        $this->result = new MRenderBinary($stream, true, 'raw');
+        return $this->result->apply($this->request, $this->response);
     }
 
     /**
@@ -512,9 +361,10 @@ class MController
      * @param $stream Stream binário.
      * @param string $fileName Nome do arquivo.
      */
-    public function renderBinary($stream, $fileName = '')
+    public function renderBinary($stream, $fileName = ''): Response
     {
-        $this->setResult(new MRenderBinary($stream, true, $fileName));
+        $this->result = new MRenderBinary($stream, true, $fileName);
+        return $this->result->apply($this->request, $this->response);
     }
 
     /**
@@ -522,48 +372,20 @@ class MController
      * @param string $filePath Path do arquivo para download.
      * @param string $fileName Nome do arquivo a ser exibido para o usuário do browser.
      */
-    public function renderDownload($filePath, $fileName = '')
+    public function renderDownload($filePath, $fileName = ''): Response
     {
-        $this->setResult(new MRenderBinary(null, false, $fileName, $filePath));
-    }
-
-    /**
-     * Prepara processo de envio via flush.
-     */
-    public function prepareFlush()
-    {
-        Manager::getFrontController()->getResponse()->prepareFlush();
-    }
-
-    /**
-     * Envia conteúdo para o browser via flush.
-     * @param $output Conteúdo a ser enviado.
-     */
-    public function flush($output)
-    {
-        Manager::getFrontController()->getResponse()->sendFlush($output);
-    }
-
-    /**
-     * Envia conteúdo da view via flush.
-     * @param string $viewName Nome da view.
-     * @param array $parameters Objeto data.
-     */
-    public function renderFlush($viewName = '', $parameters = array())
-    {
-        Manager::getPage()->clearContent();
-        $this->renderContent($viewName, $parameters);
-        $output = Manager::getPage()->generate();
-        $this->flush($output);
+        $this->result = new MRenderBinary(null, false, $fileName, $filePath);
+        return $this->result->apply($this->request, $this->response);
     }
 
     /**
      * Redireciona browser para outra URL.
      * @param $url URL
      */
-    public function redirect(string $url): void
+    public function redirect(string $url): Response
     {
-        $this->result = new MRedirect(NULL, $url);
+        $this->result =  new MRedirect($url);
+        return $this->result->apply($this->request, $this->response);
     }
 
     /**
@@ -572,7 +394,8 @@ class MController
      */
     public function notfound($msg)
     {
-        $this->setResult(new MNotFound($msg));
+        $this->result = new MNotFound($msg);
+        return $this->result->apply($this->request, $this->response);
     }
 
     /**

@@ -1,7 +1,6 @@
 <?php
 namespace Orkester\Security;
 
-use App\Models\User;
 use Orkester\Manager;
 
 class MLogin
@@ -16,7 +15,7 @@ class MLogin
     private array $groups;
     private string $lastAccess;
 
-    public function __construct(User $user)
+    public function __construct(MUser $user)
     {
         $this->setUser($user);
         $this->time = time();
@@ -76,10 +75,10 @@ class MLogin
     }
     */
 
-    public function setGroups(array $groups)
+    public function setGroups(array $groups = [])
     {
         $this->groups = $groups;
-        $this->isAdmin(array_key_exists('ADMIN', $groups));
+        $this->isAdmin(in_array('ADMIN', $groups));
     }
 
     public function getGroups(): array
@@ -97,7 +96,15 @@ class MLogin
 
     public function isMemberOf($group): bool
     {
-        return Manager::getPerms()->isMemberOf($group);
+        return in_array($group, $this->groups);
+    }
+
+    public function checkAccess($group): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+        return array_key_exists($group, $this->groups);
     }
 
     public function setLastAccess($data)
@@ -107,13 +114,5 @@ class MLogin
         $this->lastAccess->remoteAddr = $data->remoteAddr;
     }
 
-    public function getUser(): User|null
-    {
-        $user = null;
-        if (!is_null ($this->idUser)) {
-            $user = new User($this->idUser);
-        }
-        return $user;
-    }
 
 }

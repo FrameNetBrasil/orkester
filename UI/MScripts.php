@@ -24,8 +24,8 @@ class MScripts
     public $events;
 */
 
-    private string $id;
-    private array $onsubmit;
+    //private string $id;
+    private Map $onsubmit;
     /**
      * @var Map
      */
@@ -62,8 +62,8 @@ class MScripts
     public function __construct($id)
     {
         //parent::__construct();
-        $this->id = $id;
-        $this->onsubmit = [];
+        //$this->id = $id;
+        $this->onsubmit = new Map();
         $this->onload = new Map();
         $this->onerror = new Map();
         $this->onunload = new Map();
@@ -97,116 +97,71 @@ class MScripts
         $this->scripts->insert($url);
     }
 
-    public function addOnSubmit($jsCode, $formId)
+    public function addOnSubmit(string $idForm, string $jsCode)
     {
-        if (!$this->onsubmit[$formId]) {
-            $this->onsubmit[$formId] = new MStringList();
+        $key = $idForm;
+        $this->onsubmit->put($key, $jsCode);
+    }
+
+    public function addJsCode(string $jsCode)
+    {
+        $key = md5($jsCode);
+        $this->jsCode->put($key, $jsCode);
+    }
+
+    public function addOnLoad(string $jsCode)
+    {
+        $key = md5($jsCode);
+        $this->onload->put($key, $jsCode);
+    }
+
+    public function getScripts() {
+        if (count($this->events) > 0) {
+            $events = json_encode($this->events);
+            $this->addOnload("manager.registerEvents(" . $events . ");");
         }
-        $this->onsubmit[$formId]->add($jsCode);
+
+        $scripts = new \StdClass;
+        $scripts->scripts = $scripts->code = $scripts->onload = $scripts->onsubmit = '';
+
+        foreach ($this->scripts as $key => $url) {
+            $scripts->scripts .= "\n manager.loader.load('{$url}');";
+        }
+
+        foreach ($this->jsCode as $key => $code) {
+            $scripts->code .= "\n {$code}";
+        }
+
+        foreach ($this->onload as $key => $code) {
+            $scripts->onload .= "\n {$code}";
+        }
+
+        $onsubmit = '';
+        foreach ($this->onsubmit as $idForm => $list) {
+            $onsubmit .= "manager.onSubmit[\"{$idForm}\"] = function() { return {$list}; }";
+            /*
+            $onsubmit .= "manager.onSubmit[\"{$idForm}\"] = function() { \n";
+            $onsubmit .= "    var result = ";
+            $onsubmit .= implode(" && ", $list) . ";\n";
+            $onsubmit .= "    return result;\n};\n";
+            */
+        }
+        $scripts->onsubmit = $onsubmit;
+        /*
+                $submit = '';
+                foreach ($this->submit as $idForm => $list) {
+                    $submit .= "manager.submit[\"{$idForm}\"] = function(element, url, idForm) { \n";
+                    $submit .= implode(" && ", $list) . ";\n";
+                    $submit .= "\n};\n";
+                }
+                $scripts->submit = $submit;
+        */
+        return $scripts;
     }
 
     public static function tag($content)
     {
         return "<script type=\"text/javascript\">{$content}</script>\n";
-    }
-
-    public function getArray()
-    {
-        $scripts = [];
-        /*
-        $events = implode(",\n", $this->events->toArray());
-        if ($events != '') {
-            $this->onload->add("manager.registerEvents([\n " . $events . "\n]);");
-        }
-
-        $scripts[0] = $this->scripts->getTextByTemplate("<script type=\"text/javascript\" src=\"/:v/\"></script>\n");
-        if (count($this->dojoRequire)) {
-            $i = 0;
-            foreach ($this->dojoRequire as $module) {
-                $moduleList .= ($i++ ? ',' : '') . "\"{$module}\"";
-            }
-            $scripts[1] = "require([" . $moduleList . "]);\n";
-        }
-        $scripts[1] .= $this->jsCode->getValueText('', "\n");
-        $scripts[2] = ($onload = $this->onload->getValueText('', "\n ")) ? "    {$onload}" : '';
-        $onsubmit = '';
-        if (count($this->onsubmit)) {
-            foreach ($this->onsubmit as $formId => $list) {
-                $onsubmit .= "manager.onSubmit[\"{$formId}\"] = function() { \n" .
-                    "    form = manager.byId(\"{$formId}\");\n " . $list->getValueText('', " \n    ") .
-                    "    return result;\n};\n";
-            }
-        }
-        $scripts[3] = $onsubmit;
-        $scripts[4] = ($onerror = $this->onerror->getValueText('', "\n    ")) ? "{$onerror}" : '';
-*/
-        return $scripts;
-
-    }
-
-    public function generate($id)
-    {
-        $isAjax = Manager::isAjaxCall();
-        $scripts = $this->getArray();
-        $hasCode = $scripts[0] . $scripts[1] . $scripts[2] . $scripts[3] . $scripts[4];
-        if ($hasCode != '') {
-            $code = "";
-
-            if ($scripts[0] != '') {
-                $code .= <<< HERE
-$scripts[0]
-                    
-HERE;
-            }
-            $code .= "\n<script type=\"text/javascript\">\n";
-
-            if ($scripts[1] != '') {
-                $code .= <<< HERE
-$scripts[1]
-
-HERE;
-            }
-
-            if ($isAjax) {
-                if (Manager::isAjaxEvent()) {
-                    $code .= <<< HERE
-{$scripts[2]}
-
-HERE;
-                } else {
-                    $code .= <<< HERE
-manager.onLoad["{$id}"] = function() {
-    console.log("inside onload {$id}");
-{$scripts[2]}
-};
-HERE;
-                }
-            } else {
-                $code .= <<< HERE
-require(["dojo/parser", "dojo/ready"], function(parser, ready){
-  ready(function(){
-    console.log("inside onload {$id}");
-{$scripts[2]}
-  });
-});   
-
-HERE;
-            }
-            $code .= <<< HERE
-
-{$scripts[3]}
-{$scripts[4]}
-HERE;
-            $code .= <<< HERE
-//-->
-</script>
-
-HERE;
-            return "<div id=\"{$id}\" class=\"mScripts\">{$code}</div>";
-//            return $code;
-        } else {
-            return '';
-        }
     }
 
 }

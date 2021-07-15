@@ -45,12 +45,12 @@ class MLog
 
         $this->logger = new Logger($this->channel);
         // Create the handlers
-        $handlerFile = new StreamHandler( $this->errorLog, Logger::DEBUG);
+        $handlerFile = new StreamHandler($this->errorLog, Logger::DEBUG);
         $handlerFile->setFormatter($formatter);
         $this->logger->pushHandler($handlerFile);
 
         $this->loggerSQL = new Logger($this->channel);
-        $handlerSQL = new StreamHandler( $this->SQLLog, Logger::DEBUG);
+        $handlerSQL = new StreamHandler($this->SQLLog, Logger::DEBUG);
         $handlerSQL->setFormatter($formatter);
         $this->loggerSQL->pushHandler($handlerSQL);
 
@@ -59,7 +59,8 @@ class MLog
             $allow = $strict ? ($strict == $this->host) : true;
             $host = $this->peer;
             if ($allow) {
-                $this->socket = fsockopen($host, $this->port);
+                $errno = $errstr = '';
+                $this->socket = fsockopen($host, $this->port, $errno, $errstr, 30);
             }
         } else {
             $this->socket = false;
@@ -105,7 +106,8 @@ class MLog
         $uid = sprintf("%-10s", ($login ? $login->getLogin() : ''));
 
         //$line = "[$dts] $ip - $conf - $uid : \"$sql\"";
-        $line = "$uid : \"$sql\"";
+        //$line = "$uid : \"$sql\"";
+        $line = "$conf : \"$sql\"";
 
         if ($force || preg_match($cmd, $sql)) {
             $logfile = $this->getLogFileName(trim($conf) . '-sql');
@@ -208,7 +210,7 @@ class MLog
             $db->execute($sql->insert(array($idLog, $ts, $uid, $msg, $this->host)));
         }
     */
-    public function getLogFileName(string$filename): string
+    public function getLogFileName(string $filename): string
     {
         $dir = $this->path;
         $filename = basename($filename) . '.' . date('Y') . '-' . date('m') . '-' . date('d') . '-' . date('H') . '.log';

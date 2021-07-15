@@ -1,20 +1,8 @@
 <?php
 
-/* Copyright [2011, 2013, 2017] da Universidade Federal de Juiz de Fora
- * Este arquivo é parte do programa Framework Maestro.
- * O Framework Maestro é um software livre; você pode redistribuí-lo e/ou
- * modificá-lo dentro dos termos da Licença Pública Geral GNU como publicada
- * pela Fundação do Software Livre (FSF); na versão 2 da Licença.
- * Este programa é distribuído na esperança que possa ser  útil,
- * mas SEM NENHUMA GARANTIA; sem uma garantia implícita de ADEQUAÇÃO a qualquer
- * MERCADO ou APLICAÇÃO EM PARTICULAR. Veja a Licença Pública Geral GNU/GPL
- * em português para maiores detalhes.
- * Você deve ter recebido uma cópia da Licença Pública Geral GNU, sob o título
- * "LICENCA.txt", junto com este programa, se não, acesse o Portal do Software
- * Público Brasileiro no endereço www.softwarepublico.gov.br ou escreva para a
- * Fundação do Software Livre(FSF) Inc., 51 Franklin St, Fifth Floor, Boston, MA
- * 02110-1301, USA.
- */
+namespace Orkester\Types;
+
+use Orkester\Manager;
 
 class MFile extends MType
 {
@@ -28,11 +16,7 @@ class MFile extends MType
     private $path;
     private $url;
 
-    /**
-     *
-     * @param <type> $file => $_FILES[i]
-     */
-    public function __construct($file, $inline = true)
+    public function __construct(array|string $file, $inline = true)
     {
         parent::__construct();
         if (is_array($file)) {
@@ -63,7 +47,6 @@ class MFile extends MType
         $file['type'] = mime_content_type($path);
         $file['tmp_name'] = $path;
         $file['size'] = filesize($path);
-
         return new MFile($file);
     }
 
@@ -81,7 +64,7 @@ class MFile extends MType
     public function saveToCache($inline = true, $name = '')
     {
         $this->name = $name ?: md5($this->value);
-        $file = \Manager::getFilesPath($this->name);
+        $file = Manager::getOptions('tmpPath') . '/files/' . $this->name;
         unlink($file);
         if (!file_exists($file)) {
             $this->saveTo($file);
@@ -97,7 +80,7 @@ class MFile extends MType
     public function setPath($file, $inline = true)
     {
         $this->path = $file;
-        $this->url = \Manager::getDownloadURL('cache', basename($file), $inline);
+        $this->url = Manager::getDownloadURL('cache', basename($file), $inline);
     }
 
     public function getTmpName()

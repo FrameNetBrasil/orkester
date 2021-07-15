@@ -19,6 +19,7 @@ class MSql
     public array $join = [];
     public array $parameters = [];
     public array $paramType = [];
+    public array $paramKey = [];
     public string $command;
     public array $setOperation = [];
     public ?MDatabase $db;
@@ -217,6 +218,7 @@ class MSql
     private function _prepareParameters()
     {
         if (!is_null($this->parameters)) {
+
             foreach ($this->parameters as $i => $paramValue) {
                 $type = $this->paramType[$i] ?? '';
                 if ($type == '') {
@@ -230,41 +232,6 @@ class MSql
                     $this->paramType[$i] = $type;
                 }
             }
-
-
-            /*
-            if (strpos($this->command, '?')) {
-                $i = $pos = 0;
-                while (($pos = strpos($this->command, '?', $pos + 1)) !== false) {
-                    $pos_array[$i++] = $pos;
-                }
-                $n = count($this->parameters);
-                if (($i > 0) && ($i == $n)) {
-                    $sqlText = '';
-                    $p = 0;
-                    $parameters = array();
-                    foreach ($pos_array as $i => $pos) {
-                        $param = $this->parameters[$i];
-                        if (\is_array($param)) { // informado o tipo do parâmetro: array(param,type)
-                            $param = $param[0];
-                            $this->paramType[$i] = $param[1];
-                        }
-                        $param = (\is_null($param) || !isset($param) ? null : $param);
-                        if (\is_string($param) && ($param[0] == ':')) {
-                            $textParam = substr($param, 1);
-                        } else {
-                            $textParam = '?';
-                            $parameters[] = $param;
-                        }
-                        $sqlText .= substr($this->command, $p, $pos - $p) . $textParam;
-                        $p = $pos + 1;
-                    }
-                    $sqlText .= substr($this->command, $p);
-                    $this->command = $sqlText;
-                    $this->parameters = $parameters;
-                }
-            }
-            */
         }
     }
 
@@ -282,11 +249,12 @@ class MSql
         $this->_prepareParameters();
         if (!is_null($this->parameters)) {
             if (count($this->parameters) > 0) {
+
                 foreach ($this->parameters as $i => $paramValue) {
                     if (is_numeric($i)) {
-                        $this->bindValue($i + 1, $paramValue, $this->paramType[$i]);
+                        $this->bindValue($i + 1, $paramValue ?? null, $this->paramType[$i]);
                     } else {
-                        $this->bindValue($i, $paramValue, $this->paramType[$i]);
+                        $this->bindValue($i, $paramValue ?? null, $this->paramType[$i]);
                     }
                 }
             }
@@ -309,18 +277,16 @@ class MSql
         $this->bind();
     }
 
-    public function insert(?array $parameters = null)
+    public function insert(?array $parameters = [])
     {
-        $this->setParameters($parameters);
-        $sqlText = 'INSERT INTO ' . implode(',', $this->tables) . ' ( ' . implode(',', $this->columns) . ' ) VALUES ( ';
-
-        for ($i = 0; $i < count($this->columns); $i++) {
-            $par[] = '?';
+        if (count($parameters) > 0) {
+            $this->setParameters($parameters);
         }
-
-        $sqlText .= implode(',', $par) . ' )';
+        $tables = implode(',', $this->tables);
+        $columns = implode(',', $this->columns);
+        $values = implode(',', $this->paramKey);
+        $sqlText = "INSERT INTO {$tables} ({$columns}) VALUES ({$values})" ;
         $this->command = $sqlText;
-
         $this->prepareAndBind();
         return $this;
     }
@@ -447,24 +413,35 @@ class MSql
                     return;
                 } elseif (is_object($parameters)) {
                     $object = $parameters;
-                    $parameters = array();
+                    $parameters = [];
                     foreach ($object as $attr => $value) {
                         $parameters[$attr] = $value;
                     }
                 } elseif (!is_array($parameters)) {
-                    $parameters = array($parameters);
+                    $parameters = [$parameters];
                 }
             } else {
                 $parameters = func_get_args();
+            }
+            $this->paramKey = [];
+            foreach ($parameters as $attr => $value) {
+                $this->paramKey[] = is_numeric($attr) ? '?' : ":{$attr}";
             }
             $this->parameters = $parameters;
         }
     }
 
-    public function addParameter($value, ?string $type = null)
+    public function addParameter($value, ?string $type = '', ?string $name = '')
     {
-        $this->parameters[] = $value;
-        $this->paramType[] = $type;
+        if ($name != '') {
+            $this->parameters[$name] = $value;
+            $this->paramType[$name] = $type;
+            $this->paramKey[] = ":{$name}";
+        } else {
+            $this->parameters[] = $value;
+            $this->paramType[] = $type;
+            $this->paramKey[] = '?';
+        }
     }
 
     public function setRange()
@@ -556,6 +533,19 @@ class MSql
         $this->setGroupBy($this->parseSqlCommand($sqltext, "group by", array("having", "order by", "#")));
         $this->setHaving($this->parseSqlCommand($sqltext, "having", array("order by", "#")));
         $this->setOrderBy($this->parseSqlCommand($sqltext, "order by", array("#")));
+    }
+
+    public function parameters(array $parameters = []): MSQL
+    {
+        $this->setParameters($parameters);
+        return $this;
+    }
+
+    public function asResult(): array
+    {
+        $this->bind();
+        $this->stmt->execute();
+        return $this->stmt->fetchAllAssociative();
     }
 
 }

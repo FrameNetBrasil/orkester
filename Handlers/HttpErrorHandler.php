@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace Orkester\Handlers;
 
 use Orkester\MVC\MError;
-use Orkester\Results\MResultPayload;
 use Exception;
+use Orkester\Results\MResultObject;
 use Psr\Http\Message\ResponseInterface as Response;
 use Slim\Exception\HttpBadRequestException;
 use Slim\Exception\HttpException;
@@ -28,7 +28,9 @@ class HttpErrorHandler extends SlimErrorHandler
         $statusCode = 500;
         $error = new MError(
             MError::SERVER_ERROR,
-            'An internal error has occurred while processing your request.'
+            'An internal error has occurred while processing your request.',
+            $exception->getFile(),
+            (string)$exception->getLine(),
         );
 
         if ($exception instanceof HttpException) {
@@ -58,12 +60,12 @@ class HttpErrorHandler extends SlimErrorHandler
             $error->setDescription($exception->getMessage());
         }
 
-        $payload = new MResultPayload($statusCode, null, $error);
-        $encodedPayload = json_encode($payload, JSON_PRETTY_PRINT);
-
+        $result = new MResultObject((object)[
+            'statusCode' => $statusCode,
+            'error' => $error,
+        ]);
         $response = $this->responseFactory->createResponse($statusCode);
-        $response->getBody()->write($encodedPayload);
 
-        return $response->withHeader('Content-Type', 'application/json');
+        return $result->apply($this->request, $response);
     }
 }
