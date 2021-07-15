@@ -2,6 +2,9 @@
 
 namespace Orkester\Results;
 
+use Slim\Psr7\Request;
+use Slim\Psr7\Response;
+
 /**
  * MRenderJSONText.
  * Retorna objeto JSON com o resultado do processamento.
@@ -14,19 +17,17 @@ class MRenderJSONText extends MResult
     {
         mtrace('Executing MRenderJSONText');
         parent::__construct();
-        $id = 'json' . uniqid();
-        $this->ajax->setResponseType('JSON');
-        $this->ajax->setId($id);
-        $this->ajax->setType('page');
-        $this->ajax->setData($content);
-        $this->content = $this->ajax->returnData();
+        $this->content = $content;
     }
 
-    public function apply($request, $response)
+    public function apply(Request $request, Response $response): Response
     {
-        $this->nocache($response);
-        $response->setHeader('Content-type', 'Content-type: application/json; charset=UTF-8');
-        $response->setOut($this->content);
+        $payload = $this->content;
+        $body = $response->getBody();
+        $body->write($payload);
+        return $response
+            ->withHeader('Content-Type', 'text/html; charset=UTF-8')
+            ->withStatus(200);
     }
 
 }

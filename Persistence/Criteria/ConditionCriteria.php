@@ -4,68 +4,61 @@ namespace Orkester\Persistence\Criteria;
 class ConditionCriteria extends BaseCriteria
 {
 
-    private $parts = array();
-    private $criteria;
+    private array $conditions = [];
+    private array $conjunctions = [];
+    private PersistentCriteria $criteria;
 
-    public function setCriteria($criteria)
+    /**
+     * PersistentCriteria this conditionCriteria belongs to
+     * @param PersistentCriteria $criteria
+     */
+    public function setCriteria(PersistentCriteria $criteria): void
     {
         $this->criteria = $criteria;
     }
 
-    public function getSize()
+    public function getSize(): int
     {
-        return count($this->parts);
+        return count($this->conditions);
     }
 
-    public function add($condition, $conjuntion = 'AND')
+    public function add(ConditionCriteria|PersistentCondition $condition, string $conjunction = 'AND'): ConditionCriteria
     {
-        $this->parts[] = array($condition, $conjuntion);
+        if ($condition instanceof PersistentCondition) {
+            $condition->setCriteria($this->criteria);
+        }
+        $this->conditions[] = $condition;
+        $this->conjunctions[] = (count($this->conjunctions) == 0 ? '' : $conjunction);
         return $this;
     }
 
-    public function addOr($condition)
+    public function addOr(ConditionCriteria|PersistentCondition $condition): ConditionCriteria
     {
         return $this->add($condition, 'OR');
     }
 
-    /**
-     * Compatibilidade
-     */
-    public function addCriteria($conditionCriteria)
-    {
-        return $this->add($conditionCriteria);
-    }
-
-    public function addOrCriteria($conditionCriteria)
-    {
-        return $this->add($conditionCriteria, 'OR');
-    }
-
-    public function addAnd($condition)
-    {
-        return $this->add($condition, 'AND');
-    }
-
-    public function and_($op1, $operator = '', $op2 = NULL)
+    public function and_(mixed $op1, string $operator = '', mixed $op2 = NULL): ConditionCriteria
     {
         if ($op1 instanceof ConditionCriteria) {
             $this->add($op1);
+        } elseif ($op1 instanceof PersistentCondition) {
+            $this->add($op1);
         } else {
-            $base = new PersistentCondition($op1, $operator, $op2);
-            $base->setCriteria($this->criteria);
-            $this->add($base);
+            $condition = new PersistentCondition($op1, $operator, $op2);
+            $this->add($condition);
         }
         return $this;
     }
 
-    public function or_($op1, $operator = '', $op2 = NULL)
+    public function or_(mixed $op1, string $operator = '', mixed $op2 = NULL): ConditionCriteria
     {
         if ($op1 instanceof ConditionCriteria) {
             $this->addOr($op1);
+        } elseif ($op1 instanceof PersistentCondition) {
+            $this->addOr($op1);
         } else {
-            $base = new PersistentCondition($op1, $operator, $op2);
-            $base->setCriteria($this->criteria);
-            $this->addOr($base);
+            $condition = new PersistentCondition($op1, $operator, $op2);
+            $this->addOr($condition);
         }
         return $this;
     }
@@ -73,20 +66,11 @@ class ConditionCriteria extends BaseCriteria
     public function getSql()
     {
         $sql = '';
-        $n = $this->getSize();
-
-        for ($i = 0; $i < $n; $i++) {
-            if ($i != 0) {
-                $sql .= " " . $this->parts[$i][1] . " ";
-            }
-            $condition = $this->parts[$i][0];
-            $sql .= $condition->getSql();
+        foreach($this->conditions as $i => $condition) {
+            $conjunction = $this->conjunctions[$i];
+            $sql .= ($conjunction != '' ? ' ' . $conjunction . ' ' : '') . $condition->getSql();
         }
-
-        if ($n > 1) {
-            $sql = "(" . $sql . ")";
-        }
-        return $sql;
+        return ($sql != '' ? "({$sql})" : '');
     }
 
 }

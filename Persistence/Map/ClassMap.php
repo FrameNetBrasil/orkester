@@ -2,105 +2,77 @@
 
 namespace Orkester\Persistence\Map;
 
-use Orkester\Database\MQuery;
-use Orkester\Database\MSql;
 use Orkester\Manager;
 use Orkester\Persistence\Association;
-use Orkester\Persistence\PersistentManager;
 use Orkester\Persistence\PersistentObject;
 use Orkester\Utils\MUtil;
 
 class ClassMap
 {
 
-    private $namespace;
     private $name;
-    private $databaseName;
-    private $tableName;
-    private $superClassName;
     private $superClassMap = NULL;
     private $superAssociationMap = NULL;
     private $fieldMaps = [];
     private $attributeMaps = [];
-    private $hashedAttributeMaps = [];
-    private $keyAttributeMaps = [];
+    private AttributeMap $keyAttributeMap;
+    private array $hashedAttributeMaps = [];
     private $updateAttributeMaps = [];
     private $insertAttributeMaps = [];
     private $referenceAttributeMaps = [];
     private $handledAttributeMaps = [];
     private $associationMaps = [];
+    private $conditionMaps = [];
     private $selectStatement;
     private $updateStatement;
     private $insertStatement;
     private $deleteStatement;
     private $manager;
-    private bool $hasTypedAttribute = FALSE;
+    private bool $hasTypedAttribute = false;
+    private string $tableName;
+    private string $tableAlias;
 
-    public function __construct($name, $databaseName, PersistentManager $manager = null)
+    public function __construct(string $name)
     {
         $this->name = $name;
-        $p = strrpos($name, '\\');
-        $this->namespace = substr($name, 0, $p);
-        $this->databaseName = $databaseName;
-        $this->hasTypedAttribute = FALSE;
+        $this->hasTypedAttribute = false;
     }
 
-    public function getManager()
-    {
-        return PersistentManager::getInstance();
-    }
-
-    public function getDb()
-    {
-        return $this->getManager()->getConnection($this->databaseName);
-    }
-
-    public function getPlatform()
-    {
-        return $this->getManager()->getConnection($this->databaseName)->getPlatform();
-    }
-
-    public function getName()
+    public function getName(): string
     {
         return $this->name;
     }
 
-    public function getNamespace()
-    {
-        return $this->namespace;
-    }
-
-    public function setNamespace($value)
-    {
-        $this->namespace = $value;
-    }
-
-    public function getDatabaseName()
-    {
-        return $this->databaseName;
-    }
-
-    public function setDatabaseName($databaseName)
-    {
-        $this->databaseName = $databaseName;
-    }
-
-    public function setTableName($tableName)
+    public function setTableName(string $tableName)
     {
         $this->tableName = $tableName;
     }
 
-    public function getTableName($alias = '')
+    public function getTableName(string $alias = ''): string
     {
-        return $this->tableName . ($alias ? ' ' . $alias : '');
+        $tableName = $this->tableName;
+        if (($alias != '') && ($alias != $tableName)) {
+            $tableName .= ' ' . $alias;
+        }
+        return $tableName;
     }
 
-    public function setHasTypedAttribute($has)
+    public function setTableAlias(string $tableAlias)
+    {
+        $this->tableAlias = $tableAlias;
+    }
+
+    public function getTableAlias(): string
+    {
+        return $this->tableAlias;
+    }
+
+    public function setHasTypedAttribute(bool $has)
     {
         $this->hasTypedAttribute = $has;
     }
 
-    public function getHasTypedAttribute()
+    public function getHasTypedAttribute(): bool
     {
         return $this->hasTypedAttribute;
     }
@@ -111,53 +83,63 @@ class ClassMap
         return Manager::getModel($className);
     }
 
-    public function setSuperClassName($superClassName)
+    public function setSuperClassName(string $superClassName)
     {
-        if (($superClassName != 'businessmodel') && ($superClassName != 'persistentobject')) {
-            $this->superClassName = $superClassName;
-            $this->superClassMap = $this->getManager()->getClassMap($superClassName);
-        }
+        $this->superClassName = $superClassName;
+        $this->superClassMap = $this->getManager()->getClassMap($superClassName);
     }
 
-    public function getSuperClassMap()
+    public function getSuperClassMap(): ClassMap|null
     {
-        return $this->superClassMap;
+        return $this->superClassMap ?? null;
     }
 
-    public function setSuperAssociationMap($associationMap)
+    public function setSuperAssociationMap(AssociationMap $associationMap)
     {
         $this->superAssociationMap = $associationMap;
     }
 
-    public function getSuperAssociationMap()
+    public function getSuperAssociationMap(): AssociationMap
     {
         return $this->superAssociationMap;
     }
 
-    public function addAttributeMap($attributeMap)
+    public function hasAttribute(string $attributeName): bool
     {
-        $this->hashedAttributeMaps[$attributeMap->getName()] = $attributeMap;
-        $columnName = $attributeMap->getColumnName();
+        return isset($this->hashedAttributeMaps[$attributeName]);
+    }
+
+    public function addCondition(array $condition = [])
+    {
+        $this->conditionMaps[] = $condition;
+    }
+
+    public function getConditions(): array
+    {
+        return $this->conditionMaps;
+    }
+
+    public function addAttributeMap(AttributeMap $attributeMap)
+    {
+        $attributeName = $attributeMap->getName();
+        $this->hashedAttributeMaps[$attributeName] = $attributeMap;
+        $columnName = $attributeMap->getColumnName() ?? $attributeName;
         if ($columnName != '') {
-            $this->attributeMaps[] = $attributeMap;
-
+            $this->attributeMaps[$attributeName] = $attributeMap;
             $this->fieldMaps[strtoupper($columnName)] = $attributeMap;
-
             if ($attributeMap->getKeyType() == 'primary') {
-                $this->keyAttributeMaps[] = $attributeMap;
+                $this->keyAttributeMap = $attributeMap;
             } else {
-                $this->updateAttributeMaps[] = $attributeMap;
+                $this->updateAttributeMaps[$attributeName] = $attributeMap;
             }
-
             if ($attributeMap->getIdGenerator() != 'identity') {
-                $this->insertAttributeMaps[] = $attributeMap;
+                $this->insertAttributeMaps[$attributeName] = $attributeMap;
             }
-
             if ($attributeMap->getReference() != NULL) {
-                $this->referenceAttributeMaps[] = $attributeMap;
+                $this->referenceAttributeMaps[$attributeName] = $attributeMap;
             }
             if ($attributeMap->getHandled()) {
-                $this->handledAttributeMaps[] = $attributeMap;
+                $this->handledAttributeMaps[$attributeName] = $attributeMap;
             }
         }
     }
@@ -167,97 +149,94 @@ class ClassMap
         return $this->attributeMaps;
     }
 
-    public function getAttributeMap($name, $areSuperClassesIncluded = false)
+    public function getAttributeMap(string $name, bool $areSuperClassesIncluded = false): AttributeMap|null
     {
-        $attributeMap = null;
-        $classMap = $this;
-
-        if (is_string($name)) {
-            do {
-                $attributeMap = $classMap->hashedAttributeMaps[$name] ?? null;
-                $classMap = $classMap->superClassMap;
-            } while ($areSuperClassesIncluded && (is_null($attributeMap)) && (!is_null($classMap)));
-        } else {
-            $attributeMap = $classMap->attributeMaps[$name];
+        $attributeMap = $this->hashedAttributeMaps[$name] ?? null;
+        if ($areSuperClassesIncluded) {
+            $superClassMap = $this->superClassMap ?? null;
+            while ($superClassMap && is_null($attributeMap)) {
+                $attributeMap = $superClassMap->hashedAttributeMaps[$name] ?? null;
+                $superClassMap = $superClassMap->superClassMap ?? null;
+            }
         }
         return $attributeMap;
     }
 
-    public function getKeyAttributeMap($index = 0)
+    public function getUpdateAttributeMaps(): array
     {
-        return $this->keyAttributeMaps[$index];
+        return $this->updateAttributeMaps;
     }
 
-    public function getUpdateAttributeMap($index = 0)
+    public function getUpdateAttributeMap(string $attributeName = ''): AttributeMap|null
     {
-        return $this->updateAttributeMaps[$index];
+        return $this->updateAttributeMaps[$attributeName] ?? null;
     }
 
-    public function getInsertAttributeMap($index = 0)
+    public function getInsertAttributeMaps(): array
     {
-        return $this->insertAttributeMaps[$index];
+        return $this->insertAttributeMaps;
     }
 
-    public function getReferenceAttributeMap($index = 0)
+    public function getInsertAttributeMap(string $attributeName = ''): AttributeMap|null
     {
-        return $this->referenceAttributeMaps[$index];
+        return $this->insertAttributeMaps[$attributeName] ?? null;
     }
 
-    public function getAssociationMap($name)
+    public function getReferenceAttributeMap(string $attributeName = ''): AttributeMap|null
     {
-        $associationMap = NULL;
-        $classMap = $this;
-        do {
-            $associationMap = $classMap->associationMaps[$name] ?? NULL;
-            if ($associationMap != NULL) {
-                $associationMap->setKeysAttributes();
-            }
-            $classMap = $classMap->superClassMap;
-        } while (($associationMap == NULL) && ($classMap != NULL));
+        return $this->referenceAttributeMaps[$attributeName] ?? null;
+    }
+
+    public function getAssociationMap(string $name): AssociationMap|null
+    {
+        $associationMap = $this->associationMaps[$name] ?? NULL;
+        if ($associationMap != NULL) {
+            $associationMap->setKeysAttributes();
+        }
         return $associationMap;
     }
 
-    public function putAssociationMap($associationMap)
+    public function putAssociationMap(AssociationMap $associationMap)
     {
         $this->associationMaps[$associationMap->getName()] = $associationMap;
     }
 
-    public function getAssociationMaps()
+    public function getAssociationMaps(): array
     {
         return $this->associationMaps;
     }
 
-    public function getSize()
+    public function getSize(): int
     {
         return count($this->attributeMaps);
     }
 
-    public function getReferenceSize()
+    public function getReferenceSize(): int
     {
         return count($this->referenceAttributeMaps);
     }
 
-    public function getAssociationSize()
+    public function getAssociationSize(): int
     {
         return count($this->associationMaps);
     }
 
-    public function getKeyAttributeName($index = 0)
+    public function getKeyAttributeName(): string
     {
-        return $this->keyAttributeMaps[$index]->getName();
+        return $this->keyAttributeMap->getName();
     }
 
-    public function getKeySize()
+    public function getKeyAttributeMap(): AttributeMap
     {
-        return count($this->keyAttributeMaps);
+        return $this->keyAttributeMap;
     }
 
-    public function getUpdateSize()
+    public function getUpdateSize(): int
     {
         return count($this->updateAttributeMaps);
     }
 
-    public function getInsertSize()
+    public function getInsertSize(): int
     {
         return count($this->insertAttributeMaps);
     }
@@ -266,42 +245,49 @@ class ClassMap
      * Se existir um campo do tipo UID no map ele é setado automaticamente aqui.
      * @param PersistentObject $object
      */
-    public function setObjectUid(PersistentObject $object)
+    public function setObjectUid(object $object)
     {
         $field = $this->getUidField();
         if ($field) {
-            $setter = 'set' . ucfirst($field);
-            $object->$setter(MUtil::generateUID());
+            $object->$field = MUtil::generateUID();
         }
     }
 
-    public function setObjectKey($object)
+    public function getObjectKey(object $object): int|null
     {
-        $value = NULL;
-        for ($i = 0; $i < $this->getKeySize(); $i++) {
-            $keyAttributeMap = $this->getKeyAttributeMap($i);
+        $keyName = $this->getKeyAttributeName();
+        return $object->$keyName ?? null;
+    }
+
+
+    public function setObjectKey(object $object, ?int $value = null): void
+    {
+        $keyName = $this->getKeyAttributeName();
+        if ($value != null) {
+            $object->$keyName = $value;
+        } else {
+            $keyAttributeMap = $this->keyAttributeMap;
             if ($keyAttributeMap->getKeyType() == 'primary') {
                 $idGenerator = $keyAttributeMap->getIdGenerator();
-                mdump($idGenerator);
                 if ($idGenerator != NULL) {
                     if ($idGenerator != 'identity') {
                         $value = $object->getNewId($keyAttributeMap->getIdGenerator());
                     }
                 } else {
-                    $value = $object->getAttributeValue($keyAttributeMap);
+                    $value = $object->$keyName ?? null;
                 }
-                $object->setAttributeValue($keyAttributeMap, $value);
+                $object->$keyName = $value;
             }
         }
     }
 
-    public function setPostObjectKey($object)
+    public function setPostObjectKey(object $object)
     {
-        $keyAttributeMap = $this->getKeyAttributeMap(0);
+        $keyAttributeMap = $this->keyAttributeMap;
         $idGenerator = $keyAttributeMap->getIdGenerator();
         if ($idGenerator == 'identity') {
-            $value = $this->getDb()->lastInsertId();
-            $object->setAttributeValue($keyAttributeMap, $value);
+            $value = Manager::getPersistentManager()->getPersistence()->lastInsertId();
+            $this->setObjectKey($object, $value);
         }
     }
 
@@ -317,12 +303,6 @@ class ClassMap
         }
     }
 
-    public function retrieveObjectFromCache($object, $objectCache)
-    {
-        foreach ($objectCache as $field => $value) {
-            $object->$field = $value;
-        }
-    }
 
     public function retrieveObjectFromData($object, $data)
     {

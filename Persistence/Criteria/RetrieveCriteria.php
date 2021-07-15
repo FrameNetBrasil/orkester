@@ -1,7 +1,15 @@
 <?php
+
 namespace Orkester\Persistence\Criteria;
+
 use Orkester\Database\MQuery;
 use Orkester\Database\MSql;
+use Orkester\Manager;
+use Orkester\MVC\MEntityMaestro;
+use Orkester\MVC\MModelMaestro;
+use Orkester\Persistence\Map\ClassMap;
+use Orkester\Persistence\PersistentObject;
+use Orkester\Types\MRange;
 
 class RetrieveCriteria extends PersistentCriteria
 {
@@ -12,7 +20,7 @@ class RetrieveCriteria extends PersistentCriteria
     private $setOperation = array();
     private $linguistic = false;
 
-    public function __construct($classMap, $command = '')
+    public function __construct(ClassMap $classMap, string $command = '')
     {
         parent::__construct($classMap);
         $this->command = $command;
@@ -21,15 +29,35 @@ class RetrieveCriteria extends PersistentCriteria
         }
     }
 
+    public function getRange()
+    {
+        return $this->range;
+    }
+
+    public function getForUpdate()
+    {
+        return $this->forUpdate;
+    }
+
+    public function getSetOperation(): array
+    {
+        return $this->setOperation;
+    }
+
+    public function getDistinct()
+    {
+        return $this->distinct;
+    }
+
     /*
      * Parsing command
      */
-
-    private function findStr($target, $source)
+    private function findStr(string $target, string $source): int
     {
         $l = strlen($target);
         $lsource = strlen($source);
         $pos = 0;
+        $fim = false;
         while (($pos < $lsource) && (!$fim)) {
             if ($source[$pos] == "(") {
                 $p = $this->findStr(")", substr($source, $pos + 1));
@@ -45,7 +73,7 @@ class RetrieveCriteria extends PersistentCriteria
         return ($fim ? $pos : -1);
     }
 
-    protected function parseSqlCommand(&$cmd, $clause, $delimiters)
+    protected function parseSqlCommand(string &$cmd, string $clause = '', array $delimiters = []): string
     {
         if (substr($cmd, 0, strlen($clause)) != $clause) {
             return false;
@@ -54,8 +82,10 @@ class RetrieveCriteria extends PersistentCriteria
         $n = count($delimiters);
         $i = 0;
         $pos = -1;
-        while (($pos < 0) && ($i < $n))
+        $r = '';
+        while (($pos < 0) && ($i < $n)) {
             $pos = $this->findStr($delimiters[$i++], $cmd);
+        }
         if ($pos > 0) {
             $r = substr($cmd, 0, $pos);
             $cmd = substr($cmd, $pos);
@@ -77,7 +107,6 @@ class RetrieveCriteria extends PersistentCriteria
         $this->select($this->parseSqlCommand($command, "select", array("from", "where", "group by", "order by", "#")));
         $from = trim($this->parseSqlCommand($command, "from", array("where", "group by", "order by", "#")));
         if ($from != '') {
-            //if ($this->findStr(' join ', $command) < 0) {
             if (strpos($from, ' join ') === false) {
                 // from
                 $this->from($from);
@@ -108,119 +137,21 @@ class RetrieveCriteria extends PersistentCriteria
         }
     }
 
-    public function getSql()
+    public function getSql(): string
     {
         $query = $this->asQuery();
         return $query->getCommand();
     }
 
-    public function getSqlStatement()
-    {
-        $statement = new MSQL();
-
-        if (count($this->columns) == 0) {
-            $this->select('*');
-        }
-        $sqlColumns = array();
-        foreach ($this->columns as $column) {
-            $sqlColumns[] = $this->getOperand($column)->getSql();
-        }
-        $columns = implode(',', $sqlColumns);
-        $statement->setColumns($columns, $this->distinct);
-
-
-        if (($where = $this->whereCondition->getSql()) != '') {
-            $statement->setWhere($where);
-        }
-
-        if (count($this->groups)) {
-            foreach ($this->groups as $group) {
-                $sqlGroups[] = $this->getOperand($group)->getSqlGroup();
-            }
-            $groups = implode(',', $sqlGroups);
-            $statement->setGroupBy($groups);
-        }
-
-        if (($having = $this->havingCondition->getSql()) != '') {
-            $statement->setHaving($having);
-        }
-
-        $this->includeOrderStatment($statement);
-
-        if ($n = count($this->tableCriteria)) {
-            for ($i = 0; $i < $n; $i++) {
-                $tables .= (($i > 0 ? ", " : "") . '(' . $this->tableCriteria[$i][0] . ')' . ' ' . $this->tableCriteria[$i][1]);
-            }
-            $statement->setTables($tables);
-        }
-
-        $hasJoin = false;
-        $joins = $this->getForcedJoin();
-        if (count($joins)) {
-            $hasJoin = true;
-            foreach ($joins as $join) {
-                $statement->join[] = $join;
-            }
-        }
-        $joins = $this->getAssociationsJoin();
-        if (count($joins)) {
-            $hasJoin = true;
-            foreach ($joins as $join) {
-                $statement->join[] = $join;
-            }
-        }
-        if (!$hasJoin) {
-            if (count($this->classes)) {
-                $sqlTables = array();
-                foreach ($this->classes as $class) {
-                    $sqlTables[] = $this->getTableName($class[0]) . ' ' . $class[1];
-                }
-                $tables = implode(',', $sqlTables);
-                $statement->setTables($tables);
-            }
-        }
-        // Set parameters to the select statement
-        if (!is_null($this->parameters)) {
-            $statement->setParameters($this->parameters);
-        }
-        // Add a range clause to the select statement
-        if (!is_null($this->range)) {
-            $statement->setRange($this->range);
-        }
-        // Add a FOR UPDATE clause to the select statement
-        if ($this->forUpdate) {
-            $statement->setForUpdate(TRUE);
-        }
-        // Add Set Operations
-        if (count($this->setOperation)) {
-            foreach ($this->setOperation as $s) {
-                $statement->setSetOperation($s[0], $s[1]->getSqlStatement());
-            }
-        }
-        return $statement;
-    }
-
-    private function includeOrderStatment(MSql $statement)
-    {
-        if (count($this->orders)) {
-            $sqlOrders = array();
-            foreach ($this->orders as $order) {
-                $sqlOrders[] = $this->processOrder($order);
-            }
-            $orders = implode(',', $sqlOrders);
-            $statement->setOrderBy($orders);
-        }
-    }
-
-    private function processOrder($order)
-    {
-        $parts = explode(' ', $order);
-        return trim($this->getOperand($parts[0])->getSqlOrder() . ' ' . $parts[1] . ' ' . $parts[2] . ' ' . $parts[3]);
-    }
 
     public function distinct($distinct = TRUE)
     {
         $this->distinct = $distinct;
+        return $this;
+    }
+
+    public function alias(string $alias) {
+        $this->setAlias($alias);
         return $this;
     }
 
@@ -245,30 +176,37 @@ class RetrieveCriteria extends PersistentCriteria
 
     public function select()
     {
-        if ($numargs = func_num_args()) {
-            foreach (func_get_args() as $arg) {
-                $attributes = explode(',', $arg);
+        $numargs = func_num_args();
+        $args = func_get_args();
+        if ($numargs == 1) {
+            $arg = $args[0];
+            $attributes = explode(',', $arg);
+            if (str_contains($attributes[0], '(')) {
+                $this->columns[] = $arg;
+            } else {
                 if (count($attributes)) {
                     foreach ($attributes as $attribute) {
                         $attribute = trim($attribute);
                         if ($attribute == '*') {
+                            /** @var ClassMap $classMap */
                             $classMap = $this->classMap;
-                            do {
-                                for ($i = 0; $i < $classMap->getSize(); $i++) {
-                                    $am = $classMap->getAttributeMap($i);
-                                    $this->columns[] = $am->getName();
+                            foreach ($classMap->getAttributesMap() as $attributeMap) {
+                                $reference = $attributeMap->getReference();
+                                if ($reference != '') {
+                                    $this->columns[] = $reference . ' as ' . $attributeMap->getName();
+                                } else {
+                                    $this->columns[] = $attributeMap->getName();
                                 }
-                                $classMap = $classMap->getSuperClassMap();
-                            } while ($classMap != NULL);
+                            }
                         } else {
-                            $parts = explode(' as ', $attribute);
-                            $label = $parts[1] ?? '';
-                            $this->columns[] = trim($parts[0]) . (($label != '') ? ' as ' . $label : '');
+                            $this->columns[] = addslashes($attribute);
                         }
                     }
-                } else {
-                    $this->columns[] = $arg;
                 }
+            }
+        } else {
+            foreach ($args as $arg) {
+                $this->columns[] = $arg;
             }
         }
         return $this;
@@ -278,11 +216,14 @@ class RetrieveCriteria extends PersistentCriteria
     {
         if ($numargs = func_num_args()) {
             foreach (func_get_args() as $arg) {
-                $classes = explode(',', $arg);
-                if (count($classes)) {
-                    $this->addMultipleClasses($classes);
+                if (is_string($arg)) {
+                    list($class, $alias) = explode(' ', $arg);
+                    /** @var MModelMaestro $class */
+                    $classMap = $class::getClassMap();
+                    $this->addClass($classMap, $alias);
                 } else {
-                    $this->addClass(trim($arg));
+                    /** @var RetrieveCriteria $arg */
+                    $this->addClass($arg, $arg->getAlias());
                 }
             }
         }
@@ -317,10 +258,10 @@ class RetrieveCriteria extends PersistentCriteria
         foreach ($classes as $class) {
             $parts = explode(' ', $class);
             $className = trim($parts[0]);
-            $this->addClass(trim($className), trim($parts[1]));
+            $classMap = $className::getClassMap();
+            $this->addClass($classMap, trim($parts[1]));
         }
     }
-
 
     public function autoAssociation($alias1, $alias2, $condition = '', $joinType = 'INNER')
     {
@@ -340,7 +281,7 @@ class RetrieveCriteria extends PersistentCriteria
 
     public function where($op1, $operator = '', $op2 = NULL)
     {
-        $this->whereCondition->and_($op1, $operator, $op2);
+        $this->whereConditionCriteria->and_($op1, $operator, $op2);
         return $this;
     }
 
@@ -351,7 +292,7 @@ class RetrieveCriteria extends PersistentCriteria
 
     public function or_($op1, $operator = '', $op2 = NULL)
     {
-        $this->whereCondition->or_($op1, $operator, $op2);
+        $this->whereConditionCriteria->or_($op1, $operator, $op2);
         return $this;
     }
 
@@ -378,7 +319,7 @@ class RetrieveCriteria extends PersistentCriteria
 
     public function having($op1, $operator = '', $op2 = NULL)
     {
-        $this->havingCondition->and_($op1, $operator, $op2);
+        $this->havingConditionCriteria->and_($op1, $operator, $op2);
         return $this;
     }
 
@@ -389,7 +330,7 @@ class RetrieveCriteria extends PersistentCriteria
 
     public function havingOr_($op1, $operator = '', $op2 = NULL)
     {
-        $this->havingCondition->or_($op1, $operator, $op2);
+        $this->havingConditionCriteria->or_($op1, $operator, $op2);
         return $this;
     }
 
@@ -417,14 +358,14 @@ class RetrieveCriteria extends PersistentCriteria
      * @param string $value Valor do parametro
      * @return $this
      */
-    public function addParameter($name, $value = '')
+    public function addParameter(string $name, mixed $value = '')
     {
         if (null === $this->parameters) {
             $this->parameters = [];
         }
 
         if (is_scalar($this->parameters)) {
-            $this->parameters = array($this->parameters);
+            $this->parameters = [$this->parameters];
         }
 
         if (is_array($this->parameters)) {
@@ -442,14 +383,9 @@ class RetrieveCriteria extends PersistentCriteria
         return $this;
     }
 
-    public function getParameters()
-    {
-        return $this->parameters ?: [];
-    }
-
     public function setOperation($operation, $criteria)
     {
-        $this->setOperation[] = array($operation, $criteria);
+        $this->setOperation[] = [$operation, $criteria];
     }
 
     public function union($criteria)
@@ -484,7 +420,7 @@ class RetrieveCriteria extends PersistentCriteria
             $parameters = func_get_args();
         }
 
-        $query = $this->manager->processCriteriaAsQuery($this, $parameters);
+        $query = Manager::getPersistentManager()->getPersistence()->processCriteriaAsQuery($this, $parameters);
 
         if ($this->linguistic) {
             $query->ignoreAccentuation();
@@ -493,23 +429,23 @@ class RetrieveCriteria extends PersistentCriteria
         return $query;
     }
 
-    public function asCursor($parameters = null)
+    public function asObjectArray(?array $parameters = [])
     {
-        return $this->manager->processCriteriaAsCursor($this, $parameters);
+        return Manager::getPersistentManager()->getPersistence()->processCriteriaAsObjectArray($this, $parameters);
     }
 
-    public function asObjectArray($parameters = null)
+    public function asResult(?array $parameters = [])
     {
-        return $this->manager->processCriteriaAsObjectArray($this, $parameters);
+        return Manager::getPersistentManager()->getPersistence()->processCriteriaAsResult($this, $parameters);
     }
 
-    /*
-     * Compatibilidade
-     */
-
-    public function setDistinct($value)
+    public function asEntity(string $entityClass, ?array $parameters = []): MEntityMaestro
     {
-        $this->distinct($value);
+        return Manager::getPersistentManager()->getPersistence()->processCriteriaAsEntity($this, $entityClass, $parameters);
+    }
+
+    public function prepare() {
+        return Manager::getPersistentManager()->getPersistence()->prepare($this);
     }
 
 }

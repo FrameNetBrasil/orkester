@@ -7,15 +7,14 @@ use Slim\Psr7\Response;
 
 class MResultResponse extends MResult
 {
-    public function __construct(object $response)
+    private int $status;
+
+    public function __construct(object $response, int $status)
     {
         mtrace('Executing MResultResponse');
         parent::__construct();
-        if (isset($response->error)) {
-            $this->content = new MResultPayload($response->code, null, $response->error);
-        } else {
-            $this->content = new MResultPayload($response->code, $response->message);
-        }
+        $this->content = $response;
+        $this->status = $status;
     }
 
     public function apply(Request $request, Response $response): Response
@@ -25,7 +24,7 @@ class MResultResponse extends MResult
         $body->write($json);
         return $response
             ->withHeader('Content-Type', 'application/json')
-            ->withStatus($this->content->getStatusCode());
+            ->withStatus($this->status);
     }
 
 }

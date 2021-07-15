@@ -17,7 +17,6 @@ class MResultList extends MResult
     public function apply(Request $request, Response $response): Response
     {
         $payload = json_encode($this->content, JSON_PRETTY_PRINT);
-        mdump($payload);
         $body = $response->getBody();
         $body->write($payload);
         return $response

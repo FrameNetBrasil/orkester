@@ -37,7 +37,8 @@ class MPage
      */
     private MTemplate $template;
     private string $templateName;
-    private string $content;
+    private object $content;
+    private string $id;
 
     public function __construct()
     {
@@ -51,6 +52,7 @@ class MPage
         $this->fileUpload = mrequest('__ISFILEUPLOAD') == 'yes';
         //$this->menu = Manager::isLogged() ? 'siga' : 'home';
         //$this->container = new MPageContent();
+
         $templateName = mrequest('__TEMPLATE');
         if ($templateName == '') {
             if (Manager::isAjaxCall()) {
@@ -66,6 +68,10 @@ class MPage
         //$this->title = Manager::getConf('name');
         $this->styleSheetCode = '';
         ob_start();
+    }
+
+    public function getId() {
+        return $this->id;
     }
 
     /*
@@ -89,8 +95,13 @@ class MPage
      */
     public function setTemplate()
     {
-        $path = Manager::getHome() . '/app/UI/templates';
-        $this->template = new MTemplate($path);
+        $basePath = Manager::getHome() . Manager::getOptions('templatePath');
+        $paths = [
+            $basePath . '/Templates/Page',
+            $basePath . '/Templates/Controls',
+            $basePath . '/Components',
+        ];
+        $this->template = new MTemplate($paths);
         //$this->template->context('manager', \Maestro\Manager);
         $this->template->context('page', $this);
         $this->template->context('charset', Manager::getOptions('charset'));
@@ -231,15 +242,6 @@ class MPage
         return $this->scripts->jsCode;
     }
 
-    public function onSubmit($jsCode, $formId)
-    {
-        $this->scripts->addOnSubmit($jsCode, $formId);
-    }
-
-    public function onLoad($jsCode)
-    {
-        $this->scripts->onload->add($jsCode);
-    }
 
     public function onUnLoad($jsCode)
     {
@@ -255,18 +257,30 @@ class MPage
     {
         $this->scripts->onfocus->add($jsCode);
     }
+    */
 
-    public function addJsCode($jsCode)
+    public function onSubmit(string $idForm, string $jsCode)
     {
-        $this->scripts->jsCode->add($jsCode);
+        $this->scripts->addOnSubmit($idForm, $jsCode);
     }
 
-    public function addJsFile($fileName)
+    public function onLoad($jsCode)
+    {
+        $this->scripts->addOnLoad($jsCode);
+    }
+
+    public function addJsCode(string $jsCode)
+    {
+        $this->scripts->addJsCode($jsCode);
+    }
+
+    public function addJsFile(string $fileName)
     {
         $jsCode = file_get_contents($fileName);
-        $this->scripts->jsCode->add($jsCode);
+        $this->scripts->addJsCode($jsCode);
     }
 
+    /*
     public function registerEvent($event)
     {
         $this->scripts->events->add($event);
@@ -341,6 +355,12 @@ class MPage
     public function generate(string $element = 'content'): string
     {
         mtrace('mpage::generate');
+        $html = $this->fetch('content');
+        if ($ob = ob_get_clean()) {
+            $html = $ob . $html;
+        }
+        return $html;
+        /*
         if ($element == 'content') {
             $html = $this->generateContent();// . $this->generateStyleSheetCode() . $this->generateScripts();
         } else {
@@ -348,6 +368,7 @@ class MPage
             $html = $component->generate();
         }
         return $html;
+        */
     }
 
     public function generateStyleSheetCode(): string
@@ -385,7 +406,8 @@ class MPage
     // get the array of controls from content
     public function getControl($key = NULL)
     {
-        //return ($key !== NULL ? $this->container->getControl($key) : $this->container);
+        $this->content = Manager::getContainer()->get('MPageControl');
+        return $this->content;
     }
 
     // get the array of controls from content
@@ -444,7 +466,7 @@ class MPage
         //$html = MBasePainter::generateToString($this->container->getInner());
         //return $html;
         //return $this->container->generate();
-        return $this->content;
+        return $this->content->generate();
     }
 
 }

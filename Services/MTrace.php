@@ -41,14 +41,20 @@ class MTrace
         }
     }
 
-    public static function traceStack(string $file = '', int $line = 0): string
+    public static function traceStack(string $file = '', int $line = 0)
     {
         try {
             throw new \Exception;
         } catch (\Exception $e) {
             $strStack = $e->getTraceAsString();
         }
-        return $strStack;
+        Manager::getLog()->logMessage('[TRACE]' . $strStack);
+    }
+
+    public static function traceDebug($tag, $msg)
+    {
+        $message = print_r($msg, true);
+        Manager::getLog()->logMessage("[$tag] $message");
     }
 
 }

@@ -1,254 +1,358 @@
 <?php
+
 namespace Orkester\Persistence\Criteria;
 
+use Orkester\Manager;
+use Orkester\Persistence\EPersistenceException;
+use Orkester\Persistence\Map\AssociationMap;
+use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
-use Orkester\Persistence\PersistentManager;
-use Orkester\Services\Exceptions\ERuntimeException;
+use Orkester\Persistence\Operand\OperandArray;
+use Orkester\Persistence\Operand\OperandAttributeMap;
+use Orkester\Persistence\Operand\OperandCriteria;
+use Orkester\Persistence\Operand\OperandFunction;
+use Orkester\Persistence\Operand\OperandList;
+use Orkester\Persistence\Operand\OperandNull;
+use Orkester\Persistence\Operand\OperandObject;
+use Orkester\Persistence\Operand\OperandString;
+use Orkester\Persistence\Operand\OperandStringAI;
 
-class PersistentCriteria extends BaseCriteria
+class PersistentCriteria
 {
-
-    protected $columns = array();
-    protected $classes = array();
-    protected $aliases = array();
-    //protected $tables = array();
-    protected $whereCondition = NULL;
-    protected $groups = array();
-    protected $havingCondition;
-    protected $orders = array();
-    protected $joins = array();
-    protected $associations = array();
-    protected $autoAssociation;
+    /* components */
+    protected array /* of AttributeCriteria */
+        $columns = [];
+    protected array /* of AttributeCriteria */
+        $groups = [];
+    protected array /* of AttributeCriteria */
+        $orders = [];
+    protected array /* of AssociationCriteria */
+        $associations = [];
+    protected array /* of AssociationCriteria */
+        $joins = [];
+    protected array /* of AssociationCriteria */
+        $autoAssociation = [];
+    protected ConditionCriteria $whereConditionCriteria;
+    protected ConditionCriteria $havingConditionCriteria;
+    /* aliases */
+    protected array /* of string */
+        $classAlias = [];
+    protected array /* of string */
+        $attributeAlias = [];
+    protected array /* of string */
+        $associationAlias = [];
+    protected array /* of string */
+        $actualAssociationAlias = [];
+    /* for criteria */
+    protected ?ClassMap $classMap = NULL;
+    protected string $alias = '';
     protected array $parameters = [];
-    protected $classMap = NULL;
-    protected $alias = '';
-    protected $maps = array(); // array of classMaps
-    protected $manager = NULL;
-    protected $tableCriteria = array();
-    protected $tableCriteriaColumn = array();
+    protected array /* of ClassMap */
+        $classMaps = [];
+    protected array /* of ClassMap/RetrieveCriteria */
+        $classes = [];
 
-    public function __construct($classMap = NULL)
+    /*
+        protected array $aliases = [];
+        protected array $maps = []; // array of classMaps
+    */
+
+    protected array $tableCriteria = [];
+
+    //protected array $tableCriteriaColumn = [];
+
+    public function __construct(?ClassMap $classMap = NULL)
     {
-        $this->manager = PersistentManager::getInstance();
         $this->setClassMap($classMap);
-        // Fill tables with tableMaps
-        // Create CriteriaCondition for the WHERE part of this criteria
-        $this->whereCondition = $this->getNewCondition();
-        //$this->whereCondition->setCriteria($this);
-        // Create condition for the HAVING part of this criteria
-        $this->havingCondition = $this->getNewCondition();
-        //$this->havingCondition->setCriteria($this);
+        $this->whereConditionCriteria = $this->getNewConditionCriteria();
+        $this->havingConditionCriteria = $this->getNewConditionCriteria();
     }
 
-    public function getManager()
+    private function getNewConditionCriteria(): ConditionCriteria
     {
-        return $this->manager;
+        $conditionCriteria = new ConditionCriteria();
+        $conditionCriteria->setCriteria($this);
+        return $conditionCriteria;
     }
 
-    public function setClassMap($classMap = NULL)
+    public function setClassMap(ClassMap $classMap)
     {
-        if ($classMap) {
-            $this->classMap = $classMap;
-            do {
-                $this->addClassMap($classMap);
-                $classMap = $classMap->getSuperClassMap();
-            } while ($classMap != NULL);
-        }
+        $this->classMap = $classMap;
+        $this->alias = $classMap->getTableName();
+        //$this->addClass($classMap, $this->alias);
     }
 
-    public function getClassMap($className = '')
+    public function getClassMap(): ClassMap
     {
-        if ($className == '') {
-            return $this->classMap;
-        }
-        return $this->getMap($className);
+        return $this->classMap;
     }
 
-    public function getNewCondition()
+
+    public function getWhereConditionCriteria(): ConditionCriteria
     {
-        $condition = new ConditionCriteria();
-        $condition->setCriteria($this);
-        return $condition;
+        return $this->whereConditionCriteria;
     }
 
-    public function getWhereCondition()
+    public function getHavingConditionCriteria(): ConditionCriteria
     {
-        return $this->whereCondition;
+        return $this->havingConditionCriteria;
     }
 
-    public function getHavingCondition()
+    public function addClassMap(ClassMap $classMap, string $alias = ''): PersistentCriteria
     {
-        return $this->havingCondition;
-    }
-
-    public function getMap($className): ClassMap|null
-    {
-//        $className = trim(strtolower($className));
-        $className = trim($className);
-        return $this->maps[$className] ?? null;
-    }
-
-    public function addClass($className, $alias = '', $classMap = NULL)
-    {
-        $className = trim($className);
-        $fullClassName = $className;
-        if (strrpos($className, '\\') === false) {
-//            $className = strtolower($className);
-            $fullClassName = $this->classMap->getNamespace() . '\\' . $className;
-        }
-        if ((!isset($this->classes[$fullClassName])) || ($alias != '')) {
-            $this->classes[$fullClassName] = array($fullClassName, $alias);
-        }
-        if (!$classMap) {
-            $classMap = $this->manager->getClassMap($fullClassName);
-        }
+        $className = trim($classMap->getName());
+        //$this->classes[$className] = [$className, $alias];
+        $this->classMaps[$className] = $classMap;
         if ($alias != '') {
-            $this->registerAlias($alias, $classMap);
-        }
-        if ($classMap) {
-            $this->maps[$className] = $classMap;
-            $this->maps[$fullClassName] = $classMap;
+            $this->classAlias[$alias] = $className;
         }
         return $this;
     }
 
-    public function addClassMap($classMap, $alias = '')
+    public function getOperand(mixed $operand, bool $accentInsensitive = false): OperandObject|OperandNull|OperandString|OperandStringAI|OperandAttributeMap|OperandArray|OperandCriteria|OperandFunction|OperandList
     {
-        $className = $classMap->getName();
-        $this->addClass($className, $alias, $classMap);
+        if (is_null($operand)) {
+            $o = new OperandNull($operand);
+        } elseif (is_object($operand)) {
+            if ($operand instanceof AttributeMap) {
+                $o = new OperandAttributeMap('', $operand, $this);
+            } elseif ($operand instanceof RetrieveCriteria) {
+                $o = new OperandCriteria($operand, $this);
+            } else {
+                $o = new OperandObject($operand, $this);
+            }
+        } elseif (is_array($operand)) {
+            $o = new OperandArray($operand);
+        } else { // string
+            if ($accentInsensitive) {
+                $o = new OperandStringAI($operand, $this);
+            } else {
+                $o = new OperandString($operand, $this);
+            }
+        }
+        return $o;
     }
 
-    public function registerAlias($alias, $class = NULL)
+    public function getTableName(string $className): string
+    {
+        $classMap = Manager::getPersistentManager()->getClassMap($className);
+        return $classMap->getTableName();
+    }
+
+    public function getConditionCriteria($op1, $operator = '', $op2 = NULL): ConditionCriteria
+    {
+        $conditionCriteria = new ConditionCriteria();
+        if ($op1 instanceof ConditionCriteria) {
+            $conditionCriteria->add($op1);
+        } elseif ($op1 instanceof PersistentCondition) {
+            $conditionCriteria->add($op1);
+        } else {
+            $condition = new PersistentCondition($op1, $operator, $op2);
+            $condition->setCriteria($conditionCriteria);
+            $conditionCriteria->add($condition);
+        }
+        return $conditionCriteria;
+    }
+
+
+    public function getMap(string $className): ClassMap|null
+    {
+        $className = trim($className);
+        return $this->classMaps[$className] ?? null;
+    }
+
+
+    /**
+     * Add class to be used on FROM clause
+     * @param string $className
+     * @param string $alias
+     * @param ClassMap|null $classMap
+     * @return $this
+     */
+    public function addClass(ClassMap|RetrieveCriteria $class, string $alias = ''): PersistentCriteria
     {
         if ($class instanceof ClassMap) {
-            $this->aliases[$alias] = $class;
-        } else {
-            $classMap = $this->manager->getClassMap($class);
-            $this->aliases[$alias] = $classMap;
+            $className = $class->getName();
         }
-    }
-
-    public function getAlias(string $className = '')
-    {
-        if ($className != '') {
-            $alias = $this->classes[$className][1] ?? '';
-        } else {
-            $alias = $this->alias;
+        if ($class instanceof RetrieveCriteria) {
+            $className = $class->getClassMap()->getName();
         }
-        return $alias;
-    }
-
-    public function setAlias($alias, $class = NULL)
-    {
-        if ($class == NULL) {
-            $class = $this->classMap;
-            $this->alias = $alias;
-            $this->classes[$class->getName()] = array($class->getName(), $alias);
-        }
-        $this->registerAlias($alias, $class);
+        $this->classes[$className] = [$class, $alias];
+        $this->classAlias[$alias] = $className;
         return $this;
     }
 
-    public function getMapFromAlias($alias)
+    /*
+    public function addClass(string $className, string $alias = '', ClassMap $classMap = NULL): PersistentCriteria
+    {
+        $className = trim($className);
+        if (is_null($classMap)) {
+            $classMap = Manager::getPersistentManager()->getClassMap($className);
+            $this->maps[$className] = $classMap;
+        }
+        $registerAlias = $alias ?? $classMap->getTableName();
+        $this->classes[$className] = [$className, $registerAlias];
+        $this->classAlias[$registerAlias] = $className;
+        return $this;
+    }
+    */
+
+    /*
+    public function registerAlias(string $alias, string $aliased): void
+    {
+        if ($aliased instanceof AttributeCriteria) {
+            $this->attributeAlias[$alias] = $aliased;
+        }
+        if ($aliased instanceof AssociationCriteria) {
+            $this->associationAlias[$alias] = $aliased;
+        }
+    }
+    */
+
+    public function getAlias(): string
+    {
+        return $this->alias;
+    }
+
+    public function isAlias(string $name): bool
+    {
+        return (isset($this->associationAlias[$name]) || isset($this->attributeAlias[$name]));
+    }
+
+    public function isAssociationAlias(string $name): bool
+    {
+        return isset($this->associationAlias[$name]);
+    }
+
+    public function getActualAssociationAlias(string $alias): string
+    {
+        if (!isset($this->actualAssociationAlias[$alias])) {
+            $this->actualAssociationAlias[$alias] = 0;
+        }
+        return $alias . '_' . ++$this->actualAssociationAlias[$alias];
+    }
+
+    public function isClassAlias(string $name): bool
+    {
+        return (isset($this->classAlias[$name]));
+    }
+
+    public function getClassAlias(string $name): string
+    {
+        return $this->classAlias[$name] ?? '';
+    }
+
+    public function isAttributeAlias(string $name): bool
+    {
+        return (isset($this->attributeAlias[$name]));
+    }
+
+    public function getAttributeAlias(string $name): string
+    {
+        return $this->attributeAlias[$name] ?? '';
+    }
+
+    public function setAttributeAlias(string $alias, string $value): void
+    {
+        $this->attributeAlias[$alias] = $value;
+    }
+
+    public function setAlias(string $alias)
+    {
+        $this->alias = $alias;
+        return $this;
+    }
+
+    /*
+    public function setAlias(string $alias, ClassMap|string $aliased = null)
+    {
+        if ($aliased == null) {
+            $className = $this->classMap->getName();
+            $this->alias = $alias;
+            $this->classes[$className] = [$className, $alias];
+        } else {
+            $this->registerAlias($alias, $aliased);
+        }
+        return $this;
+    }
+
+    public function getMapFromAlias($alias): ClassMap|string
     {
         return $this->aliases[$alias];
     }
+    */
 
-    public function isAlias($name)
+
+    public function getAliases(): array
     {
-        return (isset($this->aliases[$name]));
+        return $this->classAlias;
     }
 
-    public function getAliases()
-    {
-        return $this->aliases;
-    }
 
     /**
      * Merge aliases from outer criteria.
-     * @param <type> $criteria
+     * @param PersistentCriteria $criteria
      */
-    public function mergeAliases($criteria)
+
+    public function mergeAliases(PersistentCriteria $criteria)
     {
         $aliases = $criteria->getAliases();
-        if (count($aliases)) {
+        if (count($aliases) > 0) {
             foreach ($aliases as $alias => $classMap) {
-                if (!isset($this->alias[$alias])) {
-                    $this->aliases[$alias] = $classMap;
+                if (!isset($this->classAlias[$alias])) {
+                    $this->classAlias[$alias] = $classMap;
                 }
             }
         }
     }
 
-    public function setAssociationAlias($associationName, $alias)
+
+    public function setAssociationAlias(string $associationName, string $alias)
     {
-        $association = $this->getAssociation($associationName);
-        if ($association == NULL) {
-            $association = $this->addAssociation($associationName);
+        $associationCriteria = $this->getAssociationCriteria($associationName);
+        if ($associationCriteria == NULL) {
+            $associationCriteria = $this->addAssociationCriteria($associationName);
         }
-        $association->setAlias($alias);
-        $classMap = $association->getAssociationMap()->getToClassMap();
-        $this->setAlias($alias, $classMap);
+        $associationCriteria->setAlias($alias);
+        $this->associationAlias[$alias] = $associationName;
+        //$classMap = $associationCriteria->getAssociationMap()->getToClassMap();
+        //$this->setAlias($alias, $classMap);
         return $this;
     }
 
-    public function setAssociationType($associationName, $joinType)
+    public function setAssociationType(string $associationName, string $joinType)
     {
-        $association = $this->getAssociation($associationName);
-        if ($association == NULL) {
-            $association = $this->addAssociation($associationName);
+        $associationCriteria = $this->getAssociationCriteria($associationName);
+        if ($associationCriteria == NULL) {
+            $associationCriteria = $this->addAssociationCriteria($associationName);
         }
-        $association->setJoinType($joinType);
+        $associationCriteria->setJoinType($joinType);
         return $this;
     }
 
-    public function setAutoAssociation($alias1, $alias2, $condition = '', $joinType = 'INNER')
+    public function setAutoAssociation(string $alias1, string $alias2, string $condition = '', string $joinType = 'INNER')
     {
         $className = $this->classMap->getName();
         $this->setAlias($alias1);
-        $this->addClass($className, $alias1);
-        $this->addClass($className, $alias2);
-        $this->autoAssociation = array($className . ' ' . $alias1, $className . ' ' . $alias2, $condition, $joinType);
+        $this->addClassMap($this->classMap, $alias1);
+        $this->addClassMap($this->classMap, $alias2);
+        $this->autoAssociation = [$className . ' ' . $alias1, $className . ' ' . $alias2, $condition, $joinType];
         return $this;
     }
 
-    public function setReferenceAlias($alias)
+    /**
+     * Build a join array from automatic joins (to be used at sql statement)
+     * @return array
+     */
+    public function getAssociationsJoin(): array
     {
-        $className = $this->classMap->getName();
-        $this->addClass($className, $alias);
-        return $this;
-    }
-
-    public function getAssociationsJoin()
-    {
-        // Build a join array to sql statement
-        $join = array();
-
-        // Inheritance associations
-        $classMap = $this->classMap;
-
-        do {
-            for ($i = 0; $i < $classMap->getReferenceSize(); $i++) {
-                $attributeMap = $classMap->getReferenceAttributeMap($i);
-                $tableName1 = $attributeMap->getClassMap()->getTableName();
-                $tableAlias1 = $this->tables[$tableName1];
-                $tableName1 .= ' ' . $tableAlias1;
-                $referenceAttributeMap = $attributeMap->getReference();
-                $tableName2 = $referenceAttributeMap->getClassMap()->getTableName();
-                $tableAlias2 = $this->tables[$tableName2];
-                $tableName2 .= ' ' . $tableAlias2;
-                $condition = $attributeMap->getFullyQualifiedName($tableAlias1) . "=" . $referenceAttributeMap->getFullyQualifiedName($tableAlias2);
-                $join[] = array($tableName1, $tableName2, $condition, 'INNER');
-            }
-            $classMap = $classMap->getSuperClassMap();
-        } while ($classMap != NULL);
-
+        $join = [];
         // AutoAssociation
         if ($this->autoAssociation) {
             $class1 = $this->getOperand($this->autoAssociation[0])->getSql();
             $class2 = $this->getOperand($this->autoAssociation[1])->getSql();
             $condition = $this->getOperand($this->autoAssociation[2])->getSql();
-            $join[] = array($class1, $class2, $condition, $this->autoAssociation[3]);
+            $join[] = [$class1, $class2, $condition, $this->autoAssociation[3]];
         }
 
         // Associations
@@ -266,88 +370,224 @@ class PersistentCriteria extends BaseCriteria
         return $join;
     }
 
-    public function getForcedJoin()
+    /**
+     * Build a join array from forced joins (to be used at sql statement)
+     * @return array
+     */
+    public function getForcedJoin(): array
     {
-        // Build a join array to sql statement
-        $join = array();
+        $join = [];
 
         // Forced joins
         if (count($this->joins)) {
             foreach ($this->joins as $forcedJoin) {
-                $class1 = $this->getOperand($forcedJoin[0])->getSql();
-                $class2 = $this->getOperand($forcedJoin[1])->getSql();
-                $condition = $this->getOperand($forcedJoin[2])->getSql();
-                $join[] = array($class1, $class2, $condition, $forcedJoin[3]);
+                list($className0, $alias0) = explode(' ', $forcedJoin[0]);
+                list($className1, $alias1) = explode(' ', $forcedJoin[1]);
+                $classMap0 = $this->classes[$className0][0];
+                $classMap1 = $this->classes[$className1][0];
+                $table0 = $classMap0->getTableName();
+                if ($table0 != $alias0) {
+                    $table0 .= ' ' . $alias0;
+                }
+                $table1 = $classMap1->getTableName();
+                if ($table1 != $alias1) {
+                    $table1 .= ' ' . $alias1;
+                }
+                $op = explode(' ', $forcedJoin[2]);
+                $condition = new PersistentCondition($op[0], $op[1], $op[2]);
+                $condition->setCriteria($this);
+                $conditionSql = $condition->getSql();
+                $join[] = [$table0, $table1, $conditionSql, $forcedJoin[3]];
             }
         }
-
         return $join;
     }
 
-    public function getAttributeMap(&$attribute)
+    /*
+    public function getAttributeMap(string $attribute): AttributeMap|null
     {
-        if ($this->checkAttributesToSkip($attribute)) {
-            return;
-        }
-        $attributeMap = null;
-        $classMap = $this->classMap;
-        $tokens = preg_split('/[.]+/', $attribute);
-        if (count($tokens) > 1) { // has associations
-            for ($i = 0; $i < count($tokens) - 1; $i++) {
-                $name = $tokens[$i];
-                if ($this->isAlias($name)) {
-                    $classMap = $this->getMapFromAlias($name);
-                } else {
-                    $existentMap = $this->getMap($name);
-                    if ($existentMap instanceof ClassMap) {
-                        $classMap = $existentMap;
-                        break;
-                    } else {
-                        $currentClassMap = $classMap;
-                        $association = $this->getAssociation($name, $classMap)
-                            ?: $this->addAssociation($name, 'INNER', $classMap);
-                        if ($association == NULL) {
-                            return $association;
-                        }
-                        $associationMap = $association->getAssociationMap();
-                        // If association map is NULL something wrong with names
-                        if (isset($associationMap)) {
-                            $classMap = $associationMap->getToClassMap();
-                        } else {
-                            $classMap = $this->getMap($name);
-                            if (!isset($classMap)) {
-                                throw new ERuntimeException($currentClassMap->getName() . ' Invalid association/alias name [' . $name . '] in attribute [' . $attribute . ']');
-                            }
-                        }
-                    }
-                }
-            }
+        $attributeCriteria = new AttributeCriteria($attribute);
+        $attributeCriteria->setCriteria($this);
+        return $attributeCriteria->getAttributeMap();
+    }
+    */
 
-            if ($classMap != NULL) {
-                $attribute = array_pop($tokens);
-                $attributeMap = $classMap->getAttributeMap($attribute, TRUE);
-                if (($classMap == NULL) || ($this->isAlias($name))) {
-                    $attribute = $name . '.' . $attribute;
-                }
+    public function getAttributeCriteria(string $attribute): AttributeCriteria
+    {
+        $attributeCriteria = new AttributeCriteria($attribute);
+        $attributeCriteria->setCriteria($this);
+        return $attributeCriteria;
+    }
+
+    public function getAssociationMap(string $attribute): AssociationMap|null
+    {
+        $associationCriteria = new AssociationCriteria($attribute);
+        $associationCriteria->setCriteria($this);
+        return $associationCriteria->getAssociationMap();
+    }
+
+    /*
+     * Attribute methods
+     */
+
+    /*
+    public function addAttributeCriteria(string $name, string $alias = ''): AttributeCriteria
+    {
+        $attributeCriteria = new AttributeCriteria($name);
+        $attributeCriteria->setCriteria($this);
+        if ($alias != '') {
+            $attributeCriteria->setAlias($alias);
+            //$this->attributeAlias[$alias] = $attributeCriteria;
+        }
+        return $attributeCriteria;
+    }
+    */
+
+    /*
+     * Associations methods
+     */
+    public function getAssociationCriteria(string $associationName, ClassMap $classMap = NULL): AssociationCriteria|null
+    {
+        $associationCriteria = $this->associations[$associationName] ?? null;
+        /*
+        if ($classMap == NULL) {
+            $classMap = $this->classMap;
+        }
+        $associationCriteria = NULL;
+        foreach ($this->associations as $tempAssociationCriteria) {
+            $classMapName = $classMap->getName();
+            $prefixedAssociationName = $classMapName . '.' . $associationName;
+            $associationCriteriaName = $tempAssociationCriteria->getName();
+            $associationCriteriaAlias = $tempAssociationCriteria->getAlias();
+            if (($associationCriteriaName == $prefixedAssociationName)
+                || ($associationCriteriaAlias == $associationName)
+                || ($associationCriteriaName == $associationName)
+            ) {
+                $associationCriteria = $tempAssociationCriteria;
+                break;
             }
+        }
+        */
+        return $associationCriteria;
+    }
+
+    public function addAssociationCriteria(
+        string $name,
+        string $joinType = 'INNER',
+        ClassMap $classMap = null,
+        string $fromAlias = null
+    ): AssociationCriteria|null
+    {
+        if ($classMap == NULL) {
+            $classMap = $this->classMap;
         } else {
-            $attributeMap = $classMap->getAttributeMap($attribute, TRUE);
-            if (($classMap != NULL) && ($this->getAlias())) {
-                $attribute = $this->getAlias() . '.' . $attribute;
-            }
+            $this->addClassMap($classMap);
         }
-        return $attributeMap;
+        $tokens = preg_split('/[.]+/', $name);
+        if (count($tokens) > 1) { // associação indireta: baseClass.x.y.assoc
+            $fromAlias ??= $classMap->getTableName();
+            for ($i = 0; $i < count($tokens); $i++) {
+                $associationName = $tokens[$i];
+                // add prefix, to avoid collision
+                $composedName = $fromAlias . '.' . $associationName;
+                // associationCriteria already exists?
+                $associationCriteria = $this->getAssociationCriteria($composedName, $classMap);
+                if ($associationCriteria == NULL) {
+                    $associationMap = $classMap->getAssociationMap($associationName);
+                    $a = $this->newAssociationCriteria($composedName, $associationMap);
+                    $classMap = $associationMap->getToClassMap();
+                    $this->addClassMap($classMap);
+                } else {
+                    $associationMap = $classMap->getAssociationMap($associationName);
+                    $classMap = $associationMap->getToClassMap();
+                    $a = $associationCriteria;
+                }
+                $alias = $this->getActualAssociationAlias($associationName);
+                $a->setAlias($alias);
+                $a->setFromAlias($fromAlias);
+                //mdump('== '. $a->getName() . ' -  from Alias = ' . $a->getFromAlias() . ' -  alias = ' . $a->getAlias());
+                $fromAlias = $alias;
+            }
+            return $a;
+        } else {  // associação direta: baseClass.assoc
+            $fromAlias ??= $classMap->getTableName();
+            $associationMap = $classMap->getAssociationMap($name);
+            $composedName = $fromAlias . '.' . $name;
+            $a = $associationCriteria = $this->newAssociationCriteria($composedName, $associationMap, $joinType);
+            $alias = $this->getActualAssociationAlias($name);
+            $a->setAlias($alias);
+            $associationCriteria->setFromAlias($fromAlias);
+            //mdump('== direct  '. $a->getName() . ' -  from Alias = ' . $a->getFromAlias() . ' -  alias = ' . $a->getAlias());
+            // test if toClass has additional conditions
+            if ($associationMap != NULL) {
+                $toClassMap = $associationMap->getToClassMap();
+                $conditions = $toClassMap->getConditions();
+                foreach ($conditions as $condition) {
+                    //$this->whereConditionCriteria->and_($alias . '.' . $condition[0], $condition[1], $condition[2]);
+                    $op2 = $this->getOperand($condition[2])->getSqlWhere();
+                    $associationCriteria->addCondition($alias . '.' . $condition[0], $condition[1], $op2);
+                }
+            }
+            return $associationCriteria;
+        }
     }
 
-    private function checkAttributesToSkip($attribute)
+    public function newAssociationCriteria(string $name, AssociationMap $associationMap, string $joinType = 'INNER'): AssociationCriteria
     {
-        return (($attribute[0] ?? '') == ':') || (in_array(trim($attribute), ['', '=', '?', '(', ')', 'and', 'or', 'not']));
+        $associationCriteria = new AssociationCriteria($name);
+        $associationCriteria->setCriteria($this);
+        $associationCriteria->setJoinType($joinType);
+        $associationCriteria->setAssociationMap($associationMap);
+        $this->associations[$name] = $associationCriteria;
+        return $this->associations[$name];
     }
+
+
+    /*
+     * getters
+     */
+
+    public function getColumns(): array
+    {
+        return $this->columns;
+    }
+
+    public function getGroups(): array
+    {
+        return $this->groups;
+    }
+
+    public function getOrders(): array
+    {
+        return $this->orders;
+    }
+
+    public function getJoins(): array
+    {
+        return $this->joins;
+    }
+
+    public function getClasses(): array
+    {
+        return $this->classes;
+    }
+
+    public function getTableCriteria(): array
+    {
+        return $this->tableCriteria;
+    }
+
+    public function getParameters(): array
+    {
+        return $this->parameters;
+    }
+
 
     /*
      * Criteria clauses
      */
 
+    /*
     public function addColumnAttribute($attribute, $label = '')
     {
         $attribute = trim($attribute);
@@ -394,11 +634,6 @@ class PersistentCriteria extends BaseCriteria
         $this->convertMultiCriteria($condition, $this->whereCondition);
     }
 
-    /**
-     * A criteria used at FROM clause.
-     * @param <type> $criteria
-     * @param <type> $alias
-     */
     public function tableCriteria($criteria, $alias)
     {
         $sql = $criteria->getSqlStatement();
@@ -427,12 +662,12 @@ class PersistentCriteria extends BaseCriteria
 
     public function addHavingCriteria($op1, $operator, $op2)
     {
-        $this->havingCondition->addCriteria($this->getCriteria($op1, $operator, $op2));
+        $this->havingConditionCriteria->addCriteria($this->getCriteria($op1, $operator, $op2));
     }
 
     public function addOrHavingCriteria($op1, $operator, $op2)
     {
-        $this->havingCondition->addOrCriteria($this->getCriteria($op1, $operator, $op2));
+        $this->havingConditionCriteria->addOrCriteria($this->getCriteria($op1, $operator, $op2));
     }
 
     public function addOrderAttribute($attribute, $ascend = TRUE)
@@ -453,94 +688,14 @@ class PersistentCriteria extends BaseCriteria
             $this->parameters[] = $value;
         }
     }
+    */
 
-    /*
-     * Associations methods
-     */
-
-    public function getAssociation($associationName, $classMap = NULL)
-    {
-        if ($classMap == NULL) {
-            $classMap = $this->classMap;
-        }
-        $associationCriteria = NULL;
-        foreach ($this->associations as $a) {
-            $classMapName = $classMap->getName();
-            $prefixedAssociationName = $classMapName . '.' . $associationName;
-            /*
-            if ($classMap != NULL) { // classMap definido
-                $classMapName = $classMap->getName();
-                if ($classMapName != $this->classMap->getName()) { // não é o classMap corrente
-                    $name =  $classMapName . '.' . $associationName;
-                } else {
-                    $name =  $associationName; // classMap corrente
-                }
-            } else {
-                $name =  $associationName; // classMap corrente
-            }
-             * 
-             */
-            if (($a->getName() == $prefixedAssociationName) || ($a->getAlias() == $associationName)) {
-                $associationCriteria = $a;
-            }
-        }
-        return $associationCriteria;
-    }
-
-    public function addAssociation($name, $joinType = 'INNER', $classMap = NULL)
-    {
-        if ($classMap == NULL) {
-            $classMap = $this->classMap;
-        } else {
-            $this->addClassMap($classMap);
-        }
-        $tokens = preg_split('/[.]+/', $name);
-        if (count($tokens) > 1) { // associação indireta
-            for ($i = 0; $i < count($tokens); $i++) {
-                $associationName = $tokens[$i];
-                // acrescenta um prefixo, para evitar colisão de nomes de associações
-                $prefixedAssociationName = $classMap->getName() . '.' . $associationName;
-                $associationCriteria = $this->getAssociation($prefixedAssociationName, $classMap);
-                if ($associationCriteria == NULL) {
-                    $associationMap = $classMap->getAssociationMap($associationName);
-                    //$a = $this->addAssociationCriteria((($i > 0) ? $name : '') . $associationName, $associationMap);
-                    $a = $this->addAssociationCriteria($prefixedAssociationName, $associationMap);
-                    $classMap = $associationMap->getToClassMap();
-                } else {
-                    $associationMap = $classMap->getAssociationMap($associationName);
-                    $classMap = $associationMap->getToClassMap();
-                    $a = $associationCriteria;
-                }
-            }
-            return $a;
-        } else {  // associação direta
-            $associationMap = $classMap->getAssociationMap($name);
-            $name = $classMap->getName() . '.' . $name;
-            $associationCriteria = $associationMap ? $this->addAssociationCriteria($name, $associationMap, $joinType) : null;
-            while ($associationMap != NULL) { // se a classe for uma subClasse, adiciona a associação com a superClasse
-                $classMap = $associationMap->getToClassMap();
-                $associationMap = $classMap->getSuperAssociationMap();
-                if ($associationMap != NULL) {
-                    $name = $associationMap->getName();
-                    $name = $classMap->getName() . '.' . $name;
-                    $this->addAssociationCriteria($name, $associationMap, 'INNER');
-                }
-            }
-            return $associationCriteria;
-        }
-    }
-
-    public function addAssociationCriteria($name, $associationMap, $joinType = 'INNER')
-    {
-        $this->associations[$name] = new AssociationCriteria($name, $this, $joinType);
-        $this->associations[$name]->setAssociationMap($associationMap);
-        return $this->associations[$name];
-    }
 
     /*
      * Retrieve methods
      */
 
+    /*
     public function retrieveAsQuery($parameters = null)
     {
         return $this->manager->processCriteriaAsQuery($this, $parameters);
@@ -565,5 +720,5 @@ class PersistentCriteria extends BaseCriteria
     {
         return $this->manager->processCriteriaAsProxyCursor($this, $parameters);
     }
-
+    */
 }

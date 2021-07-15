@@ -25,7 +25,8 @@ class SessionMiddleware implements Middleware
         //mdump($jwtHeader);
         if (!$jwtHeader) {
             //throw new AuthException('JWT Token required.', 400);
-            $idSession = session_id();//uniqid('session_');
+            //$idSession = session_id();//uniqid('session_');
+            $idSession = $_COOKIE['PHPSESSID'] ?? session_id();
         } else {
             $jwt = explode('Bearer ', $jwtHeader);
             if (isset($jwt[2])) {
@@ -34,7 +35,6 @@ class SessionMiddleware implements Middleware
                 $idSession = md5($jwt[1]);
             }
         }
-        mdump('===id session = ' . $idSession);
         session_id($idSession);
         $session = new MSession();
         $session->init();

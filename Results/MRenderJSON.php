@@ -2,6 +2,9 @@
 
 namespace Orkester\Results;
 
+use Slim\Psr7\Request;
+use Slim\Psr7\Response;
+
 /**
  * MRenderJSON.
  * Retorna objeto JSON com o resultado do processamento.
@@ -16,11 +19,14 @@ class MRenderJSON extends MResult
         $this->content = $json;
     }
 
-    public function apply($request, $response)
+    public function apply(Request $request, Response $response): Response
     {
-        $this->nocache($response);
-        $response->setHeader('Content-type', 'Content-type: application/json; charset=UTF-8');
-        $response->setOut($this->content);
+        $payload = $this->content;
+        $body = $response->getBody();
+        $body->write($payload);
+        return $response
+            ->withHeader('Content-Type', 'application/json')
+            ->withStatus(200);
     }
 
 }

@@ -38,7 +38,7 @@ class MActionController extends MController
         $controllerClass = "App\\Modules\\{$this->module}\\Controllers\\{$this->controller}Controller";
         mdump('==== '. $controllerClass);
         $controller = Manager::getContainer()->make($controllerClass);
-        $result = $controller->dispatch($this->action);
-        return $result->apply($request, $response);
+        $controller->parseRoute($request, $response);
+        return $controller->dispatch($this->action);
     }
 }

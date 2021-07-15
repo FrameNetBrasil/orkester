@@ -2,15 +2,117 @@
 
 namespace Orkester\MVC;
 
-use Orkester\Exception\ERuntimeException;
-use JsonSerializable;
-use Orkester\Persistence\PersistentObject;
-use Orkester\Types\MTypes;
-use Orkester\Utils\MDataValidator;
-use Serializable;
+use Atk4\Data\Model;
+use Atk4\Data\Persistence;
 
-class MModel extends PersistentObject implements JsonSerializable, Serializable
+class MModel extends Model
 {
+    protected int $_totalRecords;
+
+    public function setData(array|object|null $data = null): void
+    {
+        if (is_null($data)) {
+            return;
+        }
+        if (is_object($data)) {
+            $data = get_object_vars($data);
+        }
+        foreach ($this->fields as $fieldName => $field) {
+            if (isset($data[$fieldName])) {
+                $value = $data[$fieldName];
+                $this->set($fieldName, $value);
+            }
+        }
+    }
+
+    public static function newEntity(Persistence $db, int $id = null): static {
+        $model = new static($db);
+        if (is_null($id)) {
+            return $model->createEntity();
+        }
+        else {
+            return $model->load($id);
+        }
+    }
+
+    public function queryParams(object $params)
+    {
+        $page = $params->pagination->page ?? 0;
+        if ($params->pagination->rows ?? false) {
+            $offset = $page * $params->pagination->rows;
+            mdump('rows = ' . $params->pagination->rows);
+            mdump('offset = ' . $offset);
+            $this->setLimit($params->pagination->rows, $offset);
+        }
+        if ($params->pagination->sort ?? false) {
+            $desc = ($params->pagination->order == -1) ? 'desc' : 'asc';
+            $this->setOrder($params->pagination->sort, $desc);
+        }
+        if (property_exists($params, 'filter') && is_object($params->filter)) {
+            foreach ($params->filter as $filterField => $condition) {
+                $op = '=';
+                $value = $condition->value;
+                if ($value != '') {
+                    if ($condition->matchMode == 'startsWith') {
+                        $op = 'LIKE';
+                        $value = "{$condition->value}%";
+                    }
+                    if ($condition->matchMode == 'contains') {
+                        $op = 'LIKE';
+                        $value = "%{$condition->value}%";
+                    }
+                    if ($condition->matchMode == 'notContains') {
+                        $op = 'NOT LIKE';
+                        $value = "%{$condition->value}%";
+                    }
+                    if ($condition->matchMode == 'endsWith') {
+                        $op = 'LIKE';
+                        $value = "%{$condition->value}";
+                    }
+                    if ($condition->matchMode == 'equals') {
+                        $op = '=';
+                        $value = $condition->value;
+                    }
+                    if ($condition->matchMode == 'notEquals') {
+                        $op = '<>';
+                        $value = $condition->value;
+                    }
+                    mdump('op = ' . $op);
+                    mdump('value = ' . $value);
+                    $this->addCondition($filterField, $op, $value);
+                }
+            }
+        }
+        $action = $this->action('count');
+        $this->_totalRecords = (int)$action->getOne();
+    }
+
+    public static function list(Persistence $persistence, object|callable $conditions, callable $projection): object
+    {
+        $instance = new static($persistence);
+        if (is_callable($conditions)) {
+            $conditions($instance);
+        }
+        else {
+            $instance->queryParams($conditions);
+        }
+        $instance->tryLoadAny();
+        $data = [];
+        foreach ($instance as $key => $item)
+        {
+            $data[$key] = $projection($item);
+        }
+        if(!isset($instance->_totalRecords)) {
+            $action = $instance->action('count');
+            $instance->_totalRecords = (int)$action->getOne();
+        }
+        return (object)[
+            'data' => $data,
+            'total' => $instance->_totalRecords
+        ];
+    }
+
+    /*
     public static array $ORMMap = [];
     public static array $config = [
         'log' => [],
@@ -37,54 +139,17 @@ class MModel extends PersistentObject implements JsonSerializable, Serializable
         throw new ERuntimeException("Class " . $this::class . ': method ' . $method . "doesn't exist.");
     }
 
-    /**
-     * Atribui $value para o atributo $attribute.
-     * @param string $attribute
-     * @param mixed $value
-     */
     public function set(string $attributeName, $value): void
     {
         $this->$attributeName = $value;
     }
 
-    /**
-     * Valor corrente do atributo $attribute.
-     * @param string $attribute
-     * @return mixed
-     */
     public function get(string $attributeName)
     {
         return $this->$attributeName;
     }
 
-    /**
-     * Recebe um ValueObject com valores planos e inicializa os atributos do Model.
-     * @param object $data
-     */
-    public function setData(object|null $data = null): void
-    {
-        if (is_null($data)) {
-            return;
-        }
-        if (is_object($data)) {
-            $data = get_object_vars($data);
-        }
-        $attributes = $this->getAttributesFromMap();
-        foreach ($attributes as $attribute => $definition) {
-            if (isset($data[$attribute])) {
-                $value = $data[$attribute];
-                $type = $definition['type'];
-                $conversion = 'get' . $type;
-                $typedValue = MTypes::$conversion($value);
-                $this->set($attribute, $typedValue);
-            }
-        }
-    }
 
-    /**
-     * Retorna um ValueObject com atributos com valores planos (tipo simples).
-     * @return \stdClass
-     */
     public function getData(): object
     {
         $data = new \stdClass();
@@ -108,38 +173,23 @@ class MModel extends PersistentObject implements JsonSerializable, Serializable
         return $data;
     }
 
-    /**
-     * Validação dos valores de atributos com base em $config[validators].
-     * $exception indica se deve ser disparada uma exceção em caso de falha.
-     * @param boolean $exception
-     */
     public function validate(bool $exception = true): bool
     {
         $validator = new MDataValidator();
         return $validator->validateModel($this, $exception);
     }
 
-    /**
-     * Valor do atributo de descrição do Model.
-     * @return string
-     */
-    /*
     public function getDescription(): string
     {
         $idAttribute = $this->getPKName();
         return '';//$this->$idAttribute;
     }
-    */
 
     public function isLogEnabled(): bool
     {
         return count(self::$config['log']) > 0;
     }
 
-    /**
-     * Descrição usada para Log.
-     * @return string
-     */
     public function getLogDescription(): string
     {
         if ($this->isLogEnabled()) {
@@ -163,9 +213,6 @@ class MModel extends PersistentObject implements JsonSerializable, Serializable
         return count($this->getDiffData()) > 0;
     }
 
-    /**
-     * Retorna a diferenca entre data e originalData
-     */
     public function getDiffData(): array
     {
         $actual = get_object_vars($this->getData());
@@ -239,5 +286,5 @@ class MModel extends PersistentObject implements JsonSerializable, Serializable
     {
         $this->setData(unserialize($serialized));
     }
-
+    */
 }

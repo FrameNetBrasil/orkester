@@ -15,7 +15,7 @@ abstract class MResult
 
     public function __construct()
     {
-        $this->ajax = Manager::getAjax();
+        //$this->ajax = Manager::getAjax();
         $this->content = null;
     }
 

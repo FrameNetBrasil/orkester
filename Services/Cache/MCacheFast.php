@@ -18,7 +18,7 @@ class MCacheFast
         CacheManager::setDefaultConfig(new ConfigurationOption([
             'path' => $path
         ]));
-        $this->cache = new Psr16Adapter($driver);
+        $this->cache = new Psr16Adapter('apcu');
     }
 
     public function getCache(): Psr16Adapter

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Orkester\Middleware;
 
+use App\Services\LutmaService;
+use App\Services\User\GetOrCreateByAuth0Service;
 use Orkester\Exception\AuthException;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -42,7 +44,7 @@ final class Auth0Middleware implements Middleware
         $this->issuer = Manager::getConf('login.AUTH0_ISSUER');
         $this->audience = Manager::getConf('login.AUTH0_AUDIENCE');
 
-        $this->setCurrentToken($jwt[1]);
+        $this->setCurrentToken($request, $jwt[1]);
         $object = (array)$request->getParsedBody();
         $object['decoded'] = $this->token;
 
@@ -50,12 +52,13 @@ final class Auth0Middleware implements Middleware
         return $handler->handle($request);
     }
 
-    public function setCurrentToken($token) {
+    public function setCurrentToken(Request $request, $token)
+    {
         $cacheHandler = new FileCache(Manager::getOptions('tmpPath'), 600);
-        $jwksUri      = $this->issuer . '.well-known/jwks.json';
+        $jwksUri = $this->issuer . '.well-known/jwks.json';
 
-        $jwksFetcher   = new JWKFetcher($cacheHandler, [ 'base_uri' => $jwksUri ]);
-        $sigVerifier   = new AsymmetricVerifier($jwksFetcher);
+        $jwksFetcher = new JWKFetcher($cacheHandler, ['base_uri' => $jwksUri]);
+        $sigVerifier = new AsymmetricVerifier($jwksFetcher);
         $tokenVerifier = new TokenVerifier($this->issuer, $this->audience, $sigVerifier);
 
         $tks = \explode('.', $token);
@@ -66,23 +69,33 @@ final class Auth0Middleware implements Middleware
         try {
             $this->tokenInfo = $tokenVerifier->verify($token);
             $this->token = $token;
-        }
-        catch(InvalidTokenException $e) {
+            mdump($this->tokenInfo);
+            $data = Manager::getData();
+            $data->userInfoAuth0 = $this->tokenInfo;
+            Manager::setData($data);
+            $userService = new GetOrCreateByAuth0Service();
+            $userData = $userService();
+            //mdump($userInfoAuth0);
+            Manager::getAuth()->registerLogin($userData);
+        } catch (InvalidTokenException $e) {
+            mdump($e->getMessage());
             // Handle invalid JWT exception ...
-            throw new AuthException('Forbidden: you are not authorized.', 403);
+            throw new AuthException($request, 'Forbidden: you are not authorized.');
         }
 
     }
 
     // This endpoint doesn't need authentication
-    public function publicEndpoint() {
+    public function publicEndpoint()
+    {
         return array(
             "status" => "ok",
             "message" => "Hello from a public endpoint! You don't need to be authenticated to see this."
         );
     }
 
-    public function privateEndpoint() {
+    public function privateEndpoint()
+    {
         return array(
             "status" => "ok",
             "message" => "Hello from a private endpoint! You need to be authenticated to see this."
