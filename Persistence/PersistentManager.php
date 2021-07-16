@@ -218,17 +218,22 @@ class PersistentManager
 
         $commands = [];
         $pkValue = $classMap->getObjectKey($object);
+        $hooks = $classMap->getHookMap();
         if ($pkValue == null) { // insert
             $classMap->setObjectKey($object);
             $classMap->setObjectUid($object);
             $statement = $this->persistence->getStatementForInsert($classMap, $object);
             $commands[] = $statement->insert();
+            $hooks->onBeforeInsert($object);
             $this->execute($commands);
             $classMap->setPostObjectKey($object);
+            $hooks->onAfterInsert($object, $classMap->getObjectKey($object));
         } else { // update
             $statement = $this->persistence->getStatementForUpdate($classMap, $object);
             $commands[] = $statement->update();
+            $hooks->onBeforeUpdate($object, $pkValue);
             $this->execute($commands);
+            $hooks->onAfterUpdate($object, $pkValue);
         }
         $this->storeObjectInCache($classMap, $object);
     }

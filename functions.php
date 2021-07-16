@@ -13,24 +13,24 @@ function mdump($var, $tag = null)
     MTrace::traceDump($var, false, 0, $tag);
 }
 
-function mdump1($var)
+function mfatal($var)
 {
-    MTrace::traceDebug("=DEBUG", $var);
+    MTrace::traceDebug("FATAL", $var);
 }
 
-function mdump2($var)
+function merror($var)
 {
-    MTrace::traceDebug("@DEBUG", $var);
+    MTrace::traceDebug("ERROR", $var);
 }
 
-function mdump3($var)
+function mwarn($var)
 {
-    MTrace::traceDebug("#DEBUG", $var);
+    MTrace::traceDebug("WARN", $var);
 }
 
-function mdump4($var)
+function minfo($var)
 {
-    MTrace::traceDebug("\$DEBUG", $var);
+    MTrace::traceDebug("INFO", $var);
 }
 
 function mtrace($var)
