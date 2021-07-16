@@ -7,6 +7,7 @@ use Orkester\MVC\MModelMaestro;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
+use Orkester\Persistence\Map\HookMap;
 
 class PHPConfigLoader extends PersistentConfigLoader
 {
@@ -40,6 +41,24 @@ class PHPConfigLoader extends PersistentConfigLoader
         $databaseName = $map['database'] ?? Manager::getOptions('db');
         $this->classMap = new ClassMap($this->className);
         $this->classMap->setTableName($map['table']);
+
+        $hooks = $map['hooks'] ?? [];
+        $tryGetFunction = function($name) use($className, $hooks) {
+            return
+                $hooks[$name] ??
+                (method_exists($className, $name) ?
+                    "$className::$name" : null);
+        };
+        $this->classMap->setHookMap(
+            new HookMap(
+                $tryGetFunction('onBeforeSave'),
+                $tryGetFunction('onBeforeUpdate'),
+                $tryGetFunction('onBeforeInsert'),
+                $tryGetFunction('onAfterSave'),
+                $tryGetFunction('onAfterUpdate'),
+                $tryGetFunction('onAfterInsert')
+            )
+        );
         if (isset($map['extends'])) {
             $this->classMap->setSuperClassName($map['extends']);
         }

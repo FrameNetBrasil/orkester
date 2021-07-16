@@ -37,7 +37,7 @@ class MTrace
         if (strlen($tag) > 0) {
             Manager::getLog()->logMessage('[' . strtoupper($tag) . ']' . $message);
         } else {
-            Manager::getLog()->logMessage('[CUSTOM]' . $message);
+            Manager::getLog()->logMessage('[DEBUG]' . $message);
         }
     }
 

@@ -24,7 +24,7 @@ class PersistenceSQL implements PersistenceBackend
 
     public function __construct()
     {
-        $this->db = Manager::getDatabase(Manager::getOptions('datasource'));
+        $this->db = Manager::getDatabase(Manager::getOptions('db'));
     }
 
     public function getPlatform()

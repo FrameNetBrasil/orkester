@@ -106,10 +106,10 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         return self::getAssociationRows($classMap, $associationChain, $id);
     }
 
-    public static function getAssociationOne(string $associationChain, int $id): object|null
+    public static function getAssociationOne(string $associationChain, int $id): array|null
     {
         $rows = static::getAssociation($associationChain, $id);
-        return $rows[0][0];
+        return $rows[0];
     }
 
 
@@ -605,4 +605,3 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
     }
     */
 }
-
