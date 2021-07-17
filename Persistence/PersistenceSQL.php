@@ -56,7 +56,11 @@ class PersistenceSQL implements PersistenceBackend
         $statement->setDb($this->db);
         // columns
         $columns = [];
-        $attributeMaps = $classMap->getInsertAttributeMaps();
+        $attributeMaps = array_filter(
+            $classMap->getInsertAttributeMaps(),
+            fn ($attributeMap) => empty($attributeMap->getReference())
+        );
+
         foreach ($attributeMaps as $attributeMap) {
             $columns[] = $attributeMap->getColumnName();
         }
@@ -79,20 +83,20 @@ class PersistenceSQL implements PersistenceBackend
         $statement->setDb($this->db);
         // columns
         $columns = [];
-        $attributeMaps = $classMap->getUpdateAttributeMaps();
+        $attributeMaps = array_filter(
+            $classMap->getInsertAttributeMaps(),
+            fn ($attributeMap) => empty($attributeMap->getReference())
+        );
+
         foreach ($attributeMaps as $attributeMap) {
-            if ($attributeMap->getReference() == '') {
-                $columns[] = $attributeMap->getColumnName();
-            }
+            $columns[] = $attributeMap->getColumnName();
         }
         $statement->setColumns(implode(',', $columns));
         // table
         $statement->setTables($classMap->getTableName());
         $funcUpdate = function ($attributeMap) use ($object, $statement) {
-            if ($attributeMap->getReference() == '') {
-                $value = $attributeMap->getValueToDb($object);
-                $statement->addParameter($value);
-            }
+            $value = $attributeMap->getValueToDb($object);
+            $statement->addParameter($value);
         };
         array_walk($attributeMaps, $funcUpdate);
         $keyAttributeMap = $classMap->getKeyAttributeMap();

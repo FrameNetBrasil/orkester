@@ -10,7 +10,6 @@ class MLogin
     private int $time;
     private string $name;
     private $userData;
-    private MUser $user;
     private int $idUser;
     private bool $isAdmin;
     private array $groups;
@@ -27,14 +26,8 @@ class MLogin
         $this->login = $user->login ?? $user->auth0;
         $this->name = $user->name;
         $this->idUser = $user->idUser;
-        $this->user = $user;
         //$this->setGroups($user->getArrayGroups());
         //$this->setRights($user->getRights());
-    }
-
-    public function getUser(): MUser
-    {
-        return $this->user;
     }
 
     public function getLogin(): string
