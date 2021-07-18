@@ -27,9 +27,20 @@ class PersistenceSQL implements PersistenceBackend
         $this->db = Manager::getDatabase(Manager::getOptions('db'));
     }
 
+    public function setDb(ClassMap $classMap = null) {
+        $databaseName = $classMap ?  $classMap->getDatabaseName() : Manager::getOptions('db');
+        $this->db = Manager::getDatabase($databaseName);
+    }
+
+    public function getDb(ClassMap $classMap = null) {
+        $databaseName = $classMap ?  $classMap->getDatabaseName() : Manager::getOptions('db');
+        $this->db = Manager::getDatabase($databaseName);
+        return $this->db;
+    }
+
     public function getPlatform()
     {
-        return $this->db->getPlatform();
+        return $this->getDb()->getPlatform();
     }
 
     public function lastInsertId(): int
@@ -42,9 +53,9 @@ class PersistenceSQL implements PersistenceBackend
         $this->inTransaction = $state;
     }
 
-    public function beginTransaction(): PersistenceTransaction
+    public function beginTransaction(ClassMap $classMap = null): PersistenceTransaction
     {
-        $connection = $this->db->beginTransaction();
+        $connection = $this->getDb($classMap)->beginTransaction();
         $transaction = new PersistenceTransaction($this);
         $transaction->begin($connection);
         return $transaction;
@@ -53,7 +64,7 @@ class PersistenceSQL implements PersistenceBackend
     public function getStatementForInsert(ClassMap $classMap, object $object)
     {
         $statement = new MSql();
-        $statement->setDb($this->db);
+        $statement->setDb($this->getDb($classMap));
         // columns
         $columns = [];
         $attributeMaps = array_filter(
@@ -80,7 +91,7 @@ class PersistenceSQL implements PersistenceBackend
     public function getStatementForUpdate(ClassMap $classMap, object $object)
     {
         $statement = new MSql();
-        $statement->setDb($this->db);
+        $statement->setDb($this->getDb($classMap));
         // columns
         $columns = [];
         $attributeMaps = array_filter(
@@ -109,7 +120,7 @@ class PersistenceSQL implements PersistenceBackend
     public function getStatementForDelete(ClassMap $classMap, int $id)
     {
         $statement = new MSql();
-        $statement->setDb($this->db);
+        $statement->setDb($this->getDb($classMap));
         // table
         $statement->setTables($classMap->getTableName());
         $keyAttributeMap = $classMap->getKeyAttributeMap();
@@ -126,7 +137,7 @@ class PersistenceSQL implements PersistenceBackend
      */
     public function convertToDatabaseValue(mixed $value, string $type, int &$bindingType): mixed
     {
-        return $this->db->getPlatform()->convertToDatabaseValue($value, $type, $bindingType);
+        return $this->getPlatform()->convertToDatabaseValue($value, $type, $bindingType);
     }
 
     /**
@@ -137,7 +148,7 @@ class PersistenceSQL implements PersistenceBackend
      */
     public function convertToPHPValue(mixed $value, string $type): mixed
     {
-        return $this->db->getPlatform()->convertToPHPValue($value, $type);
+        return $this->getPlatform()->convertToPHPValue($value, $type);
     }
 
     /**
@@ -147,7 +158,7 @@ class PersistenceSQL implements PersistenceBackend
      */
     public function convertColumn(mixed $value, string $type)
     {
-        return $this->db->getPlatform()->convertColumn($value, $type);
+        return $this->getPlatform()->convertColumn($value, $type);
     }
 
     /**
@@ -157,7 +168,7 @@ class PersistenceSQL implements PersistenceBackend
      */
     public function convertWhere(mixed $value, ?string $dbalType = '')
     {
-        return $this->db->getPlatform()->convertWhere($value, $dbalType);
+        return $this->getPlatform()->convertWhere($value, $dbalType);
     }
 
     public function execute(array $commands)
@@ -194,6 +205,7 @@ class PersistenceSQL implements PersistenceBackend
     public function getSqlStatementForCriteria(PersistentCriteria $criteria): MSQL
     {
         $statement = new MSQL();
+        $statement->setDb($this->getDb($criteria->getClassMap()));
 
         $columns = $criteria->getColumns();
         if (count($columns) == 0) {
@@ -229,7 +241,7 @@ class PersistenceSQL implements PersistenceBackend
             $sqlOrders = [];
             foreach ($orders as $order) {
                 $parts = explode(' ', $order);
-                $sqlOrders[] = trim($this->getOperand($parts[0])->getSqlOrder() . ' ' . $parts[1] . ' ' . $parts[2] . ' ' . $parts[3]);
+                $sqlOrders[] = trim($criteria->getOperand($parts[0])->getSqlOrder() . ' ' . $parts[1] . ' ' . $parts[2] . ' ' . $parts[3]);
             }
             $statement->setOrderBy(implode(',', $sqlOrders));
         }
@@ -353,7 +365,7 @@ class PersistenceSQL implements PersistenceBackend
     public function prepare(PersistentCriteria $criteria): MSQL
     {
         $statement = $this->getSqlStatementForCriteria($criteria);
-        $statement->setDb($this->db);
+        $statement->setDb($this->getDb($criteria->getClassMap()));
         $statement->prepare();
         return $statement;
     }
@@ -367,7 +379,7 @@ class PersistenceSQL implements PersistenceBackend
     private function processCriteriaQuery(PersistentCriteria $criteria, ?array $parameters = []): MQuery
     {
         $statement = $this->getSqlStatementForCriteria($criteria);
-        $statement->setDb($this->db);
+        $statement->setDb($this->getDb($criteria->getClassMap()));
         if (count($parameters) > 0) {
             $statement->setParameters($parameters);
         }
@@ -418,6 +430,7 @@ class PersistenceSQL implements PersistenceBackend
     public function processCriteriaInsert(InsertCriteria $criteria, ?array $parameters): void
     {
         $statement = new MSQL();
+        $statement->setDb($this->getDb($criteria->getClassMap()));
 
         $rows = $criteria->getRows();
         if (count($rows) < 1) {
@@ -426,6 +439,7 @@ class PersistenceSQL implements PersistenceBackend
         $columns = array_keys($rows[0]);
         $sqlColumns = [];
         foreach ($columns as $column) {
+            mdump($column);
             $attributeMap = $criteria->getClassMap()->getAttributeMap($column);
             $sqlColumns[] = $attributeMap->getColumnName();
         }
@@ -448,6 +462,7 @@ class PersistenceSQL implements PersistenceBackend
     public function processCriteriaUpdate(UpdateCriteria $criteria, ?array $parameters): void
     {
         $statement = new MSQL();
+        $statement->setDb($this->getDb($criteria->getClassMap()));
 
         $columns = $criteria->getColumns();
         if (count($columns) == 0) {
@@ -483,7 +498,7 @@ class PersistenceSQL implements PersistenceBackend
     public function processCriteriaDelete(DeleteCriteria $criteria): void
     {
         $statement = new MSQL();
-
+        $statement->setDb($this->getDb($criteria->getClassMap()));
         $where = $criteria->getWhereConditionCriteria()->getSql() ?? '';
         if ($where != '') {
             $statement->setWhere($where);
