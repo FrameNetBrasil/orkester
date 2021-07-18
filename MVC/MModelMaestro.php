@@ -29,7 +29,8 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
 
     public static function beginTransaction(): PersistenceTransaction
     {
-        return Manager::getPersistentManager()->beginTransaction();
+        $classMap = static::getClassMap();
+        return Manager::getPersistentManager()->beginTransaction($classMap);
     }
 
     public static function getMap(): array

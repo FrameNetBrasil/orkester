@@ -3,6 +3,7 @@
 namespace Orkester\Persistence\Map;
 
 use Orkester\Manager;
+use Orkester\MVC\MModelMaestro;
 use Orkester\Persistence\Association;
 use Orkester\Persistence\PersistentObject;
 use Orkester\Utils\MUtil;
@@ -10,26 +11,28 @@ use Orkester\Utils\MUtil;
 class ClassMap
 {
 
-    private $name;
+    private string $name;
     private $superClassMap = NULL;
     private $superAssociationMap = NULL;
-    private $fieldMaps = [];
-    private $attributeMaps = [];
+    private array $fieldMaps = [];
+    private array $attributeMaps = [];
     private AttributeMap $keyAttributeMap;
     private HookMap $hookMap;
     private array $hashedAttributeMaps = [];
-    private $updateAttributeMaps = [];
-    private $insertAttributeMaps = [];
-    private $referenceAttributeMaps = [];
-    private $handledAttributeMaps = [];
-    private $associationMaps = [];
-    private $conditionMaps = [];
+    private array $updateAttributeMaps = [];
+    private array $insertAttributeMaps = [];
+    private array $referenceAttributeMaps = [];
+    private array $handledAttributeMaps = [];
+    private array $associationMaps = [];
+    private array $conditionMaps = [];
+    /*
     private $selectStatement;
     private $updateStatement;
     private $insertStatement;
     private $deleteStatement;
-    private $manager;
+    */
     private bool $hasTypedAttribute = false;
+    private ?string $databaseName = null;
     private string $tableName;
     private string $tableAlias;
 
@@ -42,6 +45,16 @@ class ClassMap
     public function getName(): string
     {
         return $this->name;
+    }
+
+    public function setDatabaseName(string $databaseName)
+    {
+        $this->databaseName = $databaseName;
+    }
+
+    public function getDatabaseName()
+    {
+        return $this->databaseName ?? Manager::getOptions('db');
     }
 
     public function setTableName(string $tableName)
@@ -78,10 +91,10 @@ class ClassMap
         return $this->hasTypedAttribute;
     }
 
-    public function getObject(): PersistentObject
+    public function getObject(): MModelMaestro|null
     {
         $className = $this->getName();
-        return Manager::getModel($className);
+        return null;//Manager::getModel($className);
     }
 
     public function setSuperClassName(string $superClassName)
@@ -315,6 +328,7 @@ class ClassMap
     }
 
 
+    /*
     public function retrieveObjectFromData($object, $data)
     {
         $classMap = $this;
@@ -564,6 +578,7 @@ class ClassMap
         $this->deleteStatement->setWhere($this->getDeleteWhereSql());
         return $this->deleteStatement;
     }
+    */
 
     public function handleTypedAttribute($object, $operation)
     {

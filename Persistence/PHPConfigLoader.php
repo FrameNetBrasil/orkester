@@ -38,8 +38,9 @@ class PHPConfigLoader extends PersistentConfigLoader
         /** @var MModelMaestro $className */
         $map = $className::getMap();
         //mdump($map);
-        $databaseName = $map['database'] ?? Manager::getOptions('db');
         $this->classMap = new ClassMap($this->className);
+        $databaseName = $map['database'] ?? Manager::getOptions('db');
+        $this->classMap->setDatabaseName($databaseName);
         $this->classMap->setTableName($map['table']);
 
         $hooks = $map['hooks'] ?? [];

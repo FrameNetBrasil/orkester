@@ -58,9 +58,9 @@ class PersistentManager
         return $this->persistence;
     }
 
-    public function beginTransaction(): PersistenceTransaction
+    public function beginTransaction(ClassMap $classMap): PersistenceTransaction
     {
-        return $this->persistence->beginTransaction();
+        return $this->persistence->beginTransaction($classMap);
     }
 
     public function setOriginalData(PersistentObject $object, object $data): void
@@ -215,7 +215,7 @@ class PersistentManager
 
     public function saveObject(ClassMap $classMap, object $object)
     {
-
+        $this->persistence->setDb($classMap);
         $commands = [];
         $pkValue = $classMap->getObjectKey($object);
         $hooks = $classMap->getHookMap();
@@ -325,6 +325,7 @@ class PersistentManager
     public function saveAssociation(PersistentObject $object, $associationName)
     {
         $classMap = $object->getClassMap();
+        $this->persistence->setDb($classMap);
         $commands = array();
         $associationMap = $classMap->getAssociationMap($associationName);
         if (is_null($associationMap)) {
@@ -380,6 +381,7 @@ class PersistentManager
         $associationIds = MUtil::parseArray($object->{'get' . $associationName}()->getId());
         //$ids = array_unique(array_merge($associationIds, MUtil::parseArray($id)));
         $classMap = $object->getClassMap();
+        $this->persistence->setDb($classMap);
         $commands = array();
         $associationMap = $classMap->getAssociationMap($associationName);
         if (is_null($associationMap)) {
@@ -429,6 +431,7 @@ class PersistentManager
      */
     public function deleteObject(ClassMap $classMap, int $id)
     {
+        $this->persistence->setDb($classMap);
         $statement = $this->persistence->getStatementForDelete($classMap, $id);
         $commands[] = $statement->delete();
         $this->execute($commands);
@@ -486,6 +489,7 @@ class PersistentManager
     public function deleteAssociation(PersistentObject $object, $associationName)
     {
         $classMap = $object->getClassMap();
+        $this->persistence->setDb($classMap);
         $commands = array();
         $associationMap = $classMap->getAssociationMap($associationName);
         if (is_null($associationMap)) {
@@ -533,6 +537,7 @@ class PersistentManager
     public function deleteAssociationObject(PersistentObject $object, $associationName, PersistentObject $refObject)
     {
         $classMap = $object->getClassMap();
+        $this->persistence->setDb($classMap);
         $commands = array();
         $associationMap = $classMap->getAssociationMap($associationName);
         if (is_null($associationMap)) {
@@ -567,6 +572,7 @@ class PersistentManager
     public function deleteAssociationById(PersistentObject $object, $associationName, $id)
     {
         $classMap = $object->getClassMap();
+        $this->persistence->setDb($classMap);
         $commands = array();
         $associationMap = $classMap->getAssociationMap($associationName);
         if (is_null($associationMap)) {
@@ -613,7 +619,7 @@ class PersistentManager
         return $db->getQuery($statement);
     }
     */
-
+/*
     public function processCriteriaDelete(DeleteCriteria $criteria, $parameters)
     {
         $db = $criteria->getClassMap()->getDb();
@@ -631,7 +637,7 @@ class PersistentManager
         $statement->setParameters($parameters);
         $this->execute($db, $statement->update());
     }
-
+*/
     /*
     public function processCriteriaAsQuery(PersistentCriteria $criteria, $parameters): MQuery
     {
