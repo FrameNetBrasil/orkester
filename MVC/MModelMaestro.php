@@ -4,6 +4,7 @@ namespace Orkester\MVC;
 
 use Orkester\Manager;
 use JsonSerializable;
+use Orkester\Persistence\Map\AttributeMap;
 use Serializable;
 use Orkester\Persistence\Criteria\DeleteCriteria;
 use Orkester\Persistence\Criteria\InsertCriteria;
@@ -111,6 +112,91 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
     {
         $rows = static::getAssociation($associationChain, $id);
         return $rows[0];
+    }
+
+    public static function listByFilter(object|null $params): RetrieveCriteria
+    {
+        $criteria = static::getCriteria();
+        if (is_null($params)) return $criteria;
+
+        if ($params->pagination->rows ?? false) {
+            $page = $params->pagination->page ?? 0;
+            //$offset = $page * $params->pagination->rows;
+            //mdump('rows = ' . $params->pagination->rows);
+            //mdump('offset = ' . $offset);
+            $criteria->range($page, $params->pagination->rows);
+        }
+        if ($params->pagination->sort ?? false) {
+            $desc = ($params->pagination->order == -1) ? 'desc' : 'asc';
+            $criteria->orderBy($params->pagination->sort, $desc);
+        }
+        if (property_exists($params, 'filter') && is_object($params->filter)) {
+            static::filter($params->filter, $criteria);
+        }
+        return $criteria;
+    }
+
+    public static function filter(object|null $filters, RetrieveCriteria|null $criteria = null): RetrieveCriteria
+    {
+        $criteria = $criteria ?? static::getCriteria();
+
+        foreach ($filters as $field => $condition) {
+            $value = $condition->value;
+            $op = '=';
+            if ($value != '') {
+                if ($condition->matchMode == 'startsWith') {
+                    $op = 'LIKE';
+                    $value = "{$condition->value}%";
+                }
+                if ($condition->matchMode == 'contains') {
+                    $op = 'LIKE';
+                    $value = "%{$condition->value}%";
+                }
+                if ($condition->matchMode == 'notContains') {
+                    $op = 'NOT LIKE';
+                    $value = "%{$condition->value}%";
+                }
+                if ($condition->matchMode == 'endsWith') {
+                    $op = 'LIKE';
+                    $value = "%{$condition->value}";
+                }
+                if ($condition->matchMode == 'equals') {
+                    $op = '=';
+                    $value = $condition->value;
+                }
+                if ($condition->matchMode == 'notEquals') {
+                    $op = '<>';
+                    $value = $condition->value;
+                }
+                $criteria->where($field, $op, $value);
+            }
+        }
+        return $criteria;
+    }
+
+    public static function list(string|null $select = null, object|null $filter = null): array
+    {
+        $criteria = static::listByFilter($filter);
+        if (is_string($select)) {
+            $criteria->select($select);
+        }
+        return $criteria->asResult();
+    }
+
+    public static function one($conditions): array
+    {
+        return static::filter($conditions)->asResult()[0];
+    }
+
+    public static function getAttributes(): array
+    {
+        return
+            array_values(
+                array_map(
+                    fn (AttributeMap $map) => $map->getName(),
+                    static::getCriteria()->getClassMap()->getAttributesMap()
+                )
+            );
     }
 
 
