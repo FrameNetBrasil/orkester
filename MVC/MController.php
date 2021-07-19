@@ -442,4 +442,14 @@ class MController
         }
     }
 
+    public function setRequest(Request $request)
+    {
+        $this->request = $request;
+    }
+
+    public function setResponse(Response $response)
+    {
+        $this->response = $response;
+    }
+
 }

@@ -155,14 +155,12 @@ class RetrieveCriteria extends PersistentCriteria
         return $this;
     }
 
-    public function range()
+    public function range(MRange|int $page, int|null $rows = null)
     {
         $numargs = func_num_args();
         if ($numargs == 1) {
-            $this->range = func_get_arg(0);
+            $this->range = $page;
         } elseif ($numargs == 2) {
-            $page = func_get_arg(0);
-            $rows = func_get_arg(1);
             $this->range = new MRange($page, $rows);
         }
         return $this;
