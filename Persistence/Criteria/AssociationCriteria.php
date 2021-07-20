@@ -94,18 +94,20 @@ class AssociationCriteria
         $this->associationMap->setKeysAttributes();
         $cardinality = $this->associationMap->getCardinality();
         if ($cardinality == 'manyToMany') {
+            $baseClassMap = $this->criteria->getClassMap();
             $associativeTable = $this->associationMap->getAssociativeTable();
             $fromAlias = $this->fromAlias;
             $toAlias = $this->alias;
-            $names = $this->associationMap->getNames($fromAlias, $toAlias);
+            $names = $this->associationMap->getNames($fromAlias, $toAlias, $baseClassMap);
             $condition = $names->fromColumnName . "=" . $associativeTable . '.' . $names->fromColumn;
             $join[] = [$names->fromTable, $associativeTable, $condition, $this->joinType];
             $condition = $associativeTable . '.' . $names->toColumn . "=" . $names->toColumnName;
             $join[] = [$associativeTable, $names->toTable, $condition, $this->joinType];
         } else {
+            $baseClassMap = $this->criteria->getClassMap();
             $fromAlias = $this->fromAlias;
             $toAlias = $this->alias;
-            $names = $this->associationMap->getNames($fromAlias, $toAlias);
+            $names = $this->associationMap->getNames($fromAlias, $toAlias, $baseClassMap);
             $condition = '(' . $names->fromColumnName . "=" . $names->toColumnName .')';
             foreach($this->conditions as $extraCondition) {
                 $condition .= ' AND ('. $extraCondition[0] . $extraCondition[1].$extraCondition[2].')';

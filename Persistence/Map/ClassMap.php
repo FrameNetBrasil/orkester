@@ -57,6 +57,11 @@ class ClassMap
         return $this->databaseName ?? Manager::getOptions('db');
     }
 
+    public function getActualDatabaseName()
+    {
+        return $this->databaseName ? Manager::getConf('db.' . $this->databaseName)['dbname'] : '';
+    }
+
     public function setTableName(string $tableName)
     {
         $this->tableName = $tableName;

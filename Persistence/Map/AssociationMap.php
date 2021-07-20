@@ -220,11 +220,18 @@ class AssociationMap
         return $this->toAttributeMap;
     }
 
-    public function getNames($fromAlias = '', $toAlias = ''): object
+    public function getNames($fromAlias = '', $toAlias = '', ClassMap $baseClassMap = null): object
     {
         $names = new \stdClass();
-        $names->fromTable = $this->fromAttributeMap->getClassMap()->getTableName($fromAlias);
-        $names->toTable = $this->toAttributeMap->getClassMap()->getTableName($toAlias);
+        $baseDatabaseName = $baseClassMap->getActualDatabaseName();
+        $fromClassMap = $this->fromAttributeMap->getClassMap();
+        $fromDatabaseName = $fromClassMap->getActualDatabaseName();
+        $toClassMap = $this->toAttributeMap->getClassMap();
+        $toDatabaseName = $toClassMap->getActualDatabaseName();
+        $fromDb = ($fromDatabaseName != $baseDatabaseName) ? $fromDatabaseName . '.' : '';
+        $toDb = ($toDatabaseName != $baseDatabaseName) ? $toDatabaseName . '.' : '';
+        $names->fromTable = $fromDb . $fromClassMap->getTableName($fromAlias);
+        $names->toTable = $toDb . $toClassMap->getTableName($toAlias);
         $names->fromColumnName = $this->fromAttributeMap->getFullyQualifiedName($fromAlias);
         $names->toColumnName = $this->toAttributeMap->getFullyQualifiedName($toAlias);
         $names->fromColumn = $this->fromAttributeMap->getName();
