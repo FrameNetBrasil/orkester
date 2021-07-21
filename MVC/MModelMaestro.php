@@ -3,9 +3,7 @@
 namespace Orkester\MVC;
 
 use Orkester\Manager;
-use JsonSerializable;
 use Orkester\Persistence\Map\AttributeMap;
-use Serializable;
 use Orkester\Persistence\Criteria\DeleteCriteria;
 use Orkester\Persistence\Criteria\InsertCriteria;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
@@ -114,26 +112,24 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         return $rows[0];
     }
 
-    public static function listByFilter(object|null $params): RetrieveCriteria
+    public static function listByFilter(string $select, object|null $params): array
     {
-        $criteria = static::getCriteria();
-        if (is_null($params)) return $criteria;
-
-        if ($params->pagination->rows ?? false) {
-            $page = $params->pagination->page ?? 0;
-            //$offset = $page * $params->pagination->rows;
-            //mdump('rows = ' . $params->pagination->rows);
-            //mdump('offset = ' . $offset);
-            $criteria->range($page, $params->pagination->rows);
+        $criteria = static::getCriteria()->select($select);
+        if (!is_null($params)) {
+            if (!empty($params->pagination->rows)) {
+                $page = $params->pagination->page ?? 1;
+                //mdump('rows = ' . $params->pagination->rows);
+                //mdump('offset = ' . $offset);
+                $criteria->range($page, $params->pagination->rows);
+            }
+            if (!empty($params->pagination->sort)) {
+                $criteria->orderBy(
+                    $params->pagination->sort . ' ' .
+                    $params->pagination->order
+                );
+            }
         }
-        if ($params->pagination->sort ?? false) {
-            $desc = ($params->pagination->order == -1) ? 'desc' : 'asc';
-            $criteria->orderBy($params->pagination->sort, $desc);
-        }
-        if (property_exists($params, 'filter') && is_object($params->filter)) {
-            static::filter($params->filter, $criteria);
-        }
-        return $criteria;
+        return static::filter($params->filter, $criteria)->asResult();
     }
 
     public static function filter(array|null $filters, RetrieveCriteria|null $criteria = null): RetrieveCriteria
