@@ -210,6 +210,19 @@ class RetrieveCriteria extends PersistentCriteria
         return $this;
     }
 
+    public function count(): int
+    {
+        $column = empty($this->columns) ? '*' : $this->columns[0];
+        $this->columns = [];
+        $this->select("count($column) as cnt");
+        return $this->asResult()[0]['cnt'];
+    }
+
+    public function exists(): bool
+    {
+        return $this->count() > 0;
+    }
+
     public function from()
     {
         if ($numargs = func_num_args()) {

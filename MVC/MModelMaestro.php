@@ -136,46 +136,13 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         return $criteria;
     }
 
-    public static function filter(object|array|null $filters, RetrieveCriteria|null $criteria = null): RetrieveCriteria
+    public static function filter(array|null $filters, RetrieveCriteria|null $criteria = null): RetrieveCriteria
     {
         $criteria = $criteria ?? static::getCriteria();
         if (is_array($filters)) {
             $filters = is_string($filters[0]) ? [$filters] : $filters;
             foreach($filters as [$field, $op, $value]) {
                 $criteria->where($field, $op, $value);
-            }
-        }
-        else if (is_object($filters)) {
-            foreach ($filters as $field => $condition) {
-                $value = $condition->value;
-                $op = '=';
-                if ($value != '') {
-                    if ($condition->matchMode == 'startsWith') {
-                        $op = 'LIKE';
-                        $value = "{$condition->value}%";
-                    }
-                    if ($condition->matchMode == 'contains') {
-                        $op = 'LIKE';
-                        $value = "%{$condition->value}%";
-                    }
-                    if ($condition->matchMode == 'notContains') {
-                        $op = 'NOT LIKE';
-                        $value = "%{$condition->value}%";
-                    }
-                    if ($condition->matchMode == 'endsWith') {
-                        $op = 'LIKE';
-                        $value = "%{$condition->value}";
-                    }
-                    if ($condition->matchMode == 'equals') {
-                        $op = '=';
-                        $value = $condition->value;
-                    }
-                    if ($condition->matchMode == 'notEquals') {
-                        $op = '<>';
-                        $value = $condition->value;
-                    }
-                    $criteria->where($field, $op, $value);
-                }
             }
         }
         return $criteria;
