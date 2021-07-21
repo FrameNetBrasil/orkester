@@ -94,11 +94,8 @@ class MView
     {
         $this->baseName = basename($this->viewFile, '.xml');
         $page = Manager::getObject(MPage::class);
-        $basePath = Manager::getHome() . Manager::getOptions('templatePath');
-        $paths = [
-            $basePath . '/Components',
-            dirname($this->viewFile)
-        ];
+        $paths = Manager::getOptions('templatePath');
+        $paths[] = dirname($this->viewFile);
         $template = new MTemplate($paths);
         $xml = $template->fetch($this->baseName);
         //mdump($xml);
