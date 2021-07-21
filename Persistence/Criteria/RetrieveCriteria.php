@@ -212,9 +212,8 @@ class RetrieveCriteria extends PersistentCriteria
 
     public function count(): int
     {
-        $column = empty($this->columns) ? '*' : $this->columns[0];
-        $this->columns = [];
-        $this->select("count($column) as cnt");
+        $pk = $this->getClassMap()->getKeyAttributeName();
+        $this->select("count($pk) as cnt");
         return $this->asResult()[0]['cnt'];
     }
 
