@@ -31,16 +31,16 @@ class DataMiddleware implements Middleware
     {
         $data->filter = [];
         foreach ($filters as $field => $condition) {
-            ['value' => $rawValue, 'matchMode' => $matchMode] = $condition;
-            if (empty($rawValue)) continue;
+            ['value' => $value, 'matchMode' => $matchMode] = $condition;
+            if (empty($value)) continue;
             array_push($data->filter,
                 match ($matchMode) {
-                    'startsWith' => [$field, "$rawValue%", 'LIKE'],
-                    'contains' => [$field, "%$rawValue%", 'LIKE'],
-                    'endsWith' => [$field, "%$rawValue", 'LIKE'],
-                    'notContains' => [$field, "%$rawValue%", 'NOT LIKE'],
-                    'notEquals' => [$field, $rawValue, '<>'],
-                    default => [$field, $rawValue, '=']
+                    'startsWith' => [$field, 'LIKE', "$value%"],
+                    'contains' => [$field, 'LIKE', "%$value%"],
+                    'endsWith' => [$field, 'LIKE', "%$value"],
+                    'notContains' => [$field, 'NOT LIKE', "%$value%"],
+                    'notEquals' => [$field, '<>', $value],
+                    default => [$field, '=', $value]
                 });
         }
         return true;
