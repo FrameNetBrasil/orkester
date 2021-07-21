@@ -46,13 +46,17 @@ class MBase
     public function __get($property): mixed
     {
         $method = 'get' . $property;
-        return method_exists($this, $method) ? $this->$method() : NULL;
+        return method_exists($this, $method) ? $this->$method() : ($this->property->$property ?? NULL);
     }
 
     public function __set($property, $value)
     {
         $method = 'set' . $property;
-        method_exists($this, $method) ? $this->$method($value) : NULL;
+        if (method_exists($this, $method)) {
+            $this->$method($value);
+        } else {
+            $this->property->$property = $value;
+        }
     }
 
     function __call($name, $args)
@@ -61,7 +65,8 @@ class MBase
             $args[] = $this;
             call_user_func_array($this->$name, $args);
         } else {
-            throw new EControlException("Method {$name} is not defined for control {$this->id} ({$this->property->className})!");
+            $className = $this::class;
+            throw new EControlException("Method {$name} is not defined for control {$className}!");
         }
     }
 
