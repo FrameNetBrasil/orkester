@@ -1,7 +1,7 @@
 <?php
 namespace Orkester\Exception;
 
-class ENotFoundException extends EMException
+class ENotFoundException extends EOrkesterException
 {
 
 }

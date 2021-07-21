@@ -3,19 +3,20 @@
 namespace Orkester\MVC;
 
 use Orkester\Manager;
+use Orkester\Results\Exception\MResultForbidden;
+use Orkester\Results\Exception\MResultNotFound;
+use Orkester\Results\Exception\MResultNotImplemented;
+use Orkester\Results\Exception\MResultRuntimeError;
+use Orkester\Results\Exception\MResultUnauthorized;
 use Orkester\Results\MBrowserFile;
-use Orkester\Results\MNotFound;
 use Orkester\Results\MRedirect;
 use Orkester\Results\MRenderBinary;
-use Orkester\Results\MRenderPage;
 use Orkester\Results\MResult;
 use Orkester\Results\MResultNull;
 use Orkester\Results\MResultObject;
 use Orkester\Results\MResultList;
 use Orkester\Results\MResultResponse;
 use Orkester\Security\MSSL;
-use Orkester\Exception\ERuntimeException;
-use Orkester\Exception\ESecurityException;
 use Orkester\Types\MFile;
 use Slim\Exception\HttpNotFoundException;
 use Slim\Psr7\Request;
@@ -54,10 +55,15 @@ class MController
         }
     }
 
-    protected function parseRoute(Request $request, Response $response)
+    public function setRequestResponse(Request $request, Response $response): void
     {
         $this->request = $request;
         $this->response = $response;
+    }
+
+    protected function parseRoute(Request $request, Response $response)
+    {
+        $this->serRequestResponse($request, $response);
         $routeContext = RouteContext::fromRequest($request);
         $route = $routeContext->getRoute();
         $arguments = $route->getArguments();
@@ -69,20 +75,10 @@ class MController
         $this->httpMethod = $route->getMethods()[0];
         //$this->addParameters($route->getArguments());
         $this->module = $arguments['module'] ?? 'Main';
-        $this->controller =  $arguments['controller'] ?? 'Main';
-        $this->action =  $arguments['action'] ?? 'main';
+        $this->controller = $arguments['controller'] ?? 'Main';
+        $this->action = $arguments['action'] ?? 'main';
         $this->id = $arguments['id'] ?? NULL;
     }
-
-    /*
-    public function __invoke(Request $request, Response $response): Response
-    {
-        $this->parseRoute($request, $response);
-        $action = $this->resource;
-        $result = $this->dispatch($action);
-        return $result->apply($request, $response);
-    }
-    */
 
     public function route(Request $request, Response $response): Response
     {
@@ -105,6 +101,7 @@ class MController
     public function dispatch(string $action): Response
     {
         mtrace('mcontroller::dispatch = ' . $action);
+        $this->action = $action;
         $this->result = new MResultNull;
         $this->decryptData();
         if (!method_exists($this, $this->action)) {
@@ -119,60 +116,14 @@ class MController
     {
         mtrace('executing = ' . $action);
         try {
+            $this->init();
             $response = $this->$action();
+            $this->terminate();
             return $response;
         } catch (\Exception $e) {
-            mtrace('callAction exception = ' . $e->getMessage());
-            $this->handleException($e, $action);
+            mtrace('callAction exception = ' . $e->getMessage() . ' - ' . $e->getCode());
+            return $this->renderException($e, $action);
         }
-    }
-
-    public function processResult($result): Response
-    {
-
-    }
-
-    protected function handleException(\Exception $e, $action)
-    {
-        switch (get_class($e)) {
-            case ERuntimeException::class:
-                $this->renderDefaultAlert($e->getMessage());
-                break;
-            case  ESecurityException::class:
-                $this->renderAccessError($e->getMessage());
-                break;
-            default:
-                $this->renderUnexpectedError($e, $action);
-        }
-    }
-
-    private function renderDefaultAlert($msg)
-    {
-        mtrace('Controller::dispatch exception: ' . $msg);
-        $this->renderPrompt('alert', $msg);
-    }
-
-    private function renderAccessError($msg)
-    {
-        mtrace('Controller::dispatch exception: ' . $msg);
-        $this->renderPrompt('error', $msg, 'main/main');
-    }
-
-    private function renderUnexpectedError(\Exception $e, $action)
-    {
-        if (Manager::getMode() == 'PROD') {
-            $this->renderPrompt('error', 'Error!', 'main/main');
-        } else {
-            $name = get_class($this);
-            $this->renderPrompt('error', "[<b>{$name}/{$action}</b>]" . $e->getMessage());
-        }
-        $msg = "{$e->getFile()}({$e->getLine()}): {$e->getMessage()}";
-        if (Manager::getLogin()) {
-            $msg .= ' idUser = ' . Manager::getLogin()->getIdUser() . ', profile = ' . Manager::getLogin()->getLogin();
-        }
-
-        mtrace('Controller::dispatch exception: ' . $e->getMessage());
-        Manager::logError($msg);
     }
 
     /**
@@ -205,15 +156,20 @@ class MController
         }
     }
 
-    /*
-    public function renderView(string $viewClass, array $parameters = []): Response
+    public function renderException(\Exception $e, string $action = ''): Response
     {
-        $view = new $viewClass;
-        $output = $view->getOutput();
-        $this->result = new MRenderPage($output);
+        $code = $e->getCode();
+        minfo('code = ' . $code);
+        $this->result = match($code) {
+            401 => new MResultUnauthorized($e),
+            403 => new MResultForbidden($e),
+            404 => new MResultNotFound($e),
+            500 => new MResultRunTimeError($e),
+            501 => new MResultNotImplemented($e),
+            default => new MResultRunTimeError($e),
+        };
         return $this->result->apply($this->request, $this->response);
     }
-*/
 
     /**
      * Obtem o conteúdo da view e passa para uma classe Result:
@@ -250,7 +206,7 @@ class MController
         $base = str_replace("Controllers", "Views", $base);
         $base = str_replace("Controller", "", $base);
         $path = str_replace("\\", "/", Manager::getAppPath() . "/" . $base . '/' . $view);
-        $extensions = ['.blade.php', '.js', '.vue'];
+        $extensions = ['.blade.php', '.js', '.blade.xml', '.xml', '.vue'];
         $viewFile = '';
         foreach ($extensions as $extension) {
             $fileName = $path . $extension;
@@ -384,7 +340,7 @@ class MController
      */
     public function redirect(string $url): Response
     {
-        $this->result =  new MRedirect($url);
+        $this->result = new MRedirect($url);
         return $this->result->apply($this->request, $this->response);
     }
 
@@ -394,7 +350,7 @@ class MController
      */
     public function notfound($msg)
     {
-        $this->result = new MNotFound($msg);
+        $this->result = new MResultNotFound($msg);
         return $this->result->apply($this->request, $this->response);
     }
 

@@ -11,7 +11,7 @@ use Orkester\Services\MSession;
 use Orkester\Results\MResult;
 use Orkester\Results\MResultNull;
 use Orkester\Services\Exceptions\{EMException, ENotFoundException, ERuntimeException, EInternalException};
-use Orkester\Results\{MNotFound, MRenderPage, MRuntimeError, MInternalError};
+use Orkester\Results\{MResultNotFound, MRenderPage, MResultRuntimeError, MResultInternalError};
 
 use Orkester\Handlers\HttpErrorHandler;
 use Orkester\Handlers\ShutdownHandler;
