@@ -83,11 +83,11 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         return $object;
     }
 
-    public static function save(object $object): void
+    public static function save(object $object): int
     {
         static::validate($object);
         $classMap = static::getClassMap();
-        Manager::getPersistentManager()->saveObject($classMap, $object);
+        return Manager::getPersistentManager()->saveObject($classMap, $object);
     }
 
     public static function delete(int $id): void
@@ -181,18 +181,18 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         return $criteria;
     }
 
-    public static function list(string|null $select = null, object|null $filter = null): array
+    public static function list(string|null $select = null, object|array|null $filter = null): array
     {
-        $criteria = static::listByFilter($filter);
+        $criteria = static::filter($filter);
         if (is_string($select)) {
             $criteria->select($select);
         }
         return $criteria->asResult();
     }
 
-    public static function one($conditions): array
+    public static function one($conditions): object
     {
-        return static::filter($conditions)->asResult()[0];
+        return (object) static::filter($conditions)->asResult()[0];
     }
 
     public static function getAttributes(): array

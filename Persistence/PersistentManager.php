@@ -236,6 +236,7 @@ class PersistentManager
             $hooks->onAfterUpdate($object, $pkValue);
         }
         $this->storeObjectInCache($classMap, $object);
+        return $classMap->getObjectKey($object);
     }
 
     private function storeObjectInCache(ClassMap $classMap, object $object): void
