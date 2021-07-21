@@ -112,9 +112,12 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         return $rows[0];
     }
 
-    public static function listByFilter(string $select, object|null $params): array
+    public static function criteriaByFilter(object|null $params, string|null $select = null): RetrieveCriteria
     {
-        $criteria = static::getCriteria()->select($select);
+        $criteria = static::getCriteria();
+        if (!empty($select)) {
+            $criteria->select($select);
+        }
         if (!is_null($params)) {
             if (!empty($params->pagination->rows)) {
                 $page = $params->pagination->page ?? 1;
@@ -129,7 +132,12 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
                 );
             }
         }
-        return static::filter($params->filter, $criteria)->asResult();
+        return static::filter($params->filter, $criteria);
+    }
+
+    public static function listByFilter(object|null $params, string $select): array
+    {
+        return self::criteriaByFilter($params, $select)->asResult();
     }
 
     public static function filter(array|null $filters, RetrieveCriteria|null $criteria = null): RetrieveCriteria
