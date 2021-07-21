@@ -60,7 +60,7 @@ class DataMiddleware implements Middleware
                         '_page' => $data->pagination->page = $value,
                         '_limit' => $data->pagination->rows = $value,
                         '_sort' => $data->pagination->sort = $value,
-                        '_order' => $data->pagination->order = $value,
+                        '_order' => $data->pagination->order = $value == -1 ? 'desc' : 'asc',
                         '_start' => $data->pagination->start = $value,
                         '_end' => $data->pagination->end = $value,
                         '_embed' => $data->relationship->embed = $value,
