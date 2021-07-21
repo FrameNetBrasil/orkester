@@ -1,4 +1,5 @@
 <?php
+
 namespace Orkester\UI;
 /**
  * MScripts Class.
@@ -10,21 +11,6 @@ use Orkester\Manager;
 
 class MScripts
 {
-/*
-    public $form;
-    public $scripts;
-    public $customScripts;
-    public $onload;
-    public $onsubmit;
-    public $onunload;
-    public $onfocus;
-    public $onerror;
-    public $jsCode;
-    public $dojoRequire;
-    public $events;
-*/
-
-    //private string $id;
     private Map $onsubmit;
     /**
      * @var Map
@@ -61,8 +47,6 @@ class MScripts
 
     public function __construct($id)
     {
-        //parent::__construct();
-        //$this->id = $id;
         $this->onsubmit = new Map();
         $this->onload = new Map();
         $this->onerror = new Map();
@@ -93,8 +77,9 @@ class MScripts
 
     public function insertScript($url)
     {
-        $url = Manager::getAbsoluteURL('html/scripts/' . $url);
-        $this->scripts->insert($url);
+        $url = Manager::getBaseURL() . 'html/scripts/' . $url;
+        $key = md5($url);
+        $this->scripts->put($key, $url);
     }
 
     public function addOnSubmit(string $idForm, string $jsCode)
@@ -115,7 +100,8 @@ class MScripts
         $this->onload->put($key, $jsCode);
     }
 
-    public function getScripts() {
+    public function getScripts(): object
+    {
         if (count($this->events) > 0) {
             $events = json_encode($this->events);
             $this->addOnload("manager.registerEvents(" . $events . ");");
@@ -139,27 +125,12 @@ class MScripts
         $onsubmit = '';
         foreach ($this->onsubmit as $idForm => $list) {
             $onsubmit .= "manager.onSubmit[\"{$idForm}\"] = function() { return {$list}; }";
-            /*
-            $onsubmit .= "manager.onSubmit[\"{$idForm}\"] = function() { \n";
-            $onsubmit .= "    var result = ";
-            $onsubmit .= implode(" && ", $list) . ";\n";
-            $onsubmit .= "    return result;\n};\n";
-            */
         }
         $scripts->onsubmit = $onsubmit;
-        /*
-                $submit = '';
-                foreach ($this->submit as $idForm => $list) {
-                    $submit .= "manager.submit[\"{$idForm}\"] = function(element, url, idForm) { \n";
-                    $submit .= implode(" && ", $list) . ";\n";
-                    $submit .= "\n};\n";
-                }
-                $scripts->submit = $submit;
-        */
         return $scripts;
     }
 
-    public static function tag($content)
+    public static function tag($content): string
     {
         return "<script type=\"text/javascript\">{$content}</script>\n";
     }

@@ -2,8 +2,6 @@
 namespace Orkester\Security;
 
 use Orkester\Manager;
-use Orkester\Services\Exceptions\EMException;
-use App\Modules\Auth\Services\UserService;
 
 class MAuthDbMD5 extends MAuth
 {

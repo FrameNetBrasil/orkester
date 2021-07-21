@@ -449,6 +449,16 @@ class RetrieveCriteria extends PersistentCriteria
         return Manager::getPersistentManager()->getPersistence()->processCriteriaAsResult($this, $parameters);
     }
 
+    public function asChunkResult(int|string $key = 0, int|string $value = 1, ?array $parameters = [])
+    {
+        return Manager::getPersistentManager()->getPersistence()->processCriteriaAsQuery($this, $parameters)->chunkResult($key, $value);
+    }
+
+    public function asTreeResult(string $group = '', string $node = '', ?array $parameters = [])
+    {
+        return Manager::getPersistentManager()->getPersistence()->processCriteriaAsQuery($this, $parameters)->treeResult($group, $node);
+    }
+
     public function asEntity(string $entityClass, ?array $parameters = []): MEntityMaestro
     {
         return Manager::getPersistentManager()->getPersistence()->processCriteriaAsEntity($this, $entityClass, $parameters);
