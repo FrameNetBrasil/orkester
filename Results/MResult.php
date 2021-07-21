@@ -27,11 +27,8 @@ abstract class MResult
     }
 
     protected function getTemplate($templateName) {
-        //$templateName .= '.blade.php';
-        $path = Manager::getBasePath() . '/maestro/UI/templates/result';
-        $template = new MTemplate($path);
+        $template = new MTemplate([]);
         $template->context('result', $this);
-        mdump($this->getMessage());
         return $template->fetch($templateName);
     }
 

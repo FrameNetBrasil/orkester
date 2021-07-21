@@ -1,7 +1,7 @@
 <?php
 namespace Orkester\Exception;
 
-class EDBException extends EMException {
+class EDBException extends EOrkesterException {
 
     public static function query($msg, $code = '') {
         return new self($msg);

@@ -1,24 +1,21 @@
 <?php
-namespace Orkester\Results;
+namespace Orkester\Results\Exception;
 
-use Orkester\Manager;
+use Orkester\Results\MResult;
 use Orkester\Services\Http\MStatusCode;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
 
-/**
- * MRuntimeError.
- * Retorna template preenchido com dados sobre o erro.
- * Objeto JSON = {'id':'error', 'type' : 'page', 'data' : '$html'}
- */
-class MRuntimeError extends MResult
+class MResultException extends MResult
 {
     private string $message;
+    private \Throwable $exception;
 
-    public function __construct(string $message = '')
+    public function __construct(\Throwable $exception)
     {
         parent::__construct();
-        $this->message = $message;
+        $this->exception = $exception;
+        $this->message = $exception->getMessage();
     }
 
     public function getMessage(): string
@@ -26,14 +23,22 @@ class MRuntimeError extends MResult
         return $this->message;
     }
 
+    public function getException(): \Throwable
+    {
+        return $this->exception;
+    }
+
     public function apply(Request $request, Response $response): Response
     {
-        $html = $this->getTemplate('runtime');
+        $code = $this->exception->getCode();
+        $html = $this->getTemplate($code);
         $payload = $html;
         $body = $response->getBody();
         $body->write($payload);
         return $response
             ->withHeader('Content-Type', 'text/html; charset=UTF-8')
-            ->withStatus(MStatusCode::NOT_FOUND);
+            ->withStatus($code);
     }
+
 }
+

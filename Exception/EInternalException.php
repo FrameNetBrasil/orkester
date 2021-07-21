@@ -1,11 +1,11 @@
 <?php
 
-namespace Orkester\Services\Exceptions;
+namespace Orkester\Exception;
 
 /**
  * Engloba exceções onde a mensagem original deve ser oculta do usuário.
  */
-class EInternalException extends \Exception
+class EInternalException extends EOrkesterException
 {
 
     public function __construct(\Exception $original, $messageId = 'error')
@@ -15,7 +15,6 @@ class EInternalException extends \Exception
             $original->getCode(),
             $original
         );
-
         $this->dump();
     }
 

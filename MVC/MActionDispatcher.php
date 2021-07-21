@@ -61,8 +61,9 @@ class MActionDispatcher extends MController
         $this->parseRoute($request, $response);
         mdump('==== '. $this->controllerClass);
         $controller = new $this->controllerClass;
+        $controller->setRequestResponse($request, $response);
        //$controller = Manager::getContainer()->make($this->controllerClass);
         //$controller->parseRoute($request, $response);
-        return $controller->dispatch($request, $response, $this);
+        return $controller->dispatch($this->action);
     }
 }

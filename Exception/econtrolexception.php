@@ -1,7 +1,7 @@
 <?php
 namespace Orkester\Exception;
 
-class EControlException extends EMException
+class EControlException extends EOrkesterException
 {
 
 }

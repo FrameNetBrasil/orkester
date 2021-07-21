@@ -4,7 +4,7 @@ namespace Orkester\MVC;
 
 use Orkester\Manager;
 use Orkester\Results\MBrowserFile;
-use Orkester\Results\MNotFound;
+use Orkester\Results\MResultNotFound;
 use Orkester\Results\MRedirect;
 use Orkester\Results\MRenderBinary;
 use Orkester\Results\MRenderPage;
@@ -375,7 +375,7 @@ class MControllerMaestro
      */
     public function notfound($msg)
     {
-        $this->result = new MNotFound($msg);
+        $this->result = new MResultNotFound($msg);
         return $this->result->apply($this->request, $this->response);
     }
 
