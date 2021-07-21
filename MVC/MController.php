@@ -63,7 +63,7 @@ class MController
 
     protected function parseRoute(Request $request, Response $response)
     {
-        $this->serRequestResponse($request, $response);
+        $this->setRequestResponse($request, $response);
         $routeContext = RouteContext::fromRequest($request);
         $route = $routeContext->getRoute();
         $arguments = $route->getArguments();

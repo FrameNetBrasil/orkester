@@ -139,7 +139,7 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
     public static function filter(array|null $filters, RetrieveCriteria|null $criteria = null): RetrieveCriteria
     {
         $criteria = $criteria ?? static::getCriteria();
-        if (is_array($filters)) {
+        if (!empty($filters)) {
             $filters = is_string($filters[0]) ? [$filters] : $filters;
             foreach($filters as [$field, $op, $value]) {
                 $criteria->where($field, $op, $value);
