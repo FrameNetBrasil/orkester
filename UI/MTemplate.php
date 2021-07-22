@@ -4,6 +4,7 @@ namespace Orkester\UI;
 
 use Orkester\Manager;
 use Jenssegers\Blade\Blade;
+use Orkester\MVC\MView;
 
 class MTemplate
 {
@@ -70,6 +71,7 @@ class MTemplate
         $args['manager'] = Manager::getInstance();
         $args['data'] = Manager::getData();
         $args['page'] = Manager::getObject(MPage::class);
+        $args['view'] = $this->context['view'] ?? new MView();
         $this->template = $templateName;
         return $this->render($args);
     }
