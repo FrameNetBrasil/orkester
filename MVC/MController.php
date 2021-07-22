@@ -45,7 +45,6 @@ class MController
         mtrace('MController::construct');
         $this->data = Manager::getData();
         $this->resultFormat();
-        $this->init();
     }
 
     public function __call($name, $arguments)
