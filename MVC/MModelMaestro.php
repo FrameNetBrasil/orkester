@@ -135,7 +135,7 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         return static::filter($params->filter, $criteria);
     }
 
-    public static function listByFilter(object|null $params, string $select): array
+    public static function listByFilter(object|null $params, string|null $select = null): array
     {
         return self::criteriaByFilter($params, $select)->asResult();
     }
