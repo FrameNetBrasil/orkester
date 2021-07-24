@@ -17,6 +17,7 @@ class AttributeMap
     private $index = NULL;
     private $type = NULL;
     private $converter = NULL;
+    private $handler = NULL;
     private $handled = false;
     private $keyType;
     private $idGenerator;
@@ -83,6 +84,16 @@ class AttributeMap
     public function setHandled($handled)
     {
         $this->handled = $handled;
+    }
+
+    public function getHandler()
+    {
+        return $this->handler;
+    }
+
+    public function setHandler(?string $handler = null)
+    {
+        $this->handler = $handler;
     }
 
     public function setColumnName($name)

@@ -22,6 +22,9 @@ class MRedirect extends MResult
 
     public function apply(Request $request, Response $response): Response
     {
+        $payload = json_encode(NULL);
+        $body = $response->getBody();
+        $body->write($payload);
         return $response
             ->withHeader('Location', $this->content)
             ->withStatus(302);

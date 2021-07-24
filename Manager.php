@@ -100,7 +100,7 @@ class Manager
     /**
      * @var MSession
      */
-    private static MSession $session;
+    private static ?MSession $session = null;
     private static $returnType;
     private static $persistence;
 
@@ -502,7 +502,7 @@ class Manager
         self::$session = $session;
     }
 
-    public static function getSession(): MSession
+    public static function getSession(): MSession|null
     {
         return self::$session;
     }
@@ -551,42 +551,6 @@ class Manager
     {
         self::$data->$field = $value;
         return self::$data;
-    }
-
-    public static function instantiate(string $class, mixed $data): mixed
-    {
-        if (is_object($data)) {
-            $data = get_object_vars($data);
-        }
-        $ref = new \ReflectionClass($class);
-        $constructor = $ref->getConstructor();
-        $missing = [];
-        $provided = [];
-        foreach ($constructor->getParameters() as $param) {
-            $name = $param->getName();
-            $type = (string)$param->getType();
-            if (array_key_exists($name, $data)) {
-                if (class_exists($type)) {
-                    $value = self::instantiate($type, $data[$name]);
-                } else {
-                    $value = $data[$name];
-                }
-                $provided[$name] = $value;
-            } else if (str_starts_with($type, '?')) {
-                $provided[$name] = null;
-            } else {
-                $missing[$param->getName()] = $param->getType();
-            }
-        }
-        if (empty($missing)) {
-            return $ref->newInstanceArgs($provided);
-        } else {
-            $str = '';
-            foreach ($missing as $key => $value) {
-                $str = "$key ($value), ";
-            }
-            throw new \InvalidArgumentException("Parâmetros ausentes: $str");
-        }
     }
 
     /**

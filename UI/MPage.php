@@ -26,7 +26,7 @@ class MPage
             if (Manager::isAjaxCall()) {
                 $templateName = 'content';
             } else {
-                $templateName = (Manager::getConf('theme.template') ?: 'index');
+                $templateName = (Manager::getOptions('templateDefault') ?: 'index');
             }
         }
         $this->setTemplateName($templateName);

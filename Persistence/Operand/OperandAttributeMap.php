@@ -36,19 +36,19 @@ class OperandAttributeMap extends PersistentOperand
 
     public function getSqlOrder()
     {
-        return $this->attributeMap->getColumnNameToDb($this->alias);
+        return $this->attributeMap->getColumnNameToDb();
         //return $this->attributeMap->getFullyQualifiedName($this->alias);
     }
 
     public function getSqlWhere()
     {
-        return $this->attributeMap->getColumnNameToDb($this->alias);
+        return $this->attributeMap->getColumnWhereName($this->alias);
         //return $this->attributeMap->getFullyQualifiedName($this->alias);
     }
 
     public function getSqlGroup()
     {
-        return $this->attributeMap->getColumnNameToDb($this->alias);
+        return $this->attributeMap->getColumnNameToDb();
         //return $this->attributeMap->getFullyQualifiedName($this->alias);
     }
 

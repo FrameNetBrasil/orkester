@@ -76,7 +76,7 @@ class MStyle
             mtracestack();
         $selector = self::selector($name);
         if ($selector != '') {
-            $this->addStyle('font-size', $value);
+            $this->addStyle($selector, $value);
         }
     }
 
