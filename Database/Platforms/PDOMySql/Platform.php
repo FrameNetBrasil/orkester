@@ -2,6 +2,7 @@
 
 namespace Orkester\Database\Platforms\PDOMySql;
 
+use Carbon\Carbon;
 use Orkester\Manager;
 use Orkester\Types\MRange;
 
@@ -125,9 +126,11 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
 
     public function convertToPHPValue($value, $type) {
         if ($type == 'date') {
-            return Manager::Date($value);
+            $formatPHP = $this->db->getConfig('formatDatePHP');;
+            return Carbon::createFromFormat($formatPHP, $value);
         } elseif ($type == 'timestamp') {
-            return Manager::Timestamp($value);
+            $formatPHP = $this->db->getConfig('formatDatePHP');;
+            return Carbon::createFromFormat($formatPHP, $value);
         } elseif ($type == 'blob') {
             if ($value) {
                 $value = base64_decode($value);
@@ -142,8 +145,10 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
     public function convertColumn($value, $type) {
         if ($type == 'date') {
             return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . "') ";
+        } elseif ($type == 'datetime') {
+            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
         } elseif ($type == 'timestamp') {
-            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . '' . $this->db->getConfig('formatTime') . "') ";
+            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
         } else {
             return $value;
         }
@@ -153,7 +158,9 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
         if ($dbalType == 'date') {
             return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDateWhere') . "') ";
         } elseif ($dbalType == 'datetime') {
-            return " DATE_FORMAT(" . $value . "," . $this->db->getConfig('formatDateWhere') . '' . $this->db->getConfig('formatTime') . "') ";
+            return " DATE_FORMAT(" . $value . "," . $this->db->getConfig('formatDateWhere') . ' ' . $this->db->getConfig('formatTime') . "') ";
+        } elseif ($dbalType == 'timestamp') {
+            return " DATE_FORMAT(" . $value . "," . $this->db->getConfig('formatDateWhere') . ' ' . $this->db->getConfig('formatTime') . "') ";
         } else {
             return $value;
         }

@@ -103,6 +103,28 @@ class PersistentManager
         $this->persistence->execute($commands);
     }
 
+    private function objectHandler(ClassMap $classMap, object $originalObject, string $operation = 'retrieve'): object
+    {
+        $object = (object)[];
+        $handlerMethod = 'convertFromType';
+        $converterMethod = 'convertToPHPValue';
+        if ($operation == 'save') {
+            $handlerMethod = 'convertToType';
+            $converterMethod = 'convertToDatabaseValue';
+        }
+        foreach ($originalObject as $attributeName => $value) {
+            $attributeMap = $classMap->getAttributeMap($attributeName);
+            $attributeType = $attributeMap->getType();
+            $handler = $attributeMap->getHandler();
+            if ($handler != null) {
+                $object->$attributeName = $handler::$handlerMethod($value);
+            } else {
+                $object->$attributeName = $this->persistence->$converterMethod($value, $attributeType);
+            }
+        }
+        return $object;
+    }
+
     /**
      * Retrieve Object
      *
@@ -125,7 +147,8 @@ class PersistentManager
         if ($cache->has($key)) {
             return $cache->get($key);
         } else {
-            $object = $this->persistence->retrieveObject($classMap, $id);
+            $tempObject = $this->persistence->retrieveObject($classMap, $id);
+            $object = $this->objectHandler($classMap, $tempObject, 'retrieve');
             $cache->set($key, $object, 300);
             return $object;
         }
@@ -216,27 +239,31 @@ class PersistentManager
     public function saveObject(ClassMap $classMap, object $object)
     {
         $this->persistence->setDb($classMap);
+        $persistentObject = $this->objectHandler($classMap, $object, 'save');
         $commands = [];
-        $pkValue = $classMap->getObjectKey($object);
+        $keyName = $classMap->getKeyAttributeName();
+        $keyValue = $classMap->getObjectKey($persistentObject);
         $hooks = $classMap->getHookMap();
-        if ($pkValue == null) { // insert
-            $classMap->setObjectKey($object);
-            $classMap->setObjectUid($object);
-            $statement = $this->persistence->getStatementForInsert($classMap, $object);
+        if ($keyValue == null) { // insert
+            $classMap->setObjectKey($persistentObject);
+            $classMap->setObjectUid($persistentObject);
+            $statement = $this->persistence->getStatementForInsert($classMap, $persistentObject);
             $commands[] = $statement->insert();
-            $hooks->onBeforeInsert($object);
+            $hooks->onBeforeInsert($persistentObject);
             $this->execute($commands);
-            $classMap->setPostObjectKey($object);
-            $hooks->onAfterInsert($object, $classMap->getObjectKey($object));
+            $classMap->setPostObjectKey($persistentObject);
+            $hooks->onAfterInsert($object, $classMap->getObjectKey($persistentObject));
         } else { // update
-            $statement = $this->persistence->getStatementForUpdate($classMap, $object);
+            $statement = $this->persistence->getStatementForUpdate($classMap, $persistentObject);
             $commands[] = $statement->update();
-            $hooks->onBeforeUpdate($object, $pkValue);
+            $hooks->onBeforeUpdate($persistentObject, $keyValue);
             $this->execute($commands);
-            $hooks->onAfterUpdate($object, $pkValue);
+            $hooks->onAfterUpdate($persistentObject, $keyValue);
         }
+        $keyValue = $classMap->getObjectKey($persistentObject);
+        $object->$keyName = $keyValue;
         $this->storeObjectInCache($classMap, $object);
-        return $classMap->getObjectKey($object);
+        return $keyValue;
     }
 
     private function storeObjectInCache(ClassMap $classMap, object $object): void
@@ -620,25 +647,25 @@ class PersistentManager
         return $db->getQuery($statement);
     }
     */
-/*
-    public function processCriteriaDelete(DeleteCriteria $criteria, $parameters)
-    {
-        $db = $criteria->getClassMap()->getDb();
-        $statement = $criteria->getSqlStatement();
-        $statement->setDb($db);
-        $statement->setParameters($parameters);
-        $this->execute($db, $statement->delete());
-    }
+    /*
+        public function processCriteriaDelete(DeleteCriteria $criteria, $parameters)
+        {
+            $db = $criteria->getClassMap()->getDb();
+            $statement = $criteria->getSqlStatement();
+            $statement->setDb($db);
+            $statement->setParameters($parameters);
+            $this->execute($db, $statement->delete());
+        }
 
-    public function processCriteriaUpdate(UpdateCriteria $criteria, $parameters)
-    {
-        $db = $criteria->getClassMap()->getDb();
-        $statement = $criteria->getSqlStatement();
-        $statement->setDb($db);
-        $statement->setParameters($parameters);
-        $this->execute($db, $statement->update());
-    }
-*/
+        public function processCriteriaUpdate(UpdateCriteria $criteria, $parameters)
+        {
+            $db = $criteria->getClassMap()->getDb();
+            $statement = $criteria->getSqlStatement();
+            $statement->setDb($db);
+            $statement->setParameters($parameters);
+            $this->execute($db, $statement->update());
+        }
+    */
     /*
     public function processCriteriaAsQuery(PersistentCriteria $criteria, $parameters): MQuery
     {
@@ -721,19 +748,19 @@ class PersistentManager
     }
     */
 
-    public function getDeleteCriteria(ClassMap $classMap):DeleteCriteria
+    public function getDeleteCriteria(ClassMap $classMap): DeleteCriteria
     {
         $criteria = new DeleteCriteria($classMap);
         return $criteria;
     }
 
-    public function getUpdateCriteria(ClassMap $classMap):UpdateCriteria
+    public function getUpdateCriteria(ClassMap $classMap): UpdateCriteria
     {
         $criteria = new UpdateCriteria($classMap);
         return $criteria;
     }
 
-    public function getInsertCriteria(ClassMap $classMap):InsertCriteria
+    public function getInsertCriteria(ClassMap $classMap): InsertCriteria
     {
         $criteria = new InsertCriteria($classMap);
         return $criteria;

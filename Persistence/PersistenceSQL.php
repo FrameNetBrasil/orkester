@@ -135,8 +135,9 @@ class PersistenceSQL implements PersistenceBackend
      * @param int $bindingType
      * @return mixed
      */
-    public function convertToDatabaseValue(mixed $value, string $type, int &$bindingType): mixed
+    public function convertToDatabaseValue(mixed $value, string $type): mixed
     {
+        $bindingType = 0;
         return $this->getPlatform()->convertToDatabaseValue($value, $type, $bindingType);
     }
 

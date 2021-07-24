@@ -104,6 +104,7 @@ class PHPConfigLoader extends PersistentConfigLoader
         }
         $type = isset($attr['type']) ? strtolower($attr['type']) : 'string';
         $attributeMap->setType($type);
+        $attributeMap->setHandler($attr['handler'] ?? null);
         $attributeMap->setHandled(false);
         if (isset($attr['converter'])) {
             $attributeMap->setConverter($attr['converter']);
@@ -112,8 +113,8 @@ class PHPConfigLoader extends PersistentConfigLoader
         $attributeMap->setAlias($attr['alias'] ?? $attributeName);
         $attributeMap->setReference($attr['ref'] ?? '');
         $attributeMap->setKeyType($key);
-        $attributeMap->setIdGenerator($attr['idgenerator'] ?? NULL);
-        $attributeMap->setDefault($attr['default'] ?? NULL);
+        $attributeMap->setIdGenerator($attr['idgenerator'] ?? null);
+        $attributeMap->setDefault($attr['default'] ?? null);
         $this->classMap->addAttributeMap($attributeMap);
     }
 
