@@ -25,17 +25,21 @@ class HttpErrorHandler extends SlimErrorHandler
     protected function respond(): Response
     {
         $exception = $this->exception;
+        $file = $exception->getFile();
+        $line = $exception->getLine();
+        $message = $exception->getMessage();
+        mfatal("$file ($line):  $message");
         $statusCode = 500;
         $error = new MError(
             MError::SERVER_ERROR,
             'An internal error has occurred while processing your request.',
-            $exception->getFile(),
-            (string)$exception->getLine(),
+            $file,
+            (string)$line,
         );
 
         if ($exception instanceof HttpException) {
             $statusCode = $exception->getCode();
-            $error->setDescription($exception->getMessage());
+            $error->setDescription($message);
 
             if ($exception instanceof HttpNotFoundException) {
                 $error->setType(MError::RESOURCE_NOT_FOUND);
