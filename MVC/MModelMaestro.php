@@ -161,9 +161,10 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         return $criteria->asResult();
     }
 
-    public static function one($conditions): object
+    public static function one($conditions): object|null
     {
-        return (object) static::filter($conditions)->asResult()[0];
+        $result = static::filter($conditions)->asResult();
+        return empty($result) ? null : (object)$result[0];
     }
 
     public static function getAttributes(): array
