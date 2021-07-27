@@ -161,6 +161,11 @@ class PHPConfigLoader extends PersistentConfigLoader
                 $associationMap->setOrder(implode(',', $arrayOrder));
             }
         }
+
+        if (isset($association['join'])) {
+            $associationMap->setJoinType($association['join']);
+        }
+
         $fromClassMap->putAssociationMap($associationMap);
     }
 
@@ -211,6 +216,10 @@ class PHPConfigLoader extends PersistentConfigLoader
                 $associationMap->setOrder(implode(',', $arrayOrder));
             }
         }
+        if (isset($association['join'])) {
+            $associationMap->setJoinType($association['join']);
+        }
+        
         $fromClassMap->putAssociationMap($associationMap);
     }
 

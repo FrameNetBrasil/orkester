@@ -536,7 +536,8 @@ class PersistentCriteria
     {
         $associationCriteria = new AssociationCriteria($name);
         $associationCriteria->setCriteria($this);
-        $associationCriteria->setJoinType($joinType);
+        //$associationCriteria->setJoinType($joinType);
+        $associationCriteria->setJoinType($associationMap->getJoinType());
         $associationCriteria->setAssociationMap($associationMap);
         $this->associations[$name] = $associationCriteria;
         return $this->associations[$name];

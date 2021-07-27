@@ -29,6 +29,7 @@ class AssociationMap
     private string $order = '';
     private string $orderAttributes = '';
     private string $indexAttribute = '';
+    private string $joinType = 'INNER';
     private bool $autoAssociation = FALSE;
 
     public function __construct(string $name, ClassMap $fromClassMap)
@@ -47,6 +48,16 @@ class AssociationMap
     public function getFromClassName(): string
     {
         return $this->fromClassName;
+    }
+
+    public function getJoinType(): string
+    {
+        return $this->joinType;
+    }
+
+    public function setJoinType(string $type)
+    {
+        $this->joinType = $type;
     }
 
     public function setToClassName(string $name): void
