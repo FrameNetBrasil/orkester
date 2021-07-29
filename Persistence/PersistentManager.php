@@ -247,16 +247,16 @@ class PersistentManager
         if ($keyValue == null) { // insert
             $classMap->setObjectKey($persistentObject);
             $classMap->setObjectUid($persistentObject);
+            $hooks->onBeforeInsert($persistentObject);
             $statement = $this->persistence->getStatementForInsert($classMap, $persistentObject);
             $commands[] = $statement->insert();
-            $hooks->onBeforeInsert($persistentObject);
             $this->execute($commands);
             $classMap->setPostObjectKey($persistentObject);
             $hooks->onAfterInsert($object, $classMap->getObjectKey($persistentObject));
         } else { // update
+            $hooks->onBeforeUpdate($persistentObject, $keyValue);
             $statement = $this->persistence->getStatementForUpdate($classMap, $persistentObject);
             $commands[] = $statement->update();
-            $hooks->onBeforeUpdate($persistentObject, $keyValue);
             $this->execute($commands);
             $hooks->onAfterUpdate($persistentObject, $keyValue);
         }
