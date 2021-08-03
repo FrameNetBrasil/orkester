@@ -13,6 +13,7 @@ class AttributeMap
     private $columnName;
     private $alias;
     private mixed $default;
+    private bool $nullable = false;
     private $reference = '';
     private $index = NULL;
     private $type = NULL;
@@ -265,5 +266,15 @@ class AttributeMap
         $fullyName = $this->getFullyQualifiedName($criteriaAlias);
         $name = Manager::getPersistentManager()->getPersistence()->convertWhere($fullyName, $this->type);
         return $name;
+    }
+
+    public function isNullable(): bool
+    {
+        return $this->nullable;
+    }
+
+    public function setNullable(bool $nullable): void
+    {
+        $this->nullable = $nullable;
     }
 }

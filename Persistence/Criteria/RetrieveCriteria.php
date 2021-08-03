@@ -217,6 +217,10 @@ class RetrieveCriteria extends PersistentCriteria
         return $this->asResult()[0]['cnt'];
     }
 
+    public function clearSelect() {
+        $this->columns = [];
+    }
+
     public function exists(): bool
     {
         return $this->count() > 0;
