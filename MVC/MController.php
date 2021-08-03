@@ -250,9 +250,9 @@ class MController
      * Preenche o objeto MAjax com os dados do controller corrent (objeto Data) para seu usado pela classe Result MRenderJSON.
      * @param string $json String JSON opcional.
      */
-    public function renderObject(object $object): Response
+    public function renderObject(object $object, int $code = 200): Response
     {
-        $this->result = new MResultObject($object);
+        $this->result = new MResultObject($object, $code);
         return $this->result->apply($this->request, $this->response);
     }
 
@@ -281,9 +281,9 @@ class MController
         return $this->result->apply($this->request, $this->response);
     }
 
-    public function renderSuccess(string|object|array $message = ''): Response
+    public function renderSuccess(string|object|array $message = '', int $code = 200): Response
     {
-        return $this->renderResponse('success', $message, 200);
+        return $this->renderResponse('success', $message, $code);
     }
 
     public function renderError(string|object|array $message = '', int $code = 200): Response
