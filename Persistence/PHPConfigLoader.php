@@ -42,6 +42,7 @@ class PHPConfigLoader extends PersistentConfigLoader
         $databaseName = $map['database'] ?? Manager::getOptions('db');
         $this->classMap->setDatabaseName($databaseName);
         $this->classMap->setTableName($map['table']);
+        $this->classMap->setResource($map['resource'] ?? $map['table']);
 
         $hooks = $map['hooks'] ?? [];
         $tryGetFunction = function($name) use($className, $hooks) {
@@ -115,6 +116,7 @@ class PHPConfigLoader extends PersistentConfigLoader
         $attributeMap->setKeyType($key);
         $attributeMap->setIdGenerator($attr['idgenerator'] ?? null);
         $attributeMap->setDefault($attr['default'] ?? null);
+        $attributeMap->setNullable($attr['nullable'] ?? false);
         $this->classMap->addAttributeMap($attributeMap);
     }
 
@@ -219,7 +221,7 @@ class PHPConfigLoader extends PersistentConfigLoader
         if (isset($association['join'])) {
             $associationMap->setJoinType($association['join']);
         }
-        
+
         $fromClassMap->putAssociationMap($associationMap);
     }
 

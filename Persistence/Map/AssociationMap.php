@@ -101,6 +101,16 @@ class AssociationMap
         $this->inverse = ($fromKey == $this->fromClassMap->getKeyAttributeName());
     }
 
+    public function getFromKey(): string
+    {
+        return $this->fromKey;
+    }
+
+    public function getToKey(): string
+    {
+        return $this->toKey;
+    }
+
     public function setKeysAttributes(): void
     {
         if ($this->toClassMap == NULL) {
@@ -345,6 +355,5 @@ class AssociationMap
         $statement->setParameters($value);
         return $statement->update();
     }
-
 
 }

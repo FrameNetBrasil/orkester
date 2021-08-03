@@ -12,6 +12,7 @@ class ClassMap
 {
 
     private string $name;
+    private string $resource;
     private $superClassMap = NULL;
     private $superAssociationMap = NULL;
     private array $fieldMaps = [];
@@ -602,6 +603,16 @@ class ClassMap
             }
         }
         return null;
+    }
+
+    public function getResource(): string
+    {
+        return $this->resource;
+    }
+
+    public function setResource(string $resource): void
+    {
+        $this->resource = $resource;
     }
 
 }
