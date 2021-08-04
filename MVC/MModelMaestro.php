@@ -94,6 +94,11 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         Manager::getPersistentManager()->deleteObject($classMap, $id);
     }
 
+    public static function validateDelete(int $id): array
+    {
+        return [];
+    }
+
     public static function getAssociationRows(ClassMap $classMap, string $associationChain, int $id): array
     {
         $associationChain .= '.*';
