@@ -21,6 +21,7 @@ class PersistenceSQL implements PersistenceBackend
     private MDatabase|null $db;
     private bool $inTransaction = false;
     private int $lastInsertId = 0;
+    private array $transactions = [];
 
     public function __construct()
     {
@@ -28,14 +29,19 @@ class PersistenceSQL implements PersistenceBackend
     }
 
     public function setDb(ClassMap $classMap = null) {
-        $databaseName = $classMap ?  $classMap->getDatabaseName() : Manager::getOptions('db');
+        $databaseName = $this->getDbName($classMap);
         $this->db = Manager::getDatabase($databaseName);
     }
 
     public function getDb(ClassMap $classMap = null) {
-        $databaseName = $classMap ?  $classMap->getDatabaseName() : Manager::getOptions('db');
+        $databaseName = $this->getDbName($classMap);
         $this->db = Manager::getDatabase($databaseName);
         return $this->db;
+    }
+
+    public function getDbName(ClassMap $classMap = null): string
+    {
+        return empty($classMap) ? Manager::getOptions('db') : $classMap->getDatabaseName();
     }
 
     public function getPlatform()
@@ -48,16 +54,18 @@ class PersistenceSQL implements PersistenceBackend
         return $this->lastInsertId;
     }
 
-    public function inTransaction(bool $state): void
-    {
-        $this->inTransaction = $state;
-    }
-
     public function beginTransaction(ClassMap $classMap = null): PersistenceTransaction
     {
-        $connection = $this->getDb($classMap)->beginTransaction();
-        $transaction = new PersistenceTransaction($this);
-        $transaction->begin($connection);
+        $dbName = $this->getDbName($classMap);
+        if (array_key_exists($dbName, $this->transactions)) {
+            $transaction = $this->transactions[$dbName];
+        }
+        else {
+            $connection = $this->getDb($classMap)->getConnection();
+            $transaction = new PersistenceTransaction($connection);
+            $this->transactions[$dbName] = $transaction;
+        }
+        $transaction->begin();
         return $transaction;
     }
 
@@ -174,10 +182,14 @@ class PersistenceSQL implements PersistenceBackend
 
     public function execute(array $commands)
     {
-        $transactionStarted = false;
-        if (!$this->inTransaction) {
+        //Can only commit transactions on the last used DB
+        $dbName = $this->db->getName();
+        if (array_key_exists($dbName, $this->transactions)) {
+            $transaction = $this->transactions[$dbName];
+            $transaction->begin();
+        }
+        else {
             $transaction = $this->beginTransaction();
-            $transactionStarted = true;
         }
         try {
             $statement = new MSql();
@@ -187,13 +199,9 @@ class PersistenceSQL implements PersistenceBackend
                 $this->db->execute($command);
             }
             $this->lastInsertId = $this->db->getConnection()->lastInsertId();
-            if ($transactionStarted) {
-                $transaction->commit();
-            }
+            $transaction->commit();
         } catch (EDBException $e) {
-            if ($transactionStarted) {
-                $transaction->rollback();
-            }
+            $transaction->rollback();
             throw new EDBException($e->getMessage());
         }
     }
@@ -515,6 +523,5 @@ class PersistenceSQL implements PersistenceBackend
         $command = $statement->delete();
         $this->execute([$command]);
     }
-
 
 }

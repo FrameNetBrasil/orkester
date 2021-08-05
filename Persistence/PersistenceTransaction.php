@@ -7,25 +7,39 @@ use Doctrine\DBAL;
 
 class PersistenceTransaction
 {
-    private DBAL\Driver\Connection $connection;
+    private int $transactionCounter = 0;
 
     public function __construct(
-        private PersistenceSQL $persistence
+        private DBAL\Driver\Connection $connection
     ) {}
 
-    public function begin($connection) {
-        $this->connection = $connection;
-        $this->persistence->inTransaction(true);
+    public function begin() {
+        if ($this->transactionCounter == 0) {
+            $this->connection->beginTransaction();
+        }
+        $this->transactionCounter += 1;
     }
 
     public function commit(): void {
-        $this->connection->commit();
-        $this->persistence->inTransaction(false);
+        if ($this->transactionCounter > 0) {
+            $this->transactionCounter -= 1;
+            if ($this->transactionCounter == 0) {
+                $this->connection->commit();
+            }
+        }
+        else {
+            mwarn("Commit transaction called but there's no active transaction!");
+        }
     }
 
     public function rollback(): void {
+        $this->transactionCounter = 0;
         $this->connection->rollback();
-        $this->persistence->inTransaction(false);
+    }
+
+    public function inTransaction(): bool
+    {
+        return $this->transactionCounter > 0;
     }
 
 }

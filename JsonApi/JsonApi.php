@@ -110,16 +110,19 @@ class JsonApi extends MController
         $this->request = $request;
         $this->response = $response;
         $middleware = Manager::getConf('jsonApi')['middleware'];
+        $transaction = null;
         try {
-            if (!empty($middleware)) {
-                ($middleware . '::beforeRequest')($request, $response, $args);
-            }
             $resource = $args['resource'];
             $model = self::modelFromResource($resource);
+            if (!empty($middleware)) {
+                ($middleware . '::beforeRequest')($request, $response, $args, $model);
+            }
             if (is_null($model)) {
                 throw new \InvalidArgumentException("Unknown resource: $resource", 404);
             }
+            $transaction = $model->beginTransaction();
             [0 => $content, 1 => $code] = $handler($model);
+            $transaction->commit();
         } catch(EValidationException $e) {
             $code = 409; //Conflict
             $es = [];
@@ -151,6 +154,9 @@ class JsonApi extends MController
         } finally {
             if (!empty($middleware)) {
                 ($middleware . '::afterRequest')($content, $code);
+            }
+            if ($transaction != null && $transaction->inTransaction()) {
+                $transaction->rollback();
             }
             return $this->renderObject($content, $code);
         }
