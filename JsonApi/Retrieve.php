@@ -100,7 +100,12 @@ class Retrieve
                     }
                 }
                 else if(!is_null($association)) {
-                    $select = $associationName . '.' . $toClassMap->getKeyAttributeName();
+                    if (is_null($fields)) {
+                        $select = $associationName . '.*';
+                    }
+                    else {
+                        $select = $fields . ', ' . $associationName . '.' . $toClassMap->getKeyAttributeName();
+                    }
                     $filter = $filter ?? [];
                     $filter[$classMap->getKeyAttributeName()]['equals'] = $id;
                     [0 => $total, 1 => $criteria] = self::buildCriteria($model, $select, $sort, $filter, $page, $group);
