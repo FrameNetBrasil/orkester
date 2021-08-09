@@ -100,7 +100,7 @@ class Update
     public static function post(MModelMaestro $model, array $data): array
     {
         $entity = static::saveEntity($model, $data, null);
-        return [new DataDocument(Retrieve::getResourceObject($model->getClassMap(), (array)$entity)), 201];
+        return [(object)['data' => Retrieve::getResourceObject($model->getClassMap(), (array)$entity)], 201];
     }
 
     public static function postRelationship(MModelMaestro $model, array $data, int $entityId, string $associationName)
@@ -126,7 +126,7 @@ class Update
             throw new \InvalidArgumentException('Resource id not found', 404);
         }
         $entity = static::saveEntity($model, $data, $current);
-        return [new DataDocument(Retrieve::getResourceObject($model->getClassMap(), (array)$entity)), 200];
+        return [(object)['data' => Retrieve::getResourceObject($model->getClassMap(), (array)$entity)], 200];
     }
 
     public static function patchRelationship(MModelMaestro $model, array $data, int $entityId, string $associationName): array
