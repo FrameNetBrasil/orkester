@@ -239,7 +239,8 @@ class PersistentManager
     public function saveObject(ClassMap $classMap, object $object)
     {
         $this->persistence->setDb($classMap);
-        $persistentObject = $this->objectHandler($classMap, $object, 'save');
+        $persistentObject = $object;
+        //$persistentObject = $this->objectHandler($classMap, $object, 'save');
         $commands = [];
         $keyName = $classMap->getKeyAttributeName();
         $keyValue = $classMap->getObjectKey($persistentObject);

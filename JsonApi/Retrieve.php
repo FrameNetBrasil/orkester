@@ -215,7 +215,6 @@ class Retrieve
              * @var array $items
              */
             $includes = array_map(fn ($i) => trim($i), explode(',', $include));
-            mdump($includes);
             foreach ($classMap->getAssociationMaps() as $associationMap) {
                 $fromKey = $associationMap->getFromKey();
                 array_push($associationAttributes, $fromKey);

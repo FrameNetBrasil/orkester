@@ -109,10 +109,13 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
                 $type = substr(strtolower($value::class), 1);
             }
         }
+        //mdump($value);
         if ($type == 'date') {
             return $value->format('Y-m-d');
         } elseif ($type == 'timestamp') {
             return $value->format('Y-m-d H:i:s');
+        } elseif ($type == 'time') {
+            return $value->format('H:i');
         } elseif (($type == 'decimal') || ($type == 'float')) {
             return str_replace(',', '.', $value);
         } elseif ($type == 'blob') {
@@ -126,10 +129,13 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
 
     public function convertToPHPValue($value, $type) {
         if ($type == 'date') {
-            $formatPHP = $this->db->getConfig('formatDatePHP');;
+            $formatPHP = $this->db->getConfig('formatDatePHP');
             return Carbon::createFromFormat($formatPHP, $value);
         } elseif ($type == 'timestamp') {
-            $formatPHP = $this->db->getConfig('formatDatePHP');;
+            $formatPHP = $this->db->getConfig('formatDatePHP');
+            return Carbon::createFromFormat($formatPHP, $value);
+        } elseif ($type == 'time') {
+            $formatPHP = $this->db->getConfig('formatTimePHP');
             return Carbon::createFromFormat($formatPHP, $value);
         } elseif ($type == 'blob') {
             if ($value) {
@@ -149,6 +155,8 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
         } elseif ($type == 'timestamp') {
             return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
+        } elseif ($type == 'time') {
+            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatTime') . "') ";
         } else {
             return $value;
         }
@@ -170,9 +178,9 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
         $method = 'handle' . $attributeMap->getType();
         $this->$method($operation);
     }
-    
+
     public function setUserInformation($userId, $userIP = null, $module = null, $action = null) {
-        
+
     }
 
     private function handleLOB($operation) {
