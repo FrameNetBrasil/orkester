@@ -207,7 +207,7 @@ class Retrieve
     {
         $id = $entity[$classMap->getKeyAttributeName()];
         $persistenceManager = Manager::getPersistentManager();
-        $associationAttributes = [];
+//        $associationAttributes = [];
         $data = [];
         if (empty($fields)) {
             /**
@@ -217,7 +217,7 @@ class Retrieve
             $includes = array_map(fn ($i) => trim($i), explode(',', $include));
             foreach ($classMap->getAssociationMaps() as $associationMap) {
                 $fromKey = $associationMap->getFromKey();
-                array_push($associationAttributes, $fromKey);
+//                array_push($associationAttributes, $fromKey);
                 $name = $associationMap->getName();
                 if (in_array($name, $includes)) {
                     $cardinality = $associationMap->getCardinality();
@@ -239,9 +239,10 @@ class Retrieve
             }
 
             foreach($entity as $key => $value) {
-                if (!in_array($key, $associationAttributes)) {
-                    $data[$key] = $value;
-                }
+                $data[$key] = $value;
+//                if (!in_array($key, $associationAttributes)) {
+//                    $data[$key] = $value;
+//                }
             }
         }
         else {
