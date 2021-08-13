@@ -49,15 +49,17 @@ class Update
     {
         $classMap = $model->getClassMap();
         $entity = is_null($oldEntity) ? [] : (array) $oldEntity;
-        /** @var AttributeMap $attributeMap */
-        foreach($classMap->getAttributesMap() as $attributeMap) {
-            if (!empty($attributeMap->getReference()))
-                continue;
-            $key = $attributeMap->getName();
-            if ($key == $classMap->getKeyAttributeName())
-                continue;
-            if (array_key_exists($key, $data['attributes'])) {
-                $entity[$key] = $data['attributes'][$key];
+        if (array_key_exists('attributes', $data)) {
+            /** @var AttributeMap $attributeMap */
+            foreach ($classMap->getAttributesMap() as $attributeMap) {
+                if (!empty($attributeMap->getReference()))
+                    continue;
+                $key = $attributeMap->getName();
+                if ($key == $classMap->getKeyAttributeName())
+                    continue;
+                if (array_key_exists($key, $data['attributes'])) {
+                    $entity[$key] = $data['attributes'][$key];
+                }
             }
         }
 
