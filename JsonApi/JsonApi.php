@@ -171,6 +171,7 @@ class JsonApi extends MController
             default => throw new \InvalidArgumentException('Invalid HTTP method', 400)
         };
         $resource = $args['resource'] ?? '';
+        $result = null;
         try {
             $model = self::modelFromResource($resource);
             $transaction = $model->beginTransaction();
@@ -181,6 +182,7 @@ class JsonApi extends MController
             $transaction->commit();
             return $result;
         } finally {
+            ($middleware . '::afterModelRequest')($result, $resource, $method, $args);
             if ($transaction != null && $transaction->inTransaction()) {
                 $transaction->rollback();
             }
