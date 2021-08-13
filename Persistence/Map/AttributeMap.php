@@ -240,9 +240,9 @@ class AttributeMap
     public function getValueToDb($object)
     {
         $value = $this->convertValue($this->getValue($object));
-        if (is_string($value)) {
-            $value = strip_tags($value);
-        }
+//        if (is_string($value)) {
+//            $value = strip_tags($value);
+//        }
         return $value;
     }
 
