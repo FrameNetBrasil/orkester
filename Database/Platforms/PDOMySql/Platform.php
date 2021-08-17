@@ -117,8 +117,6 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             return $value->format('H:i');
         } elseif (($type == 'decimal') || ($type == 'float')) {
             return str_replace(',', '.', $value);
-        } elseif ($type == 'html') {
-            return htmlspecialchars($value);
         } elseif ($type == 'blob') {
             $value = base64_encode($value->getValue());
             $bindingType = 3; //PDO::PARAM_LOB
@@ -138,8 +136,6 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
         } elseif ($type == 'time') {
             $formatPHP = $this->db->getConfig('formatTimePHP');
             return Carbon::createFromFormat($formatPHP, $value);
-        } elseif ($type == 'html') {
-            return html_entity_decode($value);
         } elseif ($type == 'blob') {
             if ($value) {
                 $value = base64_decode($value);
