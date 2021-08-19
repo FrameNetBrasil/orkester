@@ -161,7 +161,6 @@ class MView
         $key = md5($content);
         if ($this->vueCache->has($key)) {
             $newContent = $this->vueCache->get($key);
-            minfo('using vue cache');
         } else {
             $outputArray = [];
             //$input = str_replace(["\n","\r"], '', $content);
@@ -170,7 +169,6 @@ class MView
             $javascript = $outputArray[3][0];
             $newContent = str_replace("`#`", "`{$outputArray[1][0]}`", $javascript);
             $this->vueCache->set($key, $newContent);
-            minfo('creating to vue cache');
         }
         $this->resultFormat = 'javascript';
         return $newContent;
