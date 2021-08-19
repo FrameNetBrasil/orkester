@@ -139,7 +139,7 @@ class Retrieve
         $filters = $filters ?? [];
         foreach ($filters as $field => $conditions) {
             foreach($conditions as $matchMode => $value) {
-                if (empty($value)) continue;
+                if ($value !== '0' && empty($value)) continue;
                 $criteria->where(...match ($matchMode) {
                     'startsWith' => [$field, 'LIKE', "$value%"],
                     'contains' => [$field, 'LIKE', "%$value%"],
