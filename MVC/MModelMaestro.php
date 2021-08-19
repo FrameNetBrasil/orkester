@@ -172,6 +172,11 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         return empty($result) ? null : (object)$result[0];
     }
 
+    public static function exists($conditions): bool
+    {
+        return !is_null(static::one($conditions));
+    }
+
     public static function getAttributes(): array
     {
         return

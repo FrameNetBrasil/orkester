@@ -9,6 +9,7 @@ use JsonApiPhp\JsonApi\DataDocument;
 use JsonApiPhp\JsonApi\Error;
 use JsonApiPhp\JsonApi\ErrorDocument;
 use JsonApiPhp\JsonApi\NullData;
+use Orkester\Exception\EDBException;
 use Orkester\Exception\EOrkesterException;
 use Orkester\Exception\ESecurityException;
 use Orkester\Exception\EValidationException;
@@ -133,11 +134,12 @@ class JsonApi extends MController
         } catch(ESecurityException $e) {
             $code = $e->getCode();
             $content = new ErrorDocument(static::createError($code, 'Forbidden', $e->getMessage()));
-        } catch(InvalidFieldNameException $e) {
+        } catch(InvalidFieldNameException | EDBException $e) {
             $code = 400; //Bad request
             $content = new ErrorDocument(
-                static::createError($code, 'Bad request', 'Invalid field')
+                static::createError($code, 'Bad request', 'Invalid or missing field')
             );
+            merror($e->getMessage());
         } catch (\InvalidArgumentException $e) {
             $code = $e->getCode(); //usually Forbidden or NotFound
             $content = new ErrorDocument(
