@@ -12,13 +12,11 @@ abstract class MResult
 
     protected $ajax;
     protected $content;
-    protected $code;
 
-    public function __construct(int $code = 200)
+    public function __construct()
     {
         //$this->ajax = Manager::getAjax();
         $this->content = null;
-        $this->code = $code;
     }
 
     public abstract function apply(Request $request, Response $response): Response;
@@ -45,3 +43,4 @@ abstract class MResult
     }
 
 }
+

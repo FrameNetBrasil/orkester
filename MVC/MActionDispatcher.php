@@ -14,6 +14,7 @@ class MActionDispatcher extends MController
     protected string $controller;
     protected string $action;
     protected string $controllerClass;
+    protected string $httpMethod;
 
     public function getPath(): string {
         return $this->path;
@@ -31,6 +32,7 @@ class MActionDispatcher extends MController
         $this->request = $request;
         $routeContext = RouteContext::fromRequest($request);
         $route = $routeContext->getRoute();
+        $this->httpMethod = $route->getMethods()[0];
         $arguments = $route->getArguments();
         $fileMapFile = Manager::getBasePath() . "/vendor/filemap.php";
         $this->id =  $arguments['id'] ?? NULL;
@@ -59,11 +61,22 @@ class MActionDispatcher extends MController
     public function __invoke(Request $request, Response $response): Response
     {
         $this->parseRoute($request, $response);
+        minfo($this->id);
         mdump('==== '. $this->controllerClass);
         $controller = new $this->controllerClass;
         $controller->setRequestResponse($request, $response);
-       //$controller = Manager::getContainer()->make($this->controllerClass);
+        $controller->setHTTPMethod($this->httpMethod);
+
+        //$controller = Manager::getContainer()->make($this->controllerClass);
         //$controller->parseRoute($request, $response);
-        return $controller->dispatch($this->action);
+        if (str_ends_with($this->action, '.vue')) {
+            $viewName = baseName($this->action, '.vue');
+            return $controller->render($viewName);
+        } elseif (str_ends_with($this->id, '.vue')) {
+            $viewName = $this->action . '/' . baseName($this->id, '.vue');
+            return $controller->render($viewName);
+        } else {
+            return $controller->dispatch($this->action);
+        }
     }
 }
