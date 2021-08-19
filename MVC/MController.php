@@ -71,13 +71,7 @@ class MController
         $routeContext = RouteContext::fromRequest($request);
         $route = $routeContext->getRoute();
         $arguments = $route->getArguments();
-        //$pattern = explode('/', $route->getPattern());
-        //mdump($arguments);
-        //$this->prefix = $pattern[1] ?? '';
-        //$this->resource = $pattern[2] ?? '';
-        //$this->relationship = $pattern[4] ?? '';
         $this->setHTTPMethod($route->getMethods()[0]);
-        //$this->addParameters($route->getArguments());
         $this->module = $arguments['module'] ?? 'Main';
         $this->controller = $arguments['controller'] ?? 'Main';
         $this->action = $arguments['action'] ?? 'main';

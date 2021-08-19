@@ -61,14 +61,9 @@ class MActionDispatcher extends MController
     public function __invoke(Request $request, Response $response): Response
     {
         $this->parseRoute($request, $response);
-        minfo($this->id);
-        mdump('==== '. $this->controllerClass);
         $controller = new $this->controllerClass;
         $controller->setRequestResponse($request, $response);
         $controller->setHTTPMethod($this->httpMethod);
-
-        //$controller = Manager::getContainer()->make($this->controllerClass);
-        //$controller->parseRoute($request, $response);
         if (str_ends_with($this->action, '.vue')) {
             $viewName = baseName($this->action, '.vue');
             return $controller->render($viewName);

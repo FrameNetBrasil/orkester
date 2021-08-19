@@ -14,8 +14,6 @@ class MHandlerApi  extends MHandler
         mtrace('handler controller = ' . $controllerClass);
         $controller = new $controllerClass;
         $this->controllers[] = $controller;
-        //$controller->setParams($this->getData());
-        //$controller->setData();
         $controller->init();
         return $controller->dispatch($this->context->getAction());
     }

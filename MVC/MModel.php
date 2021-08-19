@@ -2,10 +2,7 @@
 
 namespace Orkester\MVC;
 
-use Atk4\Data\Model;
-use Atk4\Data\Persistence;
-
-class MModel extends Model
+class MModel
 {
     protected int $_totalRecords;
 
