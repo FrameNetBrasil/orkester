@@ -104,6 +104,7 @@ class MFrontController
 
         // Run App & Emit Response
         $this->response = $this->app->handle($this->request);
+        mdump($this->response->getBody()->getContents());
 
         /*
         // inicializa o contexto - execução online

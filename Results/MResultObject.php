@@ -7,10 +7,10 @@ use Slim\Psr7\Response;
 
 class MResultObject extends MResult
 {
-    public function __construct(object $object, int $code = 200)
+    public function __construct(object $object)
     {
         mtrace('Executing MResultObject');
-        parent::__construct($code);
+        parent::__construct();
         $this->content = $object;
     }
 
@@ -21,7 +21,7 @@ class MResultObject extends MResult
         $body->write($payload);
         return $response
             ->withHeader('Content-Type', 'application/json')
-            ->withStatus($this->code);
+            ->withStatus(200);
     }
 
 }

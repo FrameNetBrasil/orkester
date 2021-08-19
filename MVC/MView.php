@@ -6,17 +6,21 @@ use Orkester\UI\Components\MBaseComponent;
 use Orkester\UI\MLatte;
 use Orkester\UI\MPage;
 use Orkester\UI\MTemplate;
-use Orkester\Results\{MResult, MResultNull, MRenderPage, MRenderJSON, MRenderJSONText};
+use Orkester\Results\{MRenderJavascript, MResult, MResultNull, MRenderPage, MRenderJSON, MRenderJSONText};
+use Phpfastcache\Helper\Psr16Adapter;
 
 class MView
 {
     private string $viewFile;
     private string $baseName;
+    private string $resultFormat;
+    private Psr16Adapter $vueCache;
 
     public function __construct($viewFile = '')
     {
         $this->viewFile = $viewFile;
         $this->baseName = '';
+        $this->vueCache = Manager::getCache();
     }
 
     public function getPath()
@@ -29,7 +33,8 @@ class MView
         $result = new MResultNull;
         if ($this->viewFile != '') {
             $content = $this->process();
-            mdump('== httpMethod = ' . $httpMethod . '   resultForm = ' . $resultFormat);
+            $resultFormat = $this->resultFormat ?? $resultFormat;
+            mdump('== httpMethod = ' . $httpMethod . '   resultFormat = ' . $resultFormat);
             if ($content != '') {
                 if ($httpMethod == 'GET') {
                     if ($resultFormat == 'html') {
@@ -37,6 +42,9 @@ class MView
                     }
                     if ($resultFormat == 'json') {
                         $result = new MRenderJSONText($content);
+                    }
+                    if ($resultFormat == 'javascript') {
+                        $result = new MRenderJavascript($content);
                     }
                 } else { // post
                     if ($resultFormat == 'html') {
@@ -134,24 +142,38 @@ class MView
     protected function processJS()
     {
         $this->baseName = basename($this->viewFile, '.js');
-        return $this->processTemplate();
+        $template = new MTemplate(dirname($this->viewFile));
+        $template->context('view', $this);
+        $content = $template->fetch($this->baseName);
+        $this->resultFormat = 'javascript';
+        return $content;
     }
 
     protected function processVue()
     {
         $this->baseName = basename($this->viewFile, '.vue');
-        $page = Manager::getObject(MPage::class);
         $template = new MTemplate(dirname($this->viewFile));
-        //$template->context('manager', Manager::getInstance());
-        $template->context('page', $page);
         $template->context('view', $this);
         $template->context('data', Manager::getData());
-        $template->context('components', Manager::getAppPath() . "/Components");
-        $template->context('appURL', Manager::getAppURL());
         $template->context('template', $template);
         $content = $template->fetch($this->baseName);
-        $page->setContent($content);
-        return $page->generate();
+
+        $key = md5($content);
+        if ($this->vueCache->has($key)) {
+            $newContent = $this->vueCache->get($key);
+            minfo('using vue cache');
+        } else {
+            $outputArray = [];
+            //$input = str_replace(["\n","\r"], '', $content);
+            $input = $content;
+            preg_match_all('/<template>(.*)<\/template>(.*)<script type="module">(.*)<\/script>/s', $input, $outputArray);
+            $javascript = $outputArray[3][0];
+            $newContent = str_replace("`#`", "`{$outputArray[1][0]}`", $javascript);
+            $this->vueCache->set($key, $newContent);
+            minfo('creating to vue cache');
+        }
+        $this->resultFormat = 'javascript';
+        return $newContent;
     }
 
     public function processPrompt(MPromptData $prompt)//$type, $message = '', $action1 = '', $action2 = '')
