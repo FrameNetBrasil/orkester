@@ -47,8 +47,6 @@ abstract class MHandler
 
     public function addApplicationActions()
     {
-        //$actionsFile = Manager::getAppPath() . 'Conf/' . (Manager::getOptions('actions') ?? 'actions.php');
-        //Manager::loadActions($actionsFile);
     }
 
 }

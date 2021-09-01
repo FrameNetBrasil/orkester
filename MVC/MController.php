@@ -60,19 +60,18 @@ class MController
         $this->response = $response;
     }
 
+    public function setHTTPMethod(string $httpMethod = 'GET'): void
+    {
+        $this->httpMethod = $httpMethod;
+    }
+
     protected function parseRoute(Request $request, Response $response)
     {
         $this->setRequestResponse($request, $response);
         $routeContext = RouteContext::fromRequest($request);
         $route = $routeContext->getRoute();
         $arguments = $route->getArguments();
-        //$pattern = explode('/', $route->getPattern());
-        //mdump($arguments);
-        //$this->prefix = $pattern[1] ?? '';
-        //$this->resource = $pattern[2] ?? '';
-        //$this->relationship = $pattern[4] ?? '';
-        $this->httpMethod = $route->getMethods()[0];
-        //$this->addParameters($route->getArguments());
+        $this->setHTTPMethod($route->getMethods()[0]);
         $this->module = $arguments['module'] ?? 'Main';
         $this->controller = $arguments['controller'] ?? 'Main';
         $this->action = $arguments['action'] ?? 'main';
@@ -90,11 +89,6 @@ class MController
 
     public function init()
     {
-    }
-
-    public function setHttpMethod(string $method): void
-    {
-        $this->httpMethod = $method;
     }
 
     public function dispatch(string $action): Response
@@ -159,7 +153,7 @@ class MController
     {
         $code = $e->getCode();
         minfo('code = ' . $code);
-        $this->result = match($code) {
+        $this->result = match ($code) {
             401 => new MResultUnauthorized($e),
             403 => new MResultForbidden($e),
             404 => new MResultNotFound($e),
@@ -250,9 +244,9 @@ class MController
      * Preenche o objeto MAjax com os dados do controller corrent (objeto Data) para seu usado pela classe Result MRenderJSON.
      * @param string $json String JSON opcional.
      */
-    public function renderObject(object $object, int $code = 200): Response
+    public function renderObject(object $object): Response
     {
-        $this->result = new MResultObject($object, $code);
+        $this->result = new MResultObject($object);
         return $this->result->apply($this->request, $this->response);
     }
 
@@ -281,9 +275,9 @@ class MController
         return $this->result->apply($this->request, $this->response);
     }
 
-    public function renderSuccess(string|object|array $message = '', int $code = 200): Response
+    public function renderSuccess(string|object|array $message = ''): Response
     {
-        return $this->renderResponse('success', $message, $code);
+        return $this->renderResponse('success', $message, 200);
     }
 
     public function renderError(string|object|array $message = '', int $code = 200): Response

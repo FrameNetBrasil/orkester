@@ -21,10 +21,6 @@ class MLoadComponent
         $fileComponent = Manager::getAppPath() . "/UI/Components/{$componentName}.blade.php";
         mtrace('handler component = ' . $fileComponent);
         if (file_exists($fileComponent)) {
-            //$view = new MView($fileComponent);
-            //mtrace('HandlerComponent ' . $fileComponent);
-            //$this->result = $view->getResult('GET', 'html');
-            //return $this->result->apply($request, $response);
             $view = new MView();
             $content = $view->component("{$componentName}.blade.php");
             mtrace('HandlerComponent ' . $fileComponent);

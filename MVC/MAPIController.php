@@ -27,14 +27,4 @@ class MAPIController extends MController
         $this->httpMethod = $route->getMethods()[0];
         $this->addParameters($route->getArguments());
     }
-
-    /*
-    public function __invoke(Request $request, Response $response): Response
-    {
-        $this->parseRoute($request, $response);
-        $action = $this->resource;
-        $result = $this->dispatch($action);
-        return $result->apply($request, $response);
-    }
-    */
 }

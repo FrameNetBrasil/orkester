@@ -29,7 +29,6 @@ class MActionController extends MController
         $this->action =  $arguments['action'];
         $this->id =  $arguments['id'] ?? NULL;
         $this->httpMethod = $route->getMethods()[0];
-        //$this->addParameters($route->getArguments());
     }
 
     public function __invoke(Request $request, Response $response): Response

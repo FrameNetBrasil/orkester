@@ -31,6 +31,7 @@ use Slim\App;
 use Slim\Factory\ServerRequestCreatorFactory;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Handlers\ErrorHandler;
+use Slim\Psr7\Request;
 
 
 define('MAESTRO_NAME', 'Maestro 4.0');
@@ -75,8 +76,6 @@ class Manager
     static private string $mode;
     static private bool $isLogged = false;
     static private array $actions;
-    //static private MRequest $request;
-    //static private MResponse $response;
     static private MAjax $ajax;
     static private MFrontController $frontController;
     static private bool $isAjax = false;
@@ -92,7 +91,6 @@ class Manager
      */
     static private array $conf = [];
     static private App $app;
-    private static ServerRequestInterface $request;
     /**
      * @var HttpErrorHandler
      */
@@ -103,6 +101,7 @@ class Manager
     private static ?MSession $session = null;
     private static $returnType;
     private static $persistence;
+    private static ?Request $request;
 
     /**
      * Cria (se não existe) e retorna a instância singleton da class Manager.
@@ -423,7 +422,7 @@ class Manager
         self::$log->logMessage($msg);
     }
 
-    public static function getRequest(): MRequest
+    public static function getRequest(): Request|null
     {
         return self::$request;
     }
