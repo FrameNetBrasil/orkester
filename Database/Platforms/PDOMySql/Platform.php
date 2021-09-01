@@ -110,11 +110,11 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             }
         }
         if ($type == 'date') {
-            return $value->format('Y-m-d');
+            return is_object($value) ? $value->format('Y-m-d') : $value;
         } elseif ($type == 'timestamp') {
-            return $value->format('Y-m-d H:i:s');
+            return is_object($value) ? $value->format('Y-m-d H:i:s') : $value;
         } elseif ($type == 'time') {
-            return $value->format('H:i');
+            return is_object($value) ? $value->format('H:i') : $value;
         } elseif (($type == 'decimal') || ($type == 'float')) {
             return str_replace(',', '.', $value);
         } elseif ($type == 'blob') {
@@ -127,6 +127,9 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
     }
 
     public function convertToPHPValue($value, $type) {
+        if (empty($value) && $value != '0') {
+            return null;
+        }
         if ($type == 'date') {
             $formatPHP = $this->db->getConfig('formatDatePHP');
             return Carbon::createFromFormat($formatPHP, $value);
