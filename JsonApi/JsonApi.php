@@ -49,6 +49,9 @@ class JsonApi extends MController
             }
             return $errors;
         }
+        else if (!Manager::getConf('jsonApi')['allowSkipValidation']) {
+            throw new ESecurityException();
+        }
         return [];
     }
 
@@ -145,6 +148,7 @@ class JsonApi extends MController
             $content = new ErrorDocument(
                 static::createError($code, 'Bad request', $e->getMessage())
             );
+            merror(get_class($e) . " at " . $e->getFile() . ": " . $e->getLine());
             merror($e->getMessage());
         } catch (\Exception | \Error | EOrkesterException $e) {
             $code = 500;
