@@ -2,6 +2,7 @@
 
 namespace Orkester\MVC;
 
+use Orkester\Exception\ESecurityException;
 use Orkester\Manager;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Criteria\DeleteCriteria;
@@ -94,11 +95,6 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
         Manager::getPersistentManager()->deleteObject($classMap, $id);
     }
 
-    public static function validateDelete(int $id): array
-    {
-        return [];
-    }
-
     public static function getAssociationRows(ClassMap $classMap, string $associationChain, int $id): array
     {
         $associationChain .= '.*';
@@ -188,8 +184,21 @@ class MModelMaestro // extends PersistentObject implements JsonSerializable, Ser
             );
     }
 
+    public static function validateDelete(int $id): array
+    {
+        $conf = Manager::getConf('jsonApi');
+        if (!empty($conf) && !$conf['allowSkipValidation']) {
+            throw new ESecurityException();
+        }
+        return [];
+    }
+
     public static function validate(object $entity, object|null $old): array
     {
+        $conf = Manager::getConf('jsonApi');
+        if (!empty($conf) && !$conf['allowSkipValidation']) {
+            throw new ESecurityException();
+        }
         return [];
     }
 
