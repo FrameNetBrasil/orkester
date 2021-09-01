@@ -2,6 +2,7 @@
 
 namespace Orkester\Persistence\Criteria;
 
+use Orkester\Exception\EOrkesterException;
 use Orkester\Manager;
 use Orkester\Persistence\EPersistenceException;
 use Orkester\Persistence\Map\AssociationMap;
@@ -512,6 +513,9 @@ class PersistentCriteria
         } else {  // associação direta: baseClass.assoc
             $fromAlias ??= $classMap->getTableName();
             $associationMap = $classMap->getAssociationMap($name);
+            if (is_null($associationMap)) {
+                throw new EOrkesterException('Association not found: ' . $name);
+            }
             $composedName = $fromAlias . '.' . $name;
             $a = $associationCriteria = $this->newAssociationCriteria($composedName, $associationMap, $joinType);
             $alias = $this->getActualAssociationAlias($name);
