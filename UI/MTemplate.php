@@ -21,6 +21,7 @@ class MTemplate
         $cachePath = Manager::getOptions('tmpPath') . '/templates';
         $this->engine = new Blade($this->paths, $cachePath);
         $this->engine->addExtension('xml','blade');
+        $this->engine->addExtension('js','blade');
         $this->engine->addExtension('vue','blade');
         if (function_exists('mb_internal_charset')) {
             mb_internal_charset('UTF-8');

@@ -131,13 +131,10 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             return null;
         }
         if ($type == 'date') {
-            $formatPHP = $this->db->getConfig('formatDatePHP');
+            $formatPHP = $this->db->getConfig('formatDatePHP');;
             return Carbon::createFromFormat($formatPHP, $value);
         } elseif ($type == 'timestamp') {
-            $formatPHP = $this->db->getConfig('formatDatePHP');
-            return Carbon::createFromFormat($formatPHP, $value);
-        } elseif ($type == 'time') {
-            $formatPHP = $this->db->getConfig('formatTimePHP');
+            $formatPHP = $this->db->getConfig('formatDatePHP');;
             return Carbon::createFromFormat($formatPHP, $value);
         } elseif ($type == 'blob') {
             if ($value) {
@@ -157,8 +154,6 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
         } elseif ($type == 'timestamp') {
             return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
-        } elseif ($type == 'time') {
-            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatTime') . "') ";
         } else {
             return $value;
         }
@@ -180,9 +175,9 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
         $method = 'handle' . $attributeMap->getType();
         $this->$method($operation);
     }
-
+    
     public function setUserInformation($userId, $userIP = null, $module = null, $action = null) {
-
+        
     }
 
     private function handleLOB($operation) {
