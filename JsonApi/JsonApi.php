@@ -44,15 +44,14 @@ class JsonApi extends MController
         $validationMethod = 'validate' . $associationName;
         if (method_exists($model, $validationMethod)) {
             $errors = $model->$validationMethod($entity, $associated);
-            if ($throw && !empty($errors)) {
-                throw new EValidationException($errors);
-            }
-            return $errors;
         }
         else if (!Manager::getConf('jsonApi')['allowSkipValidation']) {
-            throw new ESecurityException();
+            $errors = [$associationName => 'Refused'];
         }
-        return [];
+        if ($throw && !empty($errors)) {
+            throw new EValidationException($errors);
+        }
+        return $errors ?? [];
     }
 
     public function get(array $args, MModelMaestro $model, Request $request): array
