@@ -10,7 +10,7 @@ class EValidationException extends BaseException
 
     public function __construct($errors)
     {
-        parent::__construct('Validation Error');
+        parent::__construct('Validation Error', 400);
         $this->errors = $errors;
     }
 }
