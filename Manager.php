@@ -3,6 +3,7 @@
 namespace Orkester;
 
 use Atk4\Data\Persistence;
+use Orkester\Exception\EOrkesterException;
 use Orkester\Handlers\HttpErrorHandler;
 use Composer\Script\Event;
 
@@ -398,6 +399,16 @@ class Manager
             ]);
         }
         return self::$databases[$databaseName];
+    }
+
+    public static function getDatabaseConfig(string $key, ?string $databaseName = null): mixed
+    {
+        $dbName = $databaseName ?? Manager::getOptions('db');
+        if (empty($dbName)) {
+            merror('Database name not provided and no default configured');
+            return null;
+        }
+        return Manager::getDatabase($dbName)->getConfig($key);
     }
 
     public static function getPainter(): ?MBasePainter
