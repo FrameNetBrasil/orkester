@@ -110,11 +110,12 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             }
         }
         if ($type == 'date') {
-            return is_object($value) ? $value->format('Y-m-d') : $value;
+            return is_object($value) ? $value->format($this->db->getConfig('formatDatePHP')) : $value;
         } elseif ($type == 'timestamp') {
-            return is_object($value) ? $value->format('Y-m-d H:i:s') : $value;
+            $format = $this->db->getConfig('formatDatePHP') . ' ' . $this->db->getConfig('formatTimePHP');
+            return is_object($value) ? $value->format($format) : $value;
         } elseif ($type == 'time') {
-            return is_object($value) ? $value->format('H:i') : $value;
+            return is_object($value) ? $value->format($this->db->getConfig('formatTimePHP')) : $value;
         } elseif (($type == 'decimal') || ($type == 'float')) {
             return str_replace(',', '.', $value);
         } elseif ($type == 'blob') {
@@ -131,10 +132,13 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             return null;
         }
         if ($type == 'date') {
-            $formatPHP = $this->db->getConfig('formatDatePHP');;
+            $formatPHP = $this->db->getConfig('formatDatePHP');
             return Carbon::createFromFormat($formatPHP, $value);
         } elseif ($type == 'timestamp') {
-            $formatPHP = $this->db->getConfig('formatDatePHP');;
+            $formatPHP = $this->db->getConfig('formatDatePHP') . ' ' . $this->db->getConfig('formatTimePHP');
+            return Carbon::createFromFormat($formatPHP, $value);
+        } elseif ($type == 'time') {
+            $formatPHP = $this->db->getConfig('formatTimePHP');
             return Carbon::createFromFormat($formatPHP, $value);
         } elseif ($type == 'blob') {
             if ($value) {
@@ -153,7 +157,9 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
         } elseif ($type == 'datetime') {
             return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
         } elseif ($type == 'timestamp') {
-            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
+            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDateTime') . ' ' . $this->db->getConfig('formatTime') . "') ";
+        } elseif ($type == 'time') {
+            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatTime') . "') ";
         } else {
             return $value;
         }
@@ -166,18 +172,19 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             return " DATE_FORMAT(" . $value . "," . $this->db->getConfig('formatDateWhere') . ' ' . $this->db->getConfig('formatTime') . "') ";
         } elseif ($dbalType == 'timestamp') {
             return " DATE_FORMAT(" . $value . "," . $this->db->getConfig('formatDateWhere') . ' ' . $this->db->getConfig('formatTime') . "') ";
-        } else {
+        } elseif ($dbalType == 'time') {
+            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatTimeWhere') . "') ";
+        } else
             return $value;
         }
-    }
 
     public function handleTypedAttribute($attributeMap, $operation) {
         $method = 'handle' . $attributeMap->getType();
         $this->$method($operation);
     }
-    
+
     public function setUserInformation($userId, $userIP = null, $module = null, $action = null) {
-        
+
     }
 
     private function handleLOB($operation) {
