@@ -179,6 +179,9 @@ class JsonApi extends MController
         $result = null;
         try {
             $model = self::modelFromResource($resource);
+            if (!$model->authorizeResource($request->getMethod(), $args['id'] ?? null, $args['relationship'] ?? null)) {
+                throw new ESecurityException();
+            }
             $transaction = $model->beginTransaction();
             if (!empty($middleware)) {
                 ($middleware . '::beforeModelRequest')($resource, $method, $request, $args);

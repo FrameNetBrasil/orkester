@@ -153,7 +153,7 @@ class MModelMaestro
         return $criteria;
     }
 
-    public static function list(string|null $select = null, object|array|null $filter = null): array
+    public static function list(object|array|null $filter = null, string|null $select = null): array
     {
         $criteria = static::filter($filter);
         if (is_string($select)) {
@@ -187,7 +187,7 @@ class MModelMaestro
     public static function validateDelete(int $id): array
     {
         $conf = Manager::getConf('jsonApi');
-        if (!empty($conf) && !$conf['allowSkipValidation']) {
+        if (!empty($conf) && !$conf['allowSkipAuthorization']) {
             throw new ESecurityException();
         }
         return [];
@@ -196,10 +196,19 @@ class MModelMaestro
     public static function validate(object $entity, object|null $old): array
     {
         $conf = Manager::getConf('jsonApi');
-        if (!empty($conf) && !$conf['allowSkipValidation']) {
+        if (!empty($conf) && !$conf['allowSkipAuthorization']) {
             throw new ESecurityException();
         }
         return [];
+    }
+
+    public static function authorizeResource(string $method, ?int $id, ?string $relationship): bool
+    {
+        $conf = Manager::getConf('jsonApi');
+        if (!empty($conf) && !$conf['allowSkipAuthorization']) {
+            return false;
+        }
+        return true;
     }
 
     public static function saveAssociationById(string $associationName, object $entity, int $id, ClassMap $classMap = null)
