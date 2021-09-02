@@ -164,13 +164,19 @@ class MModelMaestro
 
     public static function one($conditions): object|null
     {
-        $result = static::filter($conditions)->asResult();
+        $criteria = static::getCriteria()->range(1, 1);
+        $result = static::filter($conditions, $criteria)->asResult();
         return empty($result) ? null : (object)$result[0];
     }
 
-    public static function exists($conditions): bool
+    public static function exists(array $conditions): bool
     {
         return !is_null(static::one($conditions));
+    }
+
+    public static function existsId(int $primaryKey): bool
+    {
+        return static::exists([self::getClassMap()->getKeyAttributeName(), '=', $primaryKey]);
     }
 
     public static function getAttributes(): array

@@ -449,7 +449,7 @@ class PersistenceSQL implements PersistenceBackend
         $columns = array_keys($rows[0]);
         $sqlColumns = [];
         foreach ($columns as $column) {
-            mdump($column);
+//            mdump($column);
             $attributeMap = $criteria->getClassMap()->getAttributeMap($column);
             $sqlColumns[] = $attributeMap->getColumnName();
         }

@@ -91,7 +91,7 @@ class MFrontController
     {
         // Run App & Emit Response
         $this->response = $this->app->handle($this->request);
-        mdump($this->response->getBody()->getContents());
+//        mdump($this->response->getBody()->getContents());
     }
 
     public function handlerResponse()
