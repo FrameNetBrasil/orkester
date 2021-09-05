@@ -5,10 +5,6 @@ namespace Orkester\JsonApi;
 
 
 use Doctrine\DBAL\Exception\InvalidFieldNameException;
-use JsonApiPhp\JsonApi\DataDocument;
-use JsonApiPhp\JsonApi\Error;
-use JsonApiPhp\JsonApi\ErrorDocument;
-use JsonApiPhp\JsonApi\NullData;
 use Orkester\Exception\EDBException;
 use Orkester\Exception\EOrkesterException;
 use Orkester\Exception\ESecurityException;
@@ -106,13 +102,20 @@ class JsonApi extends MController
         }
     }
 
-    public static function createError(int $code, string $title, string $detail): Error {
-        return new Error(
-            new Error\Status($code),
-            new Error\Title($title),
-            new Error\Detail($detail)
-        );
+    public static function createError(int $code, string $title, string $detail): array
+    {
+        return [
+            'status' => $code,
+            'title' => $title,
+            'detail' => $detail
+        ];
     }
+
+    public static function createErrorResponse(array $errors): object
+    {
+        return (object)["errors" => $errors];
+    }
+
 
     public function handleRequest(Request $request, Response $response, array $args): Response
     {
@@ -132,26 +135,26 @@ class JsonApi extends MController
             foreach ($e->errors as $key => $value) {
                 array_push($es, static::createError($code, $key, $value));
             }
-            $content = new ErrorDocument(...$es);
+            $content = static::createErrorResponse($es);
         } catch(ESecurityException $e) {
             $code = $e->getCode();
-            $content = new ErrorDocument(static::createError($code, 'Forbidden', $e->getMessage()));
+            $content = static::createErrorResponse(static::createError($code, 'Forbidden', $e->getMessage()));
         } catch(InvalidFieldNameException | EDBException $e) {
             $code = 400; //Bad request
-            $content = new ErrorDocument(
+            $content = static::createErrorResponse(
                 static::createError($code, 'Bad request', 'Invalid or missing field')
             );
             merror($e->getMessage());
         } catch (\InvalidArgumentException $e) {
             $code = $e->getCode(); //usually Forbidden or NotFound
-            $content = new ErrorDocument(
+            $content = static::createErrorResponse(
                 static::createError($code, 'Bad request', $e->getMessage())
             );
             merror(get_class($e) . " at " . $e->getFile() . ": " . $e->getLine());
             merror($e->getMessage());
         } catch (\Exception | \Error | EOrkesterException $e) {
             $code = 500;
-            $content = new ErrorDocument(
+            $content = static::createErrorResponse(
                 static::createError($code, 'InternalServerError', '')
             );
             mfatal(get_class($e) . " at " . $e->getFile() . ": " . $e->getLine());
@@ -216,7 +219,7 @@ class JsonApi extends MController
         $this->response = $response;
         $code = 404;
         return $this->renderObject(
-            new ErrorDocument(static::createError($code, 'Endpoint not found', '')),
+            static::createErrorResponse(static::createError($code, 'Endpoint not found', '')),
             $code
         );
     }
