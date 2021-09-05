@@ -1,8 +1,8 @@
 <?php
+
 namespace Orkester\MVC;
 
 use Orkester\Manager;
-use Orkester\UI\Components\MBaseComponent;
 use Orkester\UI\MLatte;
 use Orkester\UI\MPage;
 use Orkester\UI\MTemplate;
@@ -168,9 +168,17 @@ class MView
             preg_match_all('/<template>(.*)<\/template>(.*)<script type="module">(.*)<\/script>/s', $input, $outputArray);
             $javascript = $outputArray[3][0];
             $newContent = str_replace("`#`", "`{$outputArray[1][0]}`", $javascript);
+            // styles?
+            $stylesArray = [];
+            preg_match_all('/<style>(.*)<\/style>/s', $input, $stylesArray);
+            if (isset($stylesArray[1][0])) {
+                $style = addslashes(str_replace(["\n","\r","\t"],' ', $stylesArray[1][0]));
+                $newContent .= "document.head.innerHTML=\"<style>{$style}</style>\" + document.head.innerHTML;";
+            }
             $this->vueCache->set($key, $newContent);
         }
         $this->resultFormat = 'javascript';
+        //mdump($newContent);
         return $newContent;
     }
 
