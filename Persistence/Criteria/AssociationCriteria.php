@@ -178,7 +178,7 @@ class AssociationCriteria
     {
         $classMap = $this->criteria->getClassMap();
         $attribute = $this->attribute;
-        mdump('== ' . $attribute . ' ' . $classMap->getName());
+//        mdump('== ' . $attribute . ' ' . $classMap->getName());
         $tokens = explode('.', $attribute);
         if ($this->criteria->isAssociationAlias($tokens[0])) {
             $alias = $tokens[0];
@@ -186,7 +186,7 @@ class AssociationCriteria
             $attribute = str_replace($alias, $associationAlias, $attribute);
         }
         $attribute = $this->implodeReference($classMap, $attribute);
-        mdump('$$ ' . $attribute);
+//        mdump('$$ ' . $attribute);
         $tokens = preg_split('/[.]+/', $attribute);
         $n = count($tokens);
         $attributeName = $tokens[$n - 1];
