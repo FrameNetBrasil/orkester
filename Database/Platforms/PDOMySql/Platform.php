@@ -110,7 +110,8 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             }
         }
         if ($type == 'date') {
-            return is_object($value) ? $value->format($this->db->getConfig('formatDatePHP')) : $value;
+//            return is_object($value) ? $value->format($this->db->getConfig('formatDatePHP')) : $value;
+            return is_object($value) ? $value->format('Y/m/d') : $value;
         } elseif ($type == 'timestamp') {
             $format = $this->db->getConfig('formatDatePHP') . ' ' . $this->db->getConfig('formatTimePHP');
             return is_object($value) ? $value->format($format) : $value;
