@@ -157,7 +157,7 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
         } elseif ($type == 'datetime') {
             return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
         } elseif ($type == 'timestamp') {
-            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDateTime') . ' ' . $this->db->getConfig('formatTime') . "') ";
+            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
         } elseif ($type == 'time') {
             return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatTime') . "') ";
         } else {
