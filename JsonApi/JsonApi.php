@@ -41,7 +41,7 @@ class JsonApi extends MController
         if (method_exists($model, $validationMethod)) {
             $errors = $model->$validationMethod($entity, $associated);
         }
-        else if (!Manager::getConf('jsonApi')['allowSkipValidation']) {
+        else if (!Manager::getConf('jsonApi')['allowSkipAuthorization']) {
             $errors = [$associationName => 'Refused'];
         }
         if ($throw && !empty($errors)) {
