@@ -205,6 +205,7 @@ class JsonApi extends MController
         ['service' => $service, 'action' => $action] = $args;
         $instance = static::getResourceInstance($service);
         if (method_exists($instance, $action)) {
+            Manager::getData()->id = $args['id'] ?? null;
             $content = (object)['data' => $instance->$action()];
             return [$content, 200];
         }
