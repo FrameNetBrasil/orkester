@@ -190,12 +190,14 @@ class RetrieveCriteria extends PersistentCriteria
                         if ($reference != '') {
                             $this->columns[] = $reference . ' as ' . $attributeMap->getName();
                         } else {
-                            $this->columns[] = $attributeMap->getName();
+                            $alias = ($exp->alias != '') ? ' as ' . $exp->alias : '';
+                            $this->columns[] = $attributeMap->getName() . $alias;
                         }
                     }
                 } else {
                     //$this->columns[] = addslashes($attribute);
-                    $this->columns[] = $attribute;
+                    $alias = ($exp->alias != '') ? ' as ' . $exp->alias : '';
+                    $this->columns[] = $attribute . $alias;
                 }
             }
             /*
