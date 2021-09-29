@@ -514,7 +514,7 @@ class PersistentCriteria
             $fromAlias ??= $classMap->getTableName();
             $associationMap = $classMap->getAssociationMap($name);
             if (is_null($associationMap)) {
-                throw new EOrkesterException('Association not found: ' . $name);
+                throw new EPersistenceException('Association not found: ' . $name);
             }
             $composedName = $fromAlias . '.' . $name;
             $a = $associationCriteria = $this->newAssociationCriteria($composedName, $associationMap, $joinType);
