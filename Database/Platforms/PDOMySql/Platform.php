@@ -170,9 +170,9 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
         if ($dbalType == 'date') {
             return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDateWhere') . "') ";
         } elseif ($dbalType == 'datetime') {
-            return " DATE_FORMAT(" . $value . "," . $this->db->getConfig('formatDateWhere') . ' ' . $this->db->getConfig('formatTime') . "') ";
+            return " DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDateWhere') . ' ' . $this->db->getConfig('formatTimeWhere') . "') ";
         } elseif ($dbalType == 'timestamp') {
-            return " DATE_FORMAT(" . $value . "," . $this->db->getConfig('formatDateWhere') . ' ' . $this->db->getConfig('formatTime') . "') ";
+            return " DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDateWhere') . ' ' . $this->db->getConfig('formatTimeWhere') . "') ";
         } elseif ($dbalType == 'time') {
             return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatTimeWhere') . "') ";
         } else
