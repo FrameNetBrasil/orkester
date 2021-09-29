@@ -251,7 +251,8 @@ class PersistenceSQL implements PersistenceBackend
             foreach ($orders as $order) {
                 $parts = explode(' ', $order);
 //                $sqlOrders[] = trim($criteria->getOperand($parts[0])->getSqlOrder() . ' ' . $parts[1] . ' ' . $parts[2] . ' ' . $parts[3]);
-                $sqlOrders[] = trim($criteria->getOperand($parts[0])->getSqlOrder());
+                $sqlOrders[] = trim($criteria->getOperand($parts[0])->getSqlOrder() . ' ' . ($parts[1] ?? ''));
+//                $sqlOrders[] = trim($criteria->getOperand($parts[0])->getSqlOrder());
             }
             $statement->setOrderBy(implode(',', $sqlOrders));
         }

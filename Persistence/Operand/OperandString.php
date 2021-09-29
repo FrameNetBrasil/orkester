@@ -39,6 +39,8 @@ class OperandString extends PersistentOperand
             $sql = $o->getSql();
         } elseif (str_starts_with($token, ':')) {
             $sql = $token;
+        } elseif (str_starts_with($token, '#')) {
+            $sql = substr($token,1);
         } elseif (is_numeric($token)) {
             $sql = $token;
         } elseif (str_contains($token, '\'')) {
@@ -78,6 +80,7 @@ class OperandString extends PersistentOperand
 
     public function getSqlWhere()
     {
+        /*
         $value = trim($this->operand);
         $token = $value;
         if (str_starts_with($token, ':')) {
@@ -95,6 +98,36 @@ class OperandString extends PersistentOperand
                 $sql = is_numeric($token) ? $token : "'{$token}'";
             }
         }
+        return $sql;
+        */
+        $value = trim($this->operand);
+        $token = $value;
+
+        if (str_contains($token, '(')) {
+            $o = new OperandFunction($token, $this->criteria);
+            $sql = $o->getSql();
+        } elseif (str_starts_with($token, ':')) {
+            $sql = $token;
+        } elseif (str_starts_with($token, '#')) {
+            $sql = substr($token,1);
+        } elseif (is_numeric($token)) {
+            $sql = $token;
+        } elseif (str_contains($token, '\'')) {
+            $sql = $token;
+        } elseif ($this->criteria->isAttributeAlias($token)) {
+            $sql = $this->criteria->getAttributeAlias($token);
+        } else {
+            $attributeCriteria = $this->criteria->getAttributeCriteria($token);
+            $attributeMap = $attributeCriteria->getAttributeMap();
+            if ($attributeMap instanceof AttributeMap) {
+                $token = $attributeCriteria->getAttribute();
+                $o = new OperandAttributeMap($token, $attributeMap, $this->criteria);
+                $sql = $o->getSqlWhere();
+            } else {
+                $sql = is_numeric($token) ? $token : "'{$token}'";
+            }
+        }
+
         return $sql;
     }
 
@@ -122,20 +155,31 @@ class OperandString extends PersistentOperand
     {
         $value = trim($this->operand);
         $token = $value;
-        if ($this->criteria->isAttributeAlias($token)) {
-            $sql = $this->criteria->getAttributeAlias($token);
+
+        if (str_contains($token, '(')) {
+            $o = new OperandFunction($token, $this->criteria);
+            $sql = $o->getSql();
+        } elseif (str_contains($token, ',')) {
+            $o = new OperandList($token, $this->criteria);
+            $sql = $o->getSql();
+        } elseif (str_starts_with($token, ':')) {
+            $sql = substr($token,1);
+        } elseif (is_numeric($token)) {
+            $sql = $token;
         } else {
             $attributeCriteria = $this->criteria->getAttributeCriteria($token);
             $attributeMap = $attributeCriteria->getAttributeMap();
+            $attribute = $attributeCriteria->getAttribute();
             if ($attributeMap instanceof AttributeMap) {
-                $token = $attributeCriteria->getAttribute();
+                $token = $attribute;
                 $o = new OperandAttributeMap($token, $attributeMap, $this->criteria);
                 $sql = $o->getSqlWhere();
             } else {
-                $sql = is_numeric($token) ? $token : "'{$token}'";
+                $sql = $token;
             }
         }
         return $sql;
+
     }
 
 }

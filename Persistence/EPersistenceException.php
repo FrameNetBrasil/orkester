@@ -1,9 +1,9 @@
 <?php
 namespace Orkester\Persistence;
 
-use Orkester\Exception\EMException;
+use Orkester\Exception\EOrkesterException;
 
-class EPersistenceException extends EMException {
+class EPersistenceException extends EOrkesterException {
 
     public static function query($msg, $code = '') {
         return new self($msg);
