@@ -10,6 +10,7 @@ use Orkester\MVC\MModelMaestro;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\PersistentObject;
 use Orkester\Types\MRange;
+use PhpMyAdmin\SqlParser\Parser;
 
 class RetrieveCriteria extends PersistentCriteria
 {
@@ -178,6 +179,27 @@ class RetrieveCriteria extends PersistentCriteria
         $args = func_get_args();
         if ($numargs == 1) {
             $arg = $args[0];
+            $select = "select " . $arg;
+            $parser = new Parser($select);
+            foreach($parser->statements[0]->expr as $exp) {
+                $attribute = trim($exp->expr);
+                if ($attribute == '*') {
+                    $classMap = $this->classMap;
+                    foreach ($classMap->getAttributesMap() as $attributeMap) {
+                        $reference = $attributeMap->getReference();
+                        if ($reference != '') {
+                            $this->columns[] = $reference . ' as ' . $attributeMap->getName();
+                        } else {
+                            $this->columns[] = $attributeMap->getName();
+                        }
+                    }
+                } else {
+                    //$this->columns[] = addslashes($attribute);
+                    $this->columns[] = $attribute;
+                }
+            }
+            /*
+            $arg = $args[0];
             $attributes = explode(',', $arg);
             if (str_contains($attributes[0], '(')) {
                 $this->columns[] = $arg;
@@ -186,7 +208,6 @@ class RetrieveCriteria extends PersistentCriteria
                     foreach ($attributes as $attribute) {
                         $attribute = trim($attribute);
                         if ($attribute == '*') {
-                            /** @var ClassMap $classMap */
                             $classMap = $this->classMap;
                             foreach ($classMap->getAttributesMap() as $attributeMap) {
                                 $reference = $attributeMap->getReference();
@@ -202,6 +223,7 @@ class RetrieveCriteria extends PersistentCriteria
                     }
                 }
             }
+            */
         } else {
             foreach ($args as $arg) {
                 $this->columns[] = $arg;
