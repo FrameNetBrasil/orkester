@@ -48,19 +48,19 @@ class Retrieve
             $primary = self::getResourceObjectCollection($classMap, $criteria->asResult(), $fields, $include);
         }
         else if ($id == 0) {
-            [0 => $_, 1 => $criteria] = self::buildCriteria($model, $fields, $sort, $filter, $page, $limit, $group, $join);
-            $result = $criteria->asResult()[0];
-            $attributes = [];
-            foreach($result as $key => $value) {
-                array_push($attributes, new Attribute($key, $value));
-            }
-            $resource = $classMap->getResource();
-            $primary = new ResourceObject(
-                $resource,
-                0,
-                new SelfLink("/api/$resource/$id"),
-                ...$attributes,
-            );
+//            [0 => $_, 1 => $criteria] = self::buildCriteria($model, $fields, $sort, $filter, $page, $limit, $group, $join);
+//            $result = $criteria->asResult()[0];
+//            $attributes = [];
+//            foreach($result as $key => $value) {
+//                array_push($attributes, new Attribute($key, $value));
+//            }
+//            $resource = $classMap->getResource();
+//            $primary = new ResourceObject(
+//                $resource,
+//                0,
+//                new SelfLink("/api/$resource/$id"),
+//                ...$attributes,
+//            );
         }
         else {
             $associationName = $association ?? $relationship;
@@ -176,9 +176,9 @@ class Retrieve
         if (!empty($sort)) {
             $sortFields = explode(',', $sort);
             foreach($sortFields as $sf) {
-                $order = $sf[0] == '-' ? 'DESC' : 'ASC';
+                $order = $sf[0] == '-' ? ' DESC' : ' ASC';
                 $field = ltrim($sf, '-');
-                $criteria->orderBy($field, $order);
+                $criteria->orderBy($field . $order);
             }
         }
         if (!empty($limit)) {
