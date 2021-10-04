@@ -2,6 +2,7 @@
 
 namespace Orkester\Persistence\Map;
 
+use Orkester\Database\MDatabase;
 use Orkester\Database\MSql;
 use Orkester\Manager;
 use Orkester\Persistence\Criteria\OperandArray;
@@ -286,59 +287,92 @@ class AssociationMap
         return $criteriaParameters;
     }
 
-    public function getDeleteStatement($object, $refObject = NULL)
+//    public function getDeleteStatement($object, $refObject = NULL)
+//    {
+//        $statement = new MSQL();
+//        $statement->setDb($this->fromClassMap->getDb());
+//        $statement->setTables($this->getAssociativeTable());
+//        $this->setKeysAttributes();
+//        $whereCondition = ($this->fromAttributeMap->getName() . ' = ' . $object->getAttributeValue($this->fromAttributeMap));
+//        // se recebe $refObject, remove a associaçao apenas com esse objeto
+//        if ($refObject) {
+//            $whereCondition .= " AND ( " . $this->toAttributeMap->getName() . " = " . $refObject->getAttributeValue($this->toAttributeMap) . ")";
+//        }
+//        $statement->setWhere($whereCondition);
+//        return $statement->delete();
+//    }
+//
+//    public function getDeleteStatementId($object, $id)
+//    {
+//        $statement = new MSQL();
+//        $statement->setDb($this->fromClassMap->getDb());
+//        $statement->setTables($this->getAssociativeTable());
+//        $this->setKeysAttributes();
+//        $whereCondition = $this->toAttributeMap->getName() . ' IN (' . implode(',', $id) . ') ';
+//        $whereCondition .= " AND ( " . $this->fromAttributeMap->getName() . " = " . $object->getAttributeValue($this->fromAttributeMap) . ")";
+//        $statement->setWhere($whereCondition);
+//        return $statement->delete();
+//    }
+//
+//    public function getInsertStatement($object, $refObject)
+//    {
+//        $statement = new MSQL();
+//        $statement->setDb($this->fromClassMap->getDb());
+//        $statement->setTables($this->getAssociativeTable());
+//        $columns = $this->fromAttributeMap->getName();
+//        $parameters[] = $object->getAttributeValue($this->fromAttributeMap);
+//        $columns .= ',' . $this->toAttributeMap->getName();
+//        $parameters[] = $refObject->getAttributeValue($this->toAttributeMap);
+//        $statement->setColumns($columns);
+//        $statement->setParameters($parameters);
+//        return $statement->insert();
+//    }
+//
+//    public function getInsertStatementId($object, $id)
+//    {
+//        $statement = new MSQL();
+//        $statement->setDb($this->fromClassMap->getDb());
+//        $statement->setTables($this->getAssociativeTable());
+//        $columns = $this->fromAttributeMap->getName();
+//        $parameters[] = $object->getAttributeValue($this->fromAttributeMap);
+//        $columns .= ',' . $this->toAttributeMap->getName();
+//        $parameters[] = $id;
+//        $statement->setColumns($columns);
+//        $statement->setParameters($parameters);
+//        return $statement->insert();
+//    }
+
+    public function getInsertStatement(MDatabase $db, int $idFrom, int|array $idTo)
     {
-        $statement = new MSQL();
-        $statement->setDb($this->fromClassMap->getDb());
+//        $idsTo = is_array($idsTo) ? $idsTo : [$idsTo];
+
+        $statement = new MSql();
+        $statement->setDb($db);
         $statement->setTables($this->getAssociativeTable());
-        $this->setKeysAttributes();
-        $whereCondition = ($this->fromAttributeMap->getName() . ' = ' . $object->getAttributeValue($this->fromAttributeMap));
-        // se recebe $refObject, remove a associaçao apenas com esse objeto
-        if ($refObject) {
-            $whereCondition .= " AND ( " . $this->toAttributeMap->getName() . " = " . $refObject->getAttributeValue($this->toAttributeMap) . ")";
+        $columns = $this->fromAttributeMap->getName() . ", " . $this->toAttributeMap->getName();
+        $parameters = [$idFrom, $idTo];
+        $statement->setColumns($columns);
+        $statement->setParameters($parameters);
+        return $statement->insert();
+    }
+
+    public function getDeleteStatement(MDatabase $db, int $idFrom,  null|int|array $idsTo = null)
+    {
+        $statement = new MSql();
+        $statement->setDb($db);
+        $statement->setTables($this->getAssociativeTable());
+        $where = $this->fromAttributeMap->getName() . " = " . $idFrom;
+        if (!empty($idsTo)) {
+            $where .= " AND ";
+            if (is_array($idsTo)) {
+                $where .= $this->toAttributeMap->getName() . " IN (" . implode(',', $idsTo) . ")";
+            }
+            else {
+                $where .= $this->toAttributeMap->getName() . " = " . $idsTo;
+            }
         }
-        $statement->setWhere($whereCondition);
+        $statement->setWhere($where);
         return $statement->delete();
-    }
-
-    public function getDeleteStatementId($object, $id)
-    {
-        $statement = new MSQL();
-        $statement->setDb($this->fromClassMap->getDb());
-        $statement->setTables($this->getAssociativeTable());
-        $this->setKeysAttributes();
-        $whereCondition = $this->toAttributeMap->getName() . ' IN (' . implode(',', $id) . ') ';
-        $whereCondition .= " AND ( " . $this->fromAttributeMap->getName() . " = " . $object->getAttributeValue($this->fromAttributeMap) . ")";
-        $statement->setWhere($whereCondition);
-        return $statement->delete();
-    }
-
-    public function getInsertStatement($object, $refObject)
-    {
-        $statement = new MSQL();
-        $statement->setDb($this->fromClassMap->getDb());
-        $statement->setTables($this->getAssociativeTable());
-        $columns = $this->fromAttributeMap->getName();
-        $parameters[] = $object->getAttributeValue($this->fromAttributeMap);
-        $columns .= ',' . $this->toAttributeMap->getName();
-        $parameters[] = $refObject->getAttributeValue($this->toAttributeMap);
-        $statement->setColumns($columns);
-        $statement->setParameters($parameters);
-        return $statement->insert();
-    }
-
-    public function getInsertStatementId($object, $id)
-    {
-        $statement = new MSQL();
-        $statement->setDb($this->fromClassMap->getDb());
-        $statement->setTables($this->getAssociativeTable());
-        $columns = $this->fromAttributeMap->getName();
-        $parameters[] = $object->getAttributeValue($this->fromAttributeMap);
-        $columns .= ',' . $this->toAttributeMap->getName();
-        $parameters[] = $id;
-        $statement->setColumns($columns);
-        $statement->setParameters($parameters);
-        return $statement->insert();
     }
 
     public function getUpdateStatementId($object, array $id, $value = NULL)
