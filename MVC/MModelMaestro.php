@@ -2,6 +2,7 @@
 
 namespace Orkester\MVC;
 
+use Orkester\Exception\EOrkesterException;
 use Orkester\Exception\ESecurityException;
 use Orkester\Manager;
 use Orkester\Persistence\Map\AttributeMap;
@@ -217,21 +218,31 @@ class MModelMaestro
         return true;
     }
 
-    public static function saveAssociationById(string $associationName, object $entity, int $id, ClassMap $classMap = null)
+    public static function saveAssociation(string $associationName, int $id, int|array $associatedIds)
     {
-        //halfway done, untested
-        $classMap = $classMap ?? static::getClassMap();
-        $associationMap = $classMap->getAssociationMap($associationName);
-        $cardinality = $associationMap->getCardinality();
-        if ($cardinality == 'oneToMany') {
-            $toClassMap = $associationMap->getToClassMap();
-            $otherEntity = MModelMaestro::getById($id, $toClassMap);
-            $otherEntity->{$associationMap->getToKey()} = $classMap->getObjectKey($entity);
-            MModelMaestro::save($otherEntity, $toClassMap);
-        } else if ($cardinality == 'manyToOne') {
-            $entity->{$associationMap->getFromKey()} = $id;
-            MModelMaestro::save($entity, $classMap);
+        $map = self::getClassMap()->getAssociationMap($associationName);
+        if (empty($map)) {
+            throw new EOrkesterException("Unknown association: $associationName");
         }
+        Manager::getPersistentManager()->saveAssociation($map, $id, $associatedIds);
+    }
+
+    public static function updateAssociation(string $associationName, int $id, int|array $associatedIds)
+    {
+        $map = self::getClassMap()->getAssociationMap($associationName);
+        if (empty($map)) {
+            throw new EOrkesterException("Unknown association: $associationName");
+        }
+        Manager::getPersistentManager()->saveAssociation($map, $id, $associatedIds, false);
+    }
+
+    public static function deleteAssociation(string $associationName, int $id, int|array $associatedIds)
+    {
+        $map = self::getClassMap()->getAssociationMap($associationName);
+        if (empty($map)) {
+            throw new EOrkesterException("Unknown association: $associationName");
+        }
+        Manager::getPersistentManager()->deleteAssociation($map, $id, $associatedIds);
     }
 
 }

@@ -2,6 +2,7 @@
 
 namespace Orkester\Persistence;
 
+use Orkester\Exception\EOrkesterException;
 use Orkester\Persistence\Criteria\DeleteCriteria;
 use Orkester\Persistence\Criteria\InsertCriteria;
 use Orkester\Persistence\Criteria\UpdateCriteria;
@@ -351,107 +352,143 @@ class PersistentManager
      * Save Associations
      *
      */
-    public function saveAssociation(PersistentObject $object, $associationName)
+//    public function saveAssociation(PersistentObject $object, $associationName)
+//    {
+//        $classMap = $object->getClassMap();
+//        $this->persistence->setDb($classMap);
+//        $commands = array();
+//        $associationMap = $classMap->getAssociationMap($associationName);
+//        if (is_null($associationMap)) {
+//            throw new EPersistenceException("Association name [{$associationName}] not found.");
+//        }
+//        $toAttributeMap = $associationMap->getToAttributeMap();
+//        $fromAttributeMap = $associationMap->getFromAttributeMap();
+//        if ($associationMap->getCardinality() == 'oneToOne') {
+//            // obtem o objeto referenciado
+//            $refObject = $object->get($associationMap->getName());
+//            if ($refObject != NULL) {
+//                // se a associação é inversa, atualiza o objeto referenciado
+//                if ($associationMap->isInverse()) {
+//                    $refObject->setAttributeValue($toAttributeMap, $object->getAttributeValue($fromAttributeMap));
+//                    $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
+//                } else { // se a associação é direta, atualiza o próprio objeto
+//                    $object->setAttributeValue($fromAttributeMap, $refObject->getAttributeValue($toAttributeMap));
+//                    $this->_saveObject($object, $classMap, $commands);
+//                }
+//            }
+//        } elseif ($associationMap->getCardinality() == 'oneToMany') {
+//            // atualiza os objetos referenciados
+//            $collection = $object->get($associationMap->getName());
+//            if (count($collection) > 0) {
+//                foreach ($collection as $refObject) {
+//                    if ($refObject != NULL) {
+//                        $refObject->setAttributeValue($toAttributeMap, $object->getAttributeValue($fromAttributeMap));
+//                        $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
+//                    }
+//                }
+//            }
+//        } elseif ($associationMap->getCardinality() == 'manyToMany') {
+//            // atualiza a tabela associativa (removendo e reinserindo os registros de associação)
+//            $commands = array();
+//            $collection = $object->get($associationMap->getName());
+//            if ($object->getOIDValue()) {
+//                $commands[] = $associationMap->getDeleteStatement($object);
+//            }
+//            if (count($collection) > 0) {
+//                foreach ($collection as $refObject) {
+//                    if ($refObject != NULL) {
+//                        $commands[] = $associationMap->getInsertStatement($object, $refObject);
+//                    }
+//                }
+//            }
+//        }
+//        $this->execute($classMap->getDb(), $commands);
+//    }
+//
+//    public function saveAssociationById(PersistentObject $object, $associationName, $id)
+//    {
+//        $object->retrieveAssociation($associationName);
+//        $associationIds = MUtil::parseArray($object->{'get' . $associationName}()->getId());
+//        //$ids = array_unique(array_merge($associationIds, MUtil::parseArray($id)));
+//        $classMap = $object->getClassMap();
+//        $this->persistence->setDb($classMap);
+//        $commands = array();
+//        $associationMap = $classMap->getAssociationMap($associationName);
+//        if (is_null($associationMap)) {
+//            throw new EPersistenceException("Association name [{$associationName}] not found.");
+//        }
+//        $toAttributeMap = $associationMap->getToAttributeMap();
+//        $fromAttributeMap = $associationMap->getFromAttributeMap();
+//        $refObject = $associationMap->getToClassMap()->getObject();
+//        if ($associationMap->getCardinality() == 'oneToOne') {
+//            // obtem o objeto referenciado
+//            if ($refObject != NULL) {
+//                // se a associação é inversa, atualiza o objeto referenciado
+//                if ($associationMap->isInverse()) {
+//                    $refObject->getById($id);
+//                    $refObject->setAttributeValue($toAttributeMap, $object->getAttributeValue($fromAttributeMap));
+//                    $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
+//                } else { // se a associação é direta, atualiza o próprio objeto
+//                    $object->setAttributeValue($fromAttributeMap, $id);
+//                    $this->_saveObject($object, $classMap, $commands);
+//                }
+//            }
+//        } elseif ($associationMap->getCardinality() == 'oneToMany') {
+//            // atualiza os objetos referenciados
+//            $commands[] = $associationMap->getUpdateStatementId($object, $id, $object->getAttributeValue($fromAttributeMap));
+//        } elseif ($associationMap->getCardinality() == 'manyToMany') {
+//            $commands = array();
+//            // atualiza a tabela associativa (removendo e reinserindo os registros de associação)
+//            $aId = $id;
+//            if (!is_array($id))
+//                $aId = array($id);
+//
+//            if ($object->getId()) {
+//                //$commands[] = $associationMap->getDeleteStatement($object);
+//                $commands[] = $associationMap->getDeleteStatementId($object, $aId);
+//            }
+//            foreach ($aId as $idRef) {
+//                $commands[] = $associationMap->getInsertStatementId($object, $idRef);
+//            }
+//            //$commands[] = $associationMap->getInsertStatementId($object, $id);
+//        }
+//        $this->execute($classMap->getDb(), $commands);
+//    }
+
+    public function saveAssociation(AssociationMap $associationMap, int $id, int|array $associatedIds, bool $replace = true)
     {
-        $classMap = $object->getClassMap();
-        $this->persistence->setDb($classMap);
-        $commands = array();
-        $associationMap = $classMap->getAssociationMap($associationName);
-        if (is_null($associationMap)) {
-            throw new EPersistenceException("Association name [{$associationName}] not found.");
+        $this->persistence->setDb($associationMap->getFromClassMap());
+        $cardinality = $associationMap->getCardinality();
+        $db = $this->persistence->getDb();
+        if ($cardinality == 'manyToMany') {
+            if ($replace) {
+                $commands[] = $associationMap->getDeleteStatement($db, $id);
+            }
+            if (is_array($associatedIds)) {
+                foreach($associatedIds as $idTo) {
+                    $commands[] = $associationMap->getInsertStatement($db, $id, $idTo);
+                }
+            }
+            else {
+                $commands[] = $associationMap->getInsertStatement($db, $id, $associatedIds);
+            }
+            $this->execute($commands);
         }
-        $toAttributeMap = $associationMap->getToAttributeMap();
-        $fromAttributeMap = $associationMap->getFromAttributeMap();
-        if ($associationMap->getCardinality() == 'oneToOne') {
-            // obtem o objeto referenciado
-            $refObject = $object->get($associationMap->getName());
-            if ($refObject != NULL) {
-                // se a associação é inversa, atualiza o objeto referenciado
-                if ($associationMap->isInverse()) {
-                    $refObject->setAttributeValue($toAttributeMap, $object->getAttributeValue($fromAttributeMap));
-                    $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
-                } else { // se a associação é direta, atualiza o próprio objeto
-                    $object->setAttributeValue($fromAttributeMap, $refObject->getAttributeValue($toAttributeMap));
-                    $this->_saveObject($object, $classMap, $commands);
-                }
-            }
-        } elseif ($associationMap->getCardinality() == 'oneToMany') {
-            // atualiza os objetos referenciados
-            $collection = $object->get($associationMap->getName());
-            if (count($collection) > 0) {
-                foreach ($collection as $refObject) {
-                    if ($refObject != NULL) {
-                        $refObject->setAttributeValue($toAttributeMap, $object->getAttributeValue($fromAttributeMap));
-                        $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
-                    }
-                }
-            }
-        } elseif ($associationMap->getCardinality() == 'manyToMany') {
-            // atualiza a tabela associativa (removendo e reinserindo os registros de associação)
-            $commands = array();
-            $collection = $object->get($associationMap->getName());
-            if ($object->getOIDValue()) {
-                $commands[] = $associationMap->getDeleteStatement($object);
-            }
-            if (count($collection) > 0) {
-                foreach ($collection as $refObject) {
-                    if ($refObject != NULL) {
-                        $commands[] = $associationMap->getInsertStatement($object, $refObject);
-                    }
-                }
-            }
+        else {
+            throw new EOrkesterException("saveAssociation not implemented for cardinality [$cardinality]");
         }
-        $this->execute($classMap->getDb(), $commands);
     }
 
-    public function saveAssociationById(PersistentObject $object, $associationName, $id)
+    public function deleteAssociation(AssociationMap $associationMap, int $id, int|array $associatedIds)
     {
-        $object->retrieveAssociation($associationName);
-        $associationIds = MUtil::parseArray($object->{'get' . $associationName}()->getId());
-        //$ids = array_unique(array_merge($associationIds, MUtil::parseArray($id)));
-        $classMap = $object->getClassMap();
-        $this->persistence->setDb($classMap);
-        $commands = array();
-        $associationMap = $classMap->getAssociationMap($associationName);
-        if (is_null($associationMap)) {
-            throw new EPersistenceException("Association name [{$associationName}] not found.");
-        }
-        $toAttributeMap = $associationMap->getToAttributeMap();
-        $fromAttributeMap = $associationMap->getFromAttributeMap();
-        $refObject = $associationMap->getToClassMap()->getObject();
-        if ($associationMap->getCardinality() == 'oneToOne') {
-            // obtem o objeto referenciado
-            if ($refObject != NULL) {
-                // se a associação é inversa, atualiza o objeto referenciado
-                if ($associationMap->isInverse()) {
-                    $refObject->getById($id);
-                    $refObject->setAttributeValue($toAttributeMap, $object->getAttributeValue($fromAttributeMap));
-                    $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
-                } else { // se a associação é direta, atualiza o próprio objeto
-                    $object->setAttributeValue($fromAttributeMap, $id);
-                    $this->_saveObject($object, $classMap, $commands);
-                }
-            }
-        } elseif ($associationMap->getCardinality() == 'oneToMany') {
-            // atualiza os objetos referenciados
-            $commands[] = $associationMap->getUpdateStatementId($object, $id, $object->getAttributeValue($fromAttributeMap));
-        } elseif ($associationMap->getCardinality() == 'manyToMany') {
-            $commands = array();
-            // atualiza a tabela associativa (removendo e reinserindo os registros de associação)
-            $aId = $id;
-            if (!is_array($id))
-                $aId = array($id);
+        $this->persistence->setDb($associationMap->getFromClassMap());
+        $cardinality = $associationMap->getCardinality();
+        $db = $this->persistence->getDb();
 
-            if ($object->getId()) {
-                //$commands[] = $associationMap->getDeleteStatement($object);
-                $commands[] = $associationMap->getDeleteStatementId($object, $aId);
-            }
-            foreach ($aId as $idRef) {
-                $commands[] = $associationMap->getInsertStatementId($object, $idRef);
-            }
-            //$commands[] = $associationMap->getInsertStatementId($object, $id);
+        if ($cardinality == 'manyToMany') {
+            $commands[] = $associationMap->getDeleteStatement($db, $id, $associatedIds);
+            $this->execute($commands);
         }
-        $this->execute($classMap->getDb(), $commands);
     }
 
     /**
@@ -515,123 +552,123 @@ class PersistentManager
      * Delete Associations
      *
      */
-    public function deleteAssociation(PersistentObject $object, $associationName)
-    {
-        $classMap = $object->getClassMap();
-        $this->persistence->setDb($classMap);
-        $commands = array();
-        $associationMap = $classMap->getAssociationMap($associationName);
-        if (is_null($associationMap)) {
-            throw new EPersistentException("Association name [{$associationName}] not found.");
-        }
-        $toAttributeMap = $associationMap->getToAttributeMap();
-        $fromAttributeMap = $associationMap->getFromAttributeMap();
-        if ($associationMap->getCardinality() == 'oneToOne') {
-            // obtem o objeto referenciado
-            $refObject = $object->get($associationMap->getName());
-            if ($refObject != NULL) {
-                // se a associação é inversa, atualiza o objeto referenciado
-                if ($associationMap->isInverse()) {
-                    $refObject->setAttributeValue($toAttributeMap, NULL);
-                    $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
-                } else { // se a associação é direta, atualiza o próprio objeto
-                    $object->setAttributeValue($fromAttributeMap, NULL);
-                    $this->_saveObject($object, $classMap, $commands);
-                }
-            }
-        } elseif ($associationMap->getCardinality() == 'oneToMany') {
-            // atualiza os objetos referenciados
-            $collection = $object->get($associationMap->getName());
-            if (count($collection) > 0) {
-                foreach ($collection as $refObject) {
-                    if ($refObject != NULL) {
-                        $refObject->setAttributeValue($toAttributeMap, NULL);
-                        $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
-                    }
-                }
-            }
-        } elseif ($associationMap->getCardinality() == 'manyToMany') {
-            // remove os registros de associação
-            $commands = array();
-            $collection = $object->get($associationMap->getName());
-            if ($object->getOIDValue()) {
-                $commands[] = $associationMap->getDeleteStatement($object);
-            }
-        }
-        $associationMap->setKeysAttributes();
-        $this->retrieveAssociationByMap($object, $classMap, $associationMap);
-        $this->execute($classMap->getDb(), $commands);
-    }
-
-    public function deleteAssociationObject(PersistentObject $object, $associationName, PersistentObject $refObject)
-    {
-        $classMap = $object->getClassMap();
-        $this->persistence->setDb($classMap);
-        $commands = array();
-        $associationMap = $classMap->getAssociationMap($associationName);
-        if (is_null($associationMap)) {
-            throw new EPersistentException("Association name [{$associationName}] not found.");
-        }
-        $toAttributeMap = $associationMap->getToAttributeMap();
-        $fromAttributeMap = $associationMap->getFromAttributeMap();
-        if (($associationMap->getCardinality() == 'oneToOne') || ($associationMap->getCardinality() == 'oneToMany')) {
-            // obtem o objeto referenciado
-            if ($refObject != NULL) {
-                // se a associação é inversa, atualiza o objeto referenciado
-                if ($associationMap->isInverse()) {
-                    $refObject->setAttributeValue($toAttributeMap, NULL);
-                    $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
-                } else { // se a associação é direta, atualiza o próprio objeto
-                    $object->setAttributeValue($fromAttributeMap, NULL);
-                    $this->_saveObject($object, $classMap, $commands);
-                }
-            }
-        } elseif ($associationMap->getCardinality() == 'manyToMany') {
-            // remove os registros da associação com $refObject
-            $commands = array();
-            if ($object->getOIDValue()) {
-                $commands[] = $associationMap->getDeleteStatement($object, $refObject);
-            }
-        }
-
-        $this->retrieveAssociationByMap($object, $classMap, $associationMap);
-        $this->execute($classMap->getDb(), $commands);
-    }
-
-    public function deleteAssociationById(PersistentObject $object, $associationName, $id)
-    {
-        $classMap = $object->getClassMap();
-        $this->persistence->setDb($classMap);
-        $commands = array();
-        $associationMap = $classMap->getAssociationMap($associationName);
-        if (is_null($associationMap)) {
-            throw new EPersistentException("Association name [{$associationName}] not found.");
-        }
-        $toAttributeMap = $associationMap->getToAttributeMap();
-        $fromAttributeMap = $associationMap->getFromAttributeMap();
-        if (!is_array($id)) {
-            $id = array($id);
-        }
-        if ($associationMap->getCardinality() == 'oneToOne') {
-            if ($associationMap->isInverse()) {
-                // obtem o objeto referenciado
-                $refObject = $object->get($associationMap->getName());
-                $refObject->setAttributeValue($toAttributeMap, NULL);
-                $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
-            } else { // se a associação é direta, atualiza o próprio objeto
-                $object->setAttributeValue($fromAttributeMap, NULL);
-                $this->_saveObject($object, $classMap, $commands);
-            }
-        } elseif ($associationMap->getCardinality() == 'oneToMany') {
-            $refObject = $associationMap->getToClassMap()->getObject();
-            $commands[] = $associationMap->getUpdateStatementId($object, $id, NULL);
-        } elseif ($associationMap->getCardinality() == 'manyToMany') {
-            $commands[] = $associationMap->getDeleteStatementId($object, $id);
-        }
-        $associationMap->setKeysAttributes();
-        $this->retrieveAssociationByMap($object, $classMap, $associationMap);
-        $this->execute($classMap->getDb(), $commands);
-    }
+//    public function deleteAssociation(PersistentObject $object, $associationName)
+//    {
+//        $classMap = $object->getClassMap();
+//        $this->persistence->setDb($classMap);
+//        $commands = array();
+//        $associationMap = $classMap->getAssociationMap($associationName);
+//        if (is_null($associationMap)) {
+//            throw new EPersistentException("Association name [{$associationName}] not found.");
+//        }
+//        $toAttributeMap = $associationMap->getToAttributeMap();
+//        $fromAttributeMap = $associationMap->getFromAttributeMap();
+//        if ($associationMap->getCardinality() == 'oneToOne') {
+//            // obtem o objeto referenciado
+//            $refObject = $object->get($associationMap->getName());
+//            if ($refObject != NULL) {
+//                // se a associação é inversa, atualiza o objeto referenciado
+//                if ($associationMap->isInverse()) {
+//                    $refObject->setAttributeValue($toAttributeMap, NULL);
+//                    $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
+//                } else { // se a associação é direta, atualiza o próprio objeto
+//                    $object->setAttributeValue($fromAttributeMap, NULL);
+//                    $this->_saveObject($object, $classMap, $commands);
+//                }
+//            }
+//        } elseif ($associationMap->getCardinality() == 'oneToMany') {
+//            // atualiza os objetos referenciados
+//            $collection = $object->get($associationMap->getName());
+//            if (count($collection) > 0) {
+//                foreach ($collection as $refObject) {
+//                    if ($refObject != NULL) {
+//                        $refObject->setAttributeValue($toAttributeMap, NULL);
+//                        $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
+//                    }
+//                }
+//            }
+//        } elseif ($associationMap->getCardinality() == 'manyToMany') {
+//            // remove os registros de associação
+//            $commands = array();
+//            $collection = $object->get($associationMap->getName());
+//            if ($object->getOIDValue()) {
+//                $commands[] = $associationMap->getDeleteStatement($object);
+//            }
+//        }
+//        $associationMap->setKeysAttributes();
+//        $this->retrieveAssociationByMap($object, $classMap, $associationMap);
+//        $this->execute($classMap->getDb(), $commands);
+//    }
+//
+//    public function deleteAssociationObject(PersistentObject $object, $associationName, PersistentObject $refObject)
+//    {
+//        $classMap = $object->getClassMap();
+//        $this->persistence->setDb($classMap);
+//        $commands = array();
+//        $associationMap = $classMap->getAssociationMap($associationName);
+//        if (is_null($associationMap)) {
+//            throw new EPersistentException("Association name [{$associationName}] not found.");
+//        }
+//        $toAttributeMap = $associationMap->getToAttributeMap();
+//        $fromAttributeMap = $associationMap->getFromAttributeMap();
+//        if (($associationMap->getCardinality() == 'oneToOne') || ($associationMap->getCardinality() == 'oneToMany')) {
+//            // obtem o objeto referenciado
+//            if ($refObject != NULL) {
+//                // se a associação é inversa, atualiza o objeto referenciado
+//                if ($associationMap->isInverse()) {
+//                    $refObject->setAttributeValue($toAttributeMap, NULL);
+//                    $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
+//                } else { // se a associação é direta, atualiza o próprio objeto
+//                    $object->setAttributeValue($fromAttributeMap, NULL);
+//                    $this->_saveObject($object, $classMap, $commands);
+//                }
+//            }
+//        } elseif ($associationMap->getCardinality() == 'manyToMany') {
+//            // remove os registros da associação com $refObject
+//            $commands = array();
+//            if ($object->getOIDValue()) {
+//                $commands[] = $associationMap->getDeleteStatement($object, $refObject);
+//            }
+//        }
+//
+//        $this->retrieveAssociationByMap($object, $classMap, $associationMap);
+//        $this->execute($classMap->getDb(), $commands);
+//    }
+//
+//    public function deleteAssociationById(PersistentObject $object, $associationName, $id)
+//    {
+//        $classMap = $object->getClassMap();
+//        $this->persistence->setDb($classMap);
+//        $commands = array();
+//        $associationMap = $classMap->getAssociationMap($associationName);
+//        if (is_null($associationMap)) {
+//            throw new EPersistentException("Association name [{$associationName}] not found.");
+//        }
+//        $toAttributeMap = $associationMap->getToAttributeMap();
+//        $fromAttributeMap = $associationMap->getFromAttributeMap();
+//        if (!is_array($id)) {
+//            $id = array($id);
+//        }
+//        if ($associationMap->getCardinality() == 'oneToOne') {
+//            if ($associationMap->isInverse()) {
+//                // obtem o objeto referenciado
+//                $refObject = $object->get($associationMap->getName());
+//                $refObject->setAttributeValue($toAttributeMap, NULL);
+//                $this->_saveObject($refObject, $associationMap->getToClassMap(), $commands);
+//            } else { // se a associação é direta, atualiza o próprio objeto
+//                $object->setAttributeValue($fromAttributeMap, NULL);
+//                $this->_saveObject($object, $classMap, $commands);
+//            }
+//        } elseif ($associationMap->getCardinality() == 'oneToMany') {
+//            $refObject = $associationMap->getToClassMap()->getObject();
+//            $commands[] = $associationMap->getUpdateStatementId($object, $id, NULL);
+//        } elseif ($associationMap->getCardinality() == 'manyToMany') {
+//            $commands[] = $associationMap->getDeleteStatementId($object, $id);
+//        }
+//        $associationMap->setKeysAttributes();
+//        $this->retrieveAssociationByMap($object, $classMap, $associationMap);
+//        $this->execute($classMap->getDb(), $commands);
+//    }
 
     /**
      * Process Criteria
