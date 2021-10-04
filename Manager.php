@@ -14,6 +14,7 @@ use Orkester\MVC\MContext;
 use Orkester\MVC\MFrontController;
 use Orkester\MVC\MModel;
 use Orkester\MVC\MService;
+use Orkester\Persistence\PersistentManager;
 use Orkester\Security\MLogin;
 use Orkester\Security\MAuth;
 use Orkester\Security\MSSL;
@@ -469,7 +470,7 @@ class Manager
         return $model;
     }
 
-    public static function getPersistentManager(string $datasource = 'orkester')
+    public static function getPersistentManager(string $datasource = 'orkester'): PersistentManager
     {
         if (!isset(self::$persistence[$datasource])) {
             if (!isset(self::$persistence[$datasource])) {
