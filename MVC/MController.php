@@ -11,6 +11,7 @@ use Orkester\Results\Exception\MResultUnauthorized;
 use Orkester\Results\MBrowserFile;
 use Orkester\Results\MRedirect;
 use Orkester\Results\MRenderBinary;
+use Orkester\Results\MRenderStatic;
 use Orkester\Results\MResult;
 use Orkester\Results\MResultNull;
 use Orkester\Results\MResultObject;
@@ -324,6 +325,16 @@ class MController
     public function renderDownload($filePath, $fileName = ''): Response
     {
         $this->result = new MRenderBinary(null, false, $fileName, $filePath);
+        return $this->result->apply($this->request, $this->response);
+    }
+
+    /**
+     * @param $filePath string Path of static file
+     * @param $contentTye string mimetype of file
+     */
+    public function renderStatic(string $filePath, string $contentTye): Response
+    {
+        $this->result = new MRenderStatic($filePath, $contentTye);
         return $this->result->apply($this->request, $this->response);
     }
 
