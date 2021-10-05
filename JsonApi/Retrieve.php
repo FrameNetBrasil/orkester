@@ -86,21 +86,15 @@ class Retrieve
                 if (!is_null($relationship)) {
                     $objects = $model->getAssociation($associationName, $id);
                     if ($isSingleRelationship) {
-                        $primary = new ResourceIdentifier(
-                            $toClassMap->getResource(),
-                            $objects[0][$toClassMap->getKeyAttributeName()]
-                        );
+                        $primary = ['id' => $objects[0][$toClassMap->getKeyAttributeName()]];
                     }
                     else {
-                        $primary = new ResourceIdentifierCollection(
+                        $primary = [
                             ...array_map(
-                                fn ($obj) => new ResourceIdentifier(
-                                    $toClassMap->getResource(),
-                                    $obj[$toClassMap->getKeyAttributeName()]
-                                ),
+                                fn ($obj) => ['id' => $obj[$toClassMap->getKeyAttributeName()]],
                                 $objects
                             ),
-                        );
+                        ];
                     }
                 }
                 else if(!is_null($association)) {
