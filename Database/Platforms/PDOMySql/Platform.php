@@ -110,15 +110,15 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             }
         }
         if ($type == 'date') {
-//            return is_object($value) ? $value->format($this->db->getConfig('formatDatePHP')) : $value;
             return is_object($value) ? $value->format('Y/m/d') : $value;
-        } elseif ($type == 'timestamp') {
-            $format = $this->db->getConfig('formatDatePHP') . ' ' . $this->db->getConfig('formatTimePHP');
-            return is_object($value) ? $value->format($format) : $value;
         } elseif ($type == 'time') {
-            return is_object($value) ? $value->format($this->db->getConfig('formatTimePHP')) : $value;
+            return is_object($value) ? $value->format('H:i:s') : $value;
+        } elseif ($type == 'timestamp' || $type == 'datetime') {
+            return is_object($value) ? $value->format('Y/m/d H:i:s') : $value;
         } elseif (($type == 'decimal') || ($type == 'float')) {
             return str_replace(',', '.', $value);
+        } elseif ($type == 'json') {
+            return json_encode($value);
         } elseif ($type == 'blob') {
             $value = base64_encode($value->getValue());
             $bindingType = 3; //PDO::PARAM_LOB
@@ -133,14 +133,13 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
             return null;
         }
         if ($type == 'date') {
-            $formatPHP = $this->db->getConfig('formatDatePHP');
-            return Carbon::createFromFormat($formatPHP, $value);
-        } elseif ($type == 'timestamp') {
-            $formatPHP = $this->db->getConfig('formatDatePHP') . ' ' . $this->db->getConfig('formatTimePHP');
-            return Carbon::createFromFormat($formatPHP, $value);
+            return Carbon::createFromFormat('Y-m-d', $value);
+        } elseif ($type == 'timestamp' || $type == 'datetime') {
+            return Carbon::createFromFormat('Y-m-d H:i:s', $value);
         } elseif ($type == 'time') {
-            $formatPHP = $this->db->getConfig('formatTimePHP');
-            return Carbon::createFromFormat($formatPHP, $value);
+            return Carbon::createFromFormat('H:i:s', $value);
+        } elseif ($type == 'json') {
+            return json_decode($value);
         } elseif ($type == 'blob') {
             if ($value) {
                 $value = base64_decode($value);
@@ -153,17 +152,16 @@ class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
     }
 
     public function convertColumn($value, $type) {
-        if ($type == 'date') {
-            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . "') ";
-        } elseif ($type == 'datetime') {
-            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
-        } elseif ($type == 'timestamp') {
-            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
-        } elseif ($type == 'time') {
-            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatTime') . "') ";
-        } else {
-            return $value;
-        }
+//        if ($type == 'date') {
+//            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . "') ";
+//        } elseif ($type == 'datetime' || $type == 'timestamp') {
+//            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatDate') . ' ' . $this->db->getConfig('formatTime') . "') ";
+//        } elseif ($type == 'time') {
+//            return "DATE_FORMAT(" . $value . ",'" . $this->db->getConfig('formatTime') . "') ";
+//        } else {
+//            return $value;
+//        }
+        return $value;
     }
 
     public function convertWhere($value, ?string $dbalType = '') {
