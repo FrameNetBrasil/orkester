@@ -45,7 +45,7 @@ class MModelMaestro
         if (is_null($classMap)) {
             $classMap = static::getClassMap();
         }
-        return Manager::getPersistentManager()->getCriteria($classMap);
+        return $classMap->getCriteria();
     }
 
     public static function getResourceCriteria(ClassMap $classMap = null): RetrieveCriteria
@@ -74,7 +74,7 @@ class MModelMaestro
         if (is_null($classMap)) {
             $classMap = static::getClassMap();
         }
-        return Manager::getPersistentManager()->getDeleteCriteria($classMap);
+        return $classMap->getDeleteCriteria();
     }
 
     public static function getById(int $id, ClassMap $classMap = null): object|null
