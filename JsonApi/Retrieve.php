@@ -139,6 +139,7 @@ class Retrieve
                     'contains' => [$field, 'LIKE', "%$value%"],
                     'endsWith' => [$field, 'LIKE', "%$value"],
                     'notContains' => [$field, 'NOT LIKE', "%$value%"],
+                    'lessEqual' => [$field, '<=', $value],
                     'notEquals' => [$field, '<>', $value],
                     'in' => [$field, 'IN', explode(',', $value)],
                     default => [$field, '=', $value]
