@@ -5,6 +5,8 @@ namespace Orkester\Persistence\Map;
 use Orkester\Manager;
 use Orkester\MVC\MModelMaestro;
 use Orkester\Persistence\Association;
+use Orkester\Persistence\Criteria\DeleteCriteria;
+use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\PersistentObject;
 use Orkester\Utils\MUtil;
 
@@ -613,6 +615,21 @@ class ClassMap
     public function setResource(string $resource): void
     {
         $this->resource = $resource;
+    }
+
+    public function getCriteria(): RetrieveCriteria
+    {
+        return Manager::getPersistentManager()->getCriteria($this);
+    }
+
+    public function getDeleteCriteria(): DeleteCriteria
+    {
+        return Manager::getPersistentManager()->getDeleteCriteria($this);
+    }
+
+    public function saveObject(object $object): int
+    {
+        return Manager::getPersistentManager()->saveObject($this, $object);
     }
 
 }
