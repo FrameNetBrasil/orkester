@@ -6,6 +6,7 @@ namespace Orkester\JsonApi;
 
 use JsonApiPhp\JsonApi\DataDocument;
 use Orkester\Exception\EValidationException;
+use Orkester\Manager;
 use Orkester\MVC\MModelMaestro;
 use Orkester\Persistence\Map\AttributeMap;
 
@@ -24,24 +25,24 @@ class Update
             $model->save($entity);
         }
         else if ($cardinality == 'oneToMany') {
-            $otherResource = $associationMap->getToClassMap()->getResource();
-            $otherModel = JsonApi::modelFromResource($otherResource);
-            $otherClassMap = $otherModel->getClassMap();
+            $fromClassMap = $associationMap->getFromClassMap();
             $otherEntities =
                 array_map(
                     fn($arr) => (object)$arr,
-                    $otherModel->getCriteria()->where($otherClassMap->getKeyAttributeName(), 'IN', $associated)->asResult()
+                    $fromClassMap->getCriteria()->where($fromClassMap->getKeyAttributeName(), 'IN', $associated)->asResult()
                 );
 
             JsonApi::validateAssociation($model, $entity, $associationName, $otherEntities, true);
             foreach ($otherEntities as $otherEntity) {
                 $otherEntity->{$associationMap->getToKey()} = $entity->{$associationMap->getFromKey()};
-                $otherModel->save($otherEntity);
+                $fromClassMap->saveObject($otherEntity);
             }
         }
         else {
-            //TODO ManyToMany
-            throw new \InvalidArgumentException("Unhandled cardinality: $cardinality", 404);
+            JsonApi::validateAssociation($model, $entity, $associationName, $associated, true);
+            $manager = Manager::getPersistentManager();
+            $id = $entity->{$associationMap->getFromKey()};
+            $manager->saveAssociation($associationMap, $id, $associated, false);
         }
     }
 

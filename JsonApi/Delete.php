@@ -5,6 +5,7 @@ namespace Orkester\JsonApi;
 
 
 use Orkester\Exception\EValidationException;
+use Orkester\Manager;
 use Orkester\MVC\MModelMaestro;
 
 class Delete
@@ -30,29 +31,29 @@ class Delete
 
         }
         else if ($cardinality == 'oneToMany') {
-            $otherResource = $associationMap->getToClassMap()->getResource();
-            $otherModel = JsonApi::modelFromResource($otherResource);
-            $otherClassMap = $otherModel->getClassMap();
+            $toClassMap = $associationMap->getToClassMap();
             $toKey = $associationMap->getToKey();
-            JsonApi::validateAssociation($model, $entity, 'Delete' . $associationName, $associated, true);
+            JsonApi::validateAssociation($model, $entity, 'delete' . $associationName, $associated, true);
 
-            if ($otherClassMap->getAttributeMap($toKey)->isNullable()) {
+            if ($toClassMap->getAttributeMap($toKey)->isNullable()) {
                 $otherEntities =
-                    $otherModel->getCriteria()
+                    $toClassMap->getCriteria()
                         ->where($toKey, 'IN', $associated)
                         ->asResult();
                 foreach($otherEntities as $otherEntity) {
                     $otherEntity[$toKey] = null;
-                    $otherModel->save((object) $otherEntity);
+                    $toClassMap->saveObject((object) $otherEntity);
                 }
             }
             else {
-                $otherModel->getDeleteCriteria()->where($otherClassMap->getKeyAttributeName(), 'IN', $associated)->execute();
+                $toClassMap->getDeleteCriteria()->where($toClassMap->getKeyAttributeName(), 'IN', $associated)->execute();
             }
         }
         else {
-            //TODO ManyToMany
-            throw new \InvalidArgumentException("Unhandled cardinality: $cardinality", 404);
+            JsonApi::validateAssociation($model, $entity, 'delete' . $associationName, $associated, true);
+            $manager = Manager::getPersistentManager();
+            $id = $entity->{$associationMap->getFromKey()};
+            $manager->deleteAssociation($associationMap, $id, $associated);
         }
     }
 
