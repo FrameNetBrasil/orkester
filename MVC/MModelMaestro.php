@@ -163,9 +163,10 @@ class MModelMaestro
         return $criteria->asResult();
     }
 
-    public static function one($conditions): object|null
+    public static function one($conditions, ?string $select = null): object|null
     {
         $criteria = static::getCriteria()->range(1, 1);
+        if ($select) $criteria->select($select);
         $result = static::filter($conditions, $criteria)->asResult();
         return empty($result) ? null : (object)$result[0];
     }
