@@ -72,33 +72,62 @@ class JsonApi extends MController
     public function post(array $args, MModelMaestro $model): array
     {
         if (array_key_exists('relationship', $args)) {
-            return Update::postRelationship($model, $this->data->data,
-                $args['id'], $args['relationship']);
+            if (!$model->existsId($args['id'])) {
+                throw new \InvalidArgumentException('Resource id not found', 404);
+            }
+            $model->saveAssociation($args['id'], $args['relationship'], $this->data->data);
+            return [(object) [], 204];
         }
         else {
-            return Update::post($model, $this->data->data);
+            $create = function($data) use ($model) {
+                $attributes = $data['attributes'] ?? [];
+                $relationships = $data['relationships'] ?? [];
+                return $model->create($attributes, $relationships);
+            };
+            if (array_key_exists(0, $this->data->data)) {
+                array_walk($this->data->data, $create);
+                return [(object)['data' => []], 204];
+            }
+            else {
+                $entity = $create($this->data->data);
+                return [(object)['data' => Retrieve::getResourceObject($model->getClassMap(), (array)$entity)], 200];
+            }
         }
     }
 
     public function patch(array $args, MModelMaestro $model): array
     {
         if (array_key_exists('relationship', $args)) {
-            return Update::patchRelationship($model, $this->data->data,
-                $args['id'], $args['relationship']);
+            $model->updateAssociation($args['id'], $args['relationship'], $this->data->data);
+            return [(object) [], 200];
         }
         else {
-            return Update::patch($model, $this->data->data, $args['id']);
+            if (!$model->existsId($args['id'])) {
+                throw new \InvalidArgumentException('Resource id not found', 404);
+            }
+            $attributes = $this->data->data['attributes'] ?? [];
+            $relationships = $this->data->data['relationships'] ?? [];
+            $entity = $model->create($attributes, $relationships, $args['id']);
+            return [(object)['data' => Retrieve::getResourceObject($model->getClassMap(), (array)$entity)], 200];
         }
     }
 
     public function delete(array $args, MModelMaestro $model): array
     {
         if (array_key_exists('relationship', $args)) {
-            return Delete::deleteRelationship($model, $this->data->data,
-                $args['id'], $args['relationship']);
+            if (!$model->existsId($args['id'])) {
+                throw new \InvalidArgumentException('Resource id not found', 404);
+            }
+            $model->deleteAssociation($args['id'], $args['relationship'], $this->data->data);
+            return [(object) [], 204];
         }
         else {
-            return Delete::deleteEntity($model, $args['id']);
+            $errors = $model->validateDelete($args['id']);
+            if (!empty($errors)) {
+                throw new EValidationException($errors);
+            }
+            $model->delete($args['id']);
+            return [(object) [], 204];
         }
     }
 
