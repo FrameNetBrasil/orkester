@@ -35,14 +35,15 @@ class PHPConfigLoader extends PersistentConfigLoader
     public function getClassMap(string $className): ?ClassMap
     {
         $this->className = $className;
-        /** @var MModelMaestro $className */
+        /** @var MModelMaestro $className array */
         $map = $className::getMap();
         //mdump($map);
         $this->classMap = new ClassMap($this->className);
         $databaseName = $map['database'] ?? Manager::getOptions('db');
         $this->classMap->setDatabaseName($databaseName);
-        $this->classMap->setTableName($map['table']);
-        $this->classMap->setResource($map['resource'] ?? $map['table']);
+        $this->classMap->setTableName($map['table'] ?? '');
+        $this->classMap->setCompareOnUpdate($map['compareOnUpdate'] ?? false);
+        $this->classMap->setModel($this->className);
 
         $hooks = $map['hooks'] ?? [];
         $tryGetFunction = function($name) use($className, $hooks) {
@@ -147,8 +148,14 @@ class PHPConfigLoader extends PersistentConfigLoader
             $key = $this->classMap->getKeyAttributeName();
             $associationMap->addKeys($key, $key);
         }
-        if (!$this->classMap->hasAttribute($key)) {
-            $this->addAttribute($key, ['type' => 'integer']);
+        $attributeMap = $this->classMap->getAttributeMap($key);
+        if (empty($attributeMap)) {
+            $this->addAttribute($key, ['type' => 'integer', 'key' => 'foreign']);
+        }
+        else {
+            if ($key != $this->classMap->getKeyAttributeName()) {
+                $attributeMap->setKeyType('foreign');
+            }
         }
 
         if (isset($association['order'])) {
@@ -202,8 +209,14 @@ class PHPConfigLoader extends PersistentConfigLoader
             $key = $this->classMap->getKeyAttributeName();
             $associationMap->addKeys($key, $key);
         }
-        if (!$this->classMap->hasAttribute($key)) {
-            $this->addAttribute($key, ['type' => 'integer']);
+        $attributeMap = $this->classMap->getAttributeMap($key);
+        if (empty($attributeMap)) {
+            $this->addAttribute($key, ['type' => 'integer', 'key' => 'foreign']);
+        }
+        else {
+            if ($key != $this->classMap->getKeyAttributeName()) {
+                $attributeMap->setKeyType('foreign');
+            }
         }
 
         if (isset($association['order'])) {

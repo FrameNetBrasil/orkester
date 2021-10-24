@@ -342,10 +342,8 @@ class AssociationMap
 //        return $statement->insert();
 //    }
 
-    public function getInsertStatement(MDatabase $db, int $idFrom, int|array $idTo)
+    public function getAssociativeInsertStatement(MDatabase $db, int $idFrom, int $idTo): MSql
     {
-//        $idsTo = is_array($idsTo) ? $idsTo : [$idsTo];
-
         $statement = new MSql();
         $statement->setDb($db);
         $statement->setTables($this->getAssociativeTable());
@@ -356,7 +354,7 @@ class AssociationMap
         return $statement->insert();
     }
 
-    public function getDeleteStatement(MDatabase $db, int $idFrom,  null|int|array $idsTo = null)
+    public function getAssociativeDeleteStatement(MDatabase $db, int $idFrom, null|int|array $idsTo = null): MSql
     {
         $statement = new MSql();
         $statement->setDb($db);

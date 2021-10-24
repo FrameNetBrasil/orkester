@@ -3,6 +3,7 @@
 namespace Orkester\Persistence;
 
 use Orkester\Exception\EOrkesterException;
+use Orkester\MVC\MModelMaestro;
 use Orkester\Persistence\Criteria\DeleteCriteria;
 use Orkester\Persistence\Criteria\InsertCriteria;
 use Orkester\Persistence\Criteria\UpdateCriteria;
@@ -455,41 +456,65 @@ class PersistentManager
 //        $this->execute($classMap->getDb(), $commands);
 //    }
 
-    public function saveAssociation(AssociationMap $associationMap, int $id, int|array $associatedIds, bool $replace = true)
-    {
-        $this->persistence->setDb($associationMap->getFromClassMap());
-        $cardinality = $associationMap->getCardinality();
-        $db = $this->persistence->getDb();
-        if ($cardinality == 'manyToMany') {
-            if ($replace) {
-                $commands[] = $associationMap->getDeleteStatement($db, $id);
-            }
-            if (is_array($associatedIds)) {
-                foreach($associatedIds as $idTo) {
-                    $commands[] = $associationMap->getInsertStatement($db, $id, $idTo);
-                }
-            }
-            else {
-                $commands[] = $associationMap->getInsertStatement($db, $id, $associatedIds);
-            }
-            $this->execute($commands);
-        }
-        else {
-            throw new EOrkesterException("saveAssociation not implemented for cardinality [$cardinality]");
-        }
-    }
+//    public function saveAssociation(AssociationMap $associationMap, int $id, int|array $associatedIds, bool $replace = true)
+//    {
+//        $transaction = MModelMaestro::beginTransaction();
+//        try {
+//            $fromClassMap = $associationMap->getFromClassMap();
+//            $this->persistence->setDb($fromClassMap);
+//            $cardinality = $associationMap->getCardinality();
+//            $db = $this->persistence->getDb();
+//            if ($cardinality == 'manyToMany') {
+//                if ($replace) {
+//                    $commands[] = $associationMap->getDeleteStatement($db, $id);
+//                }
+//                if (is_array($associatedIds)) {
+//                    foreach ($associatedIds as $idTo) {
+//                        $commands[] = $associationMap->getInsertStatement($db, $id, $idTo);
+//                    }
+//                } else {
+//                    $commands[] = $associationMap->getInsertStatement($db, $id, $associatedIds);
+//                }
+//                $this->execute($commands);
+//            }
+//            else if ($cardinality == 'oneToOne') {
+//                $toClassMap = $associationMap->getToClassMap();
+//                if ($replace) {
+//                    if ($toClassMap->getAttributeMap($associationMap->getToKey())->isNullable()) {
+//                        //TODO
+//                        $commands = [];
+//                    } else {
+//                        MModelMaestro::getDeleteCriteria($toClassMap)
+//                            ->where($associationMap->getFromKey(), '=', $id)
+//                            ->execute();
+//                    }
+//                }
+//                $ids = is_array($associatedIds) ? $associatedIds : [$associatedIds];
+//                MModelMaestro::getUpdateCriteria()
+//                    ->update([$associationMap->getFromKey() => $id])
+//                    ->where($associationMap->getToKey(), 'IN', $ids)
+//                    ->execute();
+//            } else {
+//                throw new EOrkesterException("saveAssociation not implemented for cardinality [$cardinality]");
+//            }
+//            $transaction->commit();
+//        } catch(\Exception $e) {
+//            $transaction->rollback();
+//            throw $e;
+//        }
+//    }
 
-    public function deleteAssociation(AssociationMap $associationMap, int $id, int|array $associatedIds)
-    {
-        $this->persistence->setDb($associationMap->getFromClassMap());
-        $cardinality = $associationMap->getCardinality();
-        $db = $this->persistence->getDb();
-
-        if ($cardinality == 'manyToMany') {
-            $commands[] = $associationMap->getDeleteStatement($db, $id, $associatedIds);
-            $this->execute($commands);
-        }
-    }
+//    public function deleteAssociation(AssociationMap $associationMap, int $id, int|array $associatedIds)
+//    {
+//        $this->persistence->setDb($associationMap->getFromClassMap());
+//        $cardinality = $associationMap->getCardinality();
+//        $db = $this->persistence->getDb();
+//
+//        if ($cardinality == 'manyToMany') {
+//            $commands[] = $associationMap->getDeleteStatement($db, $id, $associatedIds);
+//            $this->execute($commands);
+//        }
+//    }
 
     /**
      * Delete Object

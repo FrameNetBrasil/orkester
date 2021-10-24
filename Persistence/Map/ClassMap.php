@@ -15,6 +15,7 @@ class ClassMap
 
     private string $name;
     private string $resource;
+    private bool $compareOnUpdate;
     private $superClassMap = NULL;
     private $superAssociationMap = NULL;
     private array $fieldMaps = [];
@@ -607,14 +608,14 @@ class ClassMap
         return null;
     }
 
-    public function getResource(): string
+    public function getModel(): MModelMaestro
     {
-        return $this->resource;
+        return new $this->model();
     }
 
-    public function setResource(string $resource): void
+    public function setModel(string $model)
     {
-        $this->resource = $resource;
+        $this->model = $model;
     }
 
     public function getCriteria(): RetrieveCriteria
@@ -632,4 +633,19 @@ class ClassMap
         return Manager::getPersistentManager()->saveObject($this, $object);
     }
 
+    /**
+     * @return bool
+     */
+    public function compareOnUpdate(): bool
+    {
+        return $this->compareOnUpdate;
+    }
+
+    /**
+     * @param bool $compareOnUpdate
+     */
+    public function setCompareOnUpdate(bool $compareOnUpdate): void
+    {
+        $this->compareOnUpdate = $compareOnUpdate;
+    }
 }

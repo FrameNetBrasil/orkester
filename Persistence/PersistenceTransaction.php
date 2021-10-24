@@ -33,8 +33,10 @@ class PersistenceTransaction
     }
 
     public function rollback(): void {
-        $this->transactionCounter = 0;
-        $this->connection->rollback();
+        if ($this->inTransaction()) {
+            $this->transactionCounter = 0;
+            $this->connection->rollback();
+        }
     }
 
     public function inTransaction(): bool

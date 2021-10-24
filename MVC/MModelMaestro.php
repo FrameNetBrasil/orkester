@@ -2,9 +2,12 @@
 
 namespace Orkester\MVC;
 
+use Orkester\Database\MSql;
 use Orkester\Exception\EOrkesterException;
 use Orkester\Exception\ESecurityException;
+use Orkester\Exception\EValidationException;
 use Orkester\Manager;
+use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Criteria\DeleteCriteria;
 use Orkester\Persistence\Criteria\InsertCriteria;
@@ -219,31 +222,250 @@ class MModelMaestro
         return true;
     }
 
-    public static function saveAssociation(string $associationName, int $id, int|array $associatedIds)
+    public static function onAfterCreate(object $entity, ?object $oldEntity) {}
+
+    public static function validateSaveAssociation(string $associationName, int|object $idEntity, int|array|object|null $associated): array
     {
-        $map = self::getClassMap()->getAssociationMap($associationName);
-        if (empty($map)) {
-            throw new EOrkesterException("Unknown association: $associationName");
+        $validationMethod = 'validateSave' . $associationName;
+        if (method_exists(static::class, $validationMethod)) {
+            $errors = static::$validationMethod($idEntity, $associated);
         }
-        Manager::getPersistentManager()->saveAssociation($map, $id, $associatedIds);
+        else if (!Manager::getConf('jsonApi')['allowSkipAuthorization']) {
+            $errors = [$associationName => 'Refused'];
+        }
+        return $errors ?? [];
     }
 
-    public static function updateAssociation(string $associationName, int $id, int|array $associatedIds)
+    public static function validateDeleteAssociation(string $associationName, int $idEntity, ?array $associated): array
     {
-        $map = self::getClassMap()->getAssociationMap($associationName);
-        if (empty($map)) {
-            throw new EOrkesterException("Unknown association: $associationName");
+        $validationMethod = 'validateDelete' . $associationName;
+        if (method_exists(static::class, $validationMethod)) {
+            $errors = static::$validationMethod($idEntity, $associated);
         }
-        Manager::getPersistentManager()->saveAssociation($map, $id, $associatedIds, false);
+        else if (!Manager::getConf('jsonApi')['allowSkipAuthorization']) {
+            $errors = [$associationName => 'Refused'];
+        }
+        return $errors ?? [];
     }
 
-    public static function deleteAssociation(string $associationName, int $id, int|array $associatedIds)
+    public static function create(array $attributes, array $associations, ?int $id = null, bool $allowFk = false): object
     {
-        $map = self::getClassMap()->getAssociationMap($associationName);
-        if (empty($map)) {
-            throw new EOrkesterException("Unknown association: $associationName");
+        $transaction = static::beginTransaction();
+        try {
+            $classMap = static::getClassMap();
+            $oldEntity = empty($id) ? null : static::getById($id);
+            $entity = is_null($oldEntity) ? [] : (array) $oldEntity;
+            /** @var AttributeMap $attributeMap */
+            foreach ($classMap->getAttributesMap() as $attributeMap) {
+                if (empty($attributeMap->getReference()) && ($allowFk || $attributeMap->getKeyType() == 'none')) {
+                    $attributeName = $attributeMap->getName();
+                    if (array_key_exists($attributeName, $attributes)) {
+                        $entity[$attributeName] = $attributes[$attributeName];
+                    }
+                }
+            }
+            $entity = (object)$entity;
+            $errors = [];
+            $delayedAssociations = [];
+            foreach ($associations as $associationName => $associationItem) {
+                $associationMap = $classMap->getAssociationMap($associationName);
+                if (empty($associationMap)) {
+                    throw new \InvalidArgumentException("Invalid association: $associationName");
+                }
+                if ($associationMap->getFromKey() == $classMap->getKeyAttributeName()) {
+                    $delayedAssociations[] = $associationName;
+                } else {
+                    $errors = array_merge($errors, static::validateSaveAssociation($associationName, $entity, $associationItem));
+                    if (empty($errors)) {
+                        $entity->{$associationMap->getFromKey()} = $associationItem;
+                    }
+                }
+            }
+            $errors = static::validate($entity, $oldEntity);
+            if ($errors) {
+                throw new EValidationException($errors);
+            }
+            static::save($entity);
+
+            foreach ($delayedAssociations as $associationName) {
+                static::saveAssociation($entity, $associationName, $associations[$associationName]);
+            }
+            static::onAfterCreate($entity, $oldEntity);
+            $transaction->commit();
+            return $entity;
+        } catch(\Exception $e) {
+            $transaction->rollback();
+            throw $e;
         }
-        Manager::getPersistentManager()->deleteAssociation($map, $id, $associatedIds);
+    }
+
+    protected static function saveMasterAssociation(int $idEntity, string $associationName, array|int|null $associated)
+    {
+        $createAssociatedObject = function(int $idEntity, array $data, string $associationName, AssociationMap $associationMap) {
+            $toModel = $associationMap->getToClassMap()->getModel();
+            $data['attributes'] = $data['attributes'] ?? [];
+            $data['attributes'][$associationMap->getToKey()] = $idEntity;
+            $toObject = $toModel->create($data['attributes'], $data['associations'] ?? [], $data['id'] ?? null, true);
+            $errors = static::validateSaveAssociation($associationName, $idEntity, $toObject);
+            if (!empty($errors)) {
+                throw new EValidationException($errors);
+            }
+            return $associationMap->getToClassMap()->getObjectKey($toObject);
+        };
+
+        $associationMap = static::getClassMap()->getAssociationMap($associationName);
+        $toModel = $associationMap->getToClassMap()->getModel();
+        $associatedIds = [];
+        if (is_array($associated)) {
+            if (array_key_exists(0, $associated)) {
+                foreach($associated as $data) {
+                    if (is_int($data)) {
+                        $associatedIds[] = $data;
+                    }
+                    else {
+                        $createAssociatedObject($idEntity, $data, $associationName, $associationMap);
+                    }
+                }
+            }
+            else if (count($associated) > 0) {
+                $createAssociatedObject($idEntity, $associated, $associationName, $associationMap);
+            }
+        }
+        else {
+            $associatedIds[] = $associated;
+        }
+        $count = count($associatedIds);
+        if ($count > 0) {
+            $errors = $count == 1 ?
+                static::validateSaveAssociation($associationName, $idEntity, $associatedIds[0]) :
+                static::validateSaveAssociation($associationName, $idEntity, $associatedIds);
+            if (!empty($errors)) {
+                throw new EValidationException($errors);
+            }
+
+            $toModel->getUpdateCriteria()
+                ->where($associationMap->getToClassMap()->getKeyAttributeName(), 'IN', $associatedIds)
+                ->update([$associationMap->getToKey() => $idEntity])->execute();
+        }
+    }
+
+    public static function saveAssociation(object|int $entity, string $associationName, int|array $associated)
+    {
+        $tryGetId = fn(object|int $e, ClassMap $classMap) => is_int($e) ? $e : $classMap->getObjectKey($e);
+        $fromClassMap = static::getClassMap();
+        $associationMap = self::getClassMap()->getAssociationMap($associationName);
+        if (empty($associationMap)) {
+            throw new EOrkesterException("Invalid association name: $associationName");
+        }
+        $transaction = static::beginTransaction();
+        try {
+            $cardinality = $associationMap->getCardinality();
+            $fromModel = $associationMap->getFromClassMap()->getModel();
+
+            $idEntity = $tryGetId($entity, $fromClassMap);
+            if (empty($idEntity)) {
+                throw new EOrkesterException("saveAssociation expects persistent entity");
+            }
+            if ($cardinality == 'oneToOne') {
+                if ($associationMap->getFromKey() == $fromClassMap->getKeyAttributeName()) {
+                    static::saveMasterAssociation($idEntity,  $associationName, $associated);
+                } else {
+                    if (is_array($associated)) {
+                        throw new EOrkesterException('saveAssociation 1:1 where entity is slave expects $associated to be an id');
+                    }
+                    $errors = static::validateSaveAssociation($associationName, $idEntity, $associated);
+                    if (empty($errors)) {
+                        $fromModel->getUpdateCriteria()
+                            ->where($fromClassMap->getKeyAttributeName(), '=', $idEntity)
+                            ->update([$associationMap->getFromKey() => $associated])->execute();
+                    }
+                    else {
+                        throw new EValidationException($errors);
+                    }
+                }
+            } else if ($cardinality == 'oneToMany') {
+                static::saveMasterAssociation($idEntity, $associationName, $associated);
+            } else if ($cardinality == 'manyToMany') {
+                if (!is_array($associated)) {
+                    throw new EOrkesterException('save association N:M expected $associated to be array of ids');
+                }
+                $db = Manager::getDatabase($fromClassMap->getDatabaseName());
+                $commands = array_map(
+                    fn($id) => $associationMap->getAssociativeInsertStatement($db, $idEntity, $id),
+                    $associated
+                );
+                Manager::getPersistentManager()->getPersistence()->execute($commands);
+            } else {
+                throw new EOrkesterException("Unknown cardinality: $cardinality");
+            }
+            $transaction->commit();
+        } catch(\Exception $e) {
+            $transaction->rollback();
+            throw $e;
+        }
+    }
+
+    protected static function deleteAssociationSelf(?array $pks, string $fkName, ?array $fks)
+    {
+        $classMap = static::getClassMap();
+        if ($classMap->getAttributeMap($fkName)->isNullable()) {
+            $criteria = Manager::getPersistentManager()
+                ->getUpdateCriteria($classMap)
+                ->update([$fkName => null]);
+        }
+        else {
+            $criteria = Manager::getPersistentManager()->getDeleteCriteria($classMap);
+        }
+        if ($fks) {
+            $criteria->where($fkName, 'IN', $fks);
+        }
+        if ($pks) {
+            $criteria->where($classMap->getKeyAttributeName(), 'IN', $pks);
+        }
+        $criteria->execute();
+    }
+
+    public static function deleteAssociation(int $idEntity, string $associationName, int|array|null $associated = null)
+    {
+        $fromClassMap = static::getClassMap();
+        $associationMap = $fromClassMap->getAssociationMap($associationName);
+        $associatedIds = $associated == null ? null : (is_array($associated) ? $associated : [$associated]);
+        $errors = static::validateDeleteAssociation($associationName, $idEntity, $associatedIds);
+        if(!empty($errors)) {
+            throw new EValidationException($errors);
+        }
+        $transaction = static::beginTransaction();
+        try {
+            if ($associationMap->getCardinality() == 'manyToMany') {
+                $db = Manager::getDatabase($fromClassMap->getDatabaseName());
+                $commands = $associationMap->getAssociativeDeleteStatement($db, $idEntity, $associatedIds);
+                Manager::getPersistentManager()->getPersistence()->execute([$commands]);
+            } else {
+                if ($associationMap->getFromKey() == $fromClassMap->getKeyAttributeName()) {
+                    $associationMap->getToClassMap()->getModel()->deleteAssociationSelf($associatedIds, $associationMap->getToKey(), [$idEntity]);
+                } else {
+                    static::deleteAssociationSelf([$idEntity], $associationMap->getFromKey(), $associatedIds);
+                }
+            }
+            $transaction->commit();
+        } catch(\Exception $e) {
+            $transaction->rollback();
+            throw $e;
+        }
+    }
+
+    public static function updateAssociation(object|int $entity, string $associationName, int|array $associated)
+    {
+        $transaction = static::beginTransaction();
+        try {
+            $id = is_int($entity) ? $entity : static::getClassMap()->getObjectKey($entity);
+            static::deleteAssociation($id, $associationName);
+            static::saveAssociation($entity, $associationName, $associated);
+            $transaction->commit();
+        }catch(\Exception $e) {
+            $transaction->rollback();
+            throw $e;
+        }
     }
 
 }
