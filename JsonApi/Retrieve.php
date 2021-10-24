@@ -48,19 +48,6 @@ class Retrieve
             $primary = self::getResourceObjectCollection($classMap, $criteria->asResult(), $fields, $include);
         }
         else if ($id == 0) {
-//            [0 => $_, 1 => $criteria] = self::buildCriteria($model, $fields, $sort, $filter, $page, $limit, $group, $join);
-//            $result = $criteria->asResult()[0];
-//            $attributes = [];
-//            foreach($result as $key => $value) {
-//                array_push($attributes, new Attribute($key, $value));
-//            }
-//            $resource = $classMap->getResource();
-//            $primary = new ResourceObject(
-//                $resource,
-//                0,
-//                new SelfLink("/api/$resource/$id"),
-//                ...$attributes,
-//            );
         }
         else {
             $associationName = $association ?? $relationship;
@@ -109,7 +96,7 @@ class Retrieve
                     [0 => $total, 1 => $criteria] = self::buildCriteria($model, $select, $sort, $filter, $page, $limit, $group, $join);
                     $entities = $criteria->asResult();
                     if ($isSingleRelationship) {
-                        $primary = empty($entities[0]) ? new NullData()
+                        $primary = empty($entities[0]) ? null
                             : self::getResourceObject($toClassMap, $entities[0], $fields, $include);
                     }
                     else {
@@ -237,9 +224,6 @@ class Retrieve
 
             foreach($entity as $key => $value) {
                 $data[$key] = $value;
-//                if (!in_array($key, $associationAttributes)) {
-//                    $data[$key] = $value;
-//                }
             }
         }
         else {
@@ -249,74 +233,6 @@ class Retrieve
         $data['id'] = $id;
         return (object)$data;
     }
-
-//    /**
-//     * Returns json:api compliant ResourceObject:
-//     * if empty fields:  { attributes: $attributes, relationships: $relationships }
-//     * else : { $attributeName: $attributeValue }
-//     */
-//    public static function getResourceObject(
-//        ClassMap $classMap,
-//        array $entity,
-//        ?string $fields = null
-//    ): ResourceObject
-//    {
-//        $id = $entity[$classMap->getKeyAttributeName()];
-//        $resource = $classMap->getResource();
-//
-//        $associationAttributes = [];
-//        $relationships = [];
-//        $data = [];
-//        if (empty($fields)) {
-//            /**
-//             * @var AssociationMap $associationMap
-//             * @var array $items
-//             */
-//            foreach ($classMap->getAssociationMaps() as $associationMap) {
-//                $fromKey = $associationMap->getFromKey();
-//                array_push($associationAttributes, $fromKey);
-//                $name = $associationMap->getName();
-//                $cardinality = $associationMap->getCardinality();
-//                $selfLink = new SelfLink("/api/$resource/$id/relationships/$name");
-//                $relatedLink = new RelatedLink("/api/$resource/$id/$name");
-//                if ($cardinality == 'oneToOne' || $cardinality == 'manyToOne') {
-//                    if (!empty($entity[$fromKey])) {
-//                        $identifier =
-//                            new ResourceIdentifier($associationMap->getToClassMap()->getResource(), $entity[$fromKey]);
-//                        $relationship = new ToOne($name, $identifier, $selfLink, $relatedLink);
-//                    } else {
-//                        continue;
-//                    }
-//
-//                } else {
-//                    $relationship = new EmptyRelationship($name, $selfLink, $relatedLink);
-//                }
-//                array_push($relationships, $relationship);
-//            }
-//
-//            foreach($entity as $key => $value) {
-//                if (!in_array($key, $associationAttributes)) {
-//                    $data[$key] = $value;
-//                }
-//            }
-//        }
-//        else {
-//            $data = $entity;
-//        }
-//        unset($data[$classMap->getKeyAttributeName()]);
-//
-//        $attributes = [];
-//        foreach($data as $key => $value) {
-//            array_push($attributes, new Attribute($key, $value));
-//        }
-//        return new ResourceObject(
-//            $resource,
-//            $id,
-//            new SelfLink("/api/$resource/$id"),
-//            ...$attributes,
-//            ...$relationships,
-//        );
-//    }
 
     public static function getResourceObjectCollection(
         ClassMap $classMap,
