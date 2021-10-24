@@ -392,7 +392,7 @@ class Manager
         return new $class;
     }
 
-    public static function getDatabase($databaseName): ?MDatabase
+    public static function getDatabase(string $databaseName = ''): ?MDatabase
     {
         if (!isset(self::$databases[$databaseName])) {
             self::$databases[$databaseName] = self::$container->make(MDatabase::class, [
