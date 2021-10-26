@@ -197,8 +197,7 @@ class MModelMaestro
 
     public static function validateDelete(int $id): array
     {
-        $conf = Manager::getConf('jsonApi');
-        if (!empty($conf) && !$conf['allowSkipAuthorization']) {
+        if (!Manager::getOptions('allowSkipValidation')) {
             throw new ESecurityException();
         }
         return [];
@@ -206,8 +205,7 @@ class MModelMaestro
 
     public static function validate(object $entity, object|null $old): array
     {
-        $conf = Manager::getConf('jsonApi');
-        if (!empty($conf) && !$conf['allowSkipAuthorization']) {
+        if (!Manager::getOptions('allowSkipValidation')) {
             throw new ESecurityException();
         }
         return [];
@@ -215,8 +213,7 @@ class MModelMaestro
 
     public static function authorizeResource(string $method, ?int $id, ?string $relationship): bool
     {
-        $conf = Manager::getConf('jsonApi');
-        if (!empty($conf) && !$conf['allowSkipAuthorization']) {
+        if (!Manager::getOptions('allowSkipValidation')) {
             return false;
         }
         return true;
@@ -224,31 +221,34 @@ class MModelMaestro
 
     public static function onAfterCreate(object $entity, ?object $oldEntity) {}
 
-    public static function validateSaveAssociation(string $associationName, int|object $idEntity, int|array|object|null $associated): array
+    public static function validateSaveAssociation(string $associationName, ?int $idEntity, int|array|object|null $associated, bool $validate): array
     {
+        if (!$validate) return [];
         $validationMethod = 'validateSave' . $associationName;
         if (method_exists(static::class, $validationMethod)) {
             $errors = static::$validationMethod($idEntity, $associated);
         }
-        else if (!Manager::getConf('jsonApi')['allowSkipAuthorization']) {
+        else if (!Manager::getOptions('allowSkipValidation')) {
+            merror("Missing function: " . static::class . "::" . $validationMethod);
             $errors = [$associationName => 'Refused'];
         }
         return $errors ?? [];
     }
 
-    public static function validateDeleteAssociation(string $associationName, int $idEntity, ?array $associated): array
+    public static function validateDeleteAssociation(string $associationName, int $idEntity, ?array $associated, bool $validate = false): array
     {
+        if (!$validate) return [];
         $validationMethod = 'validateDelete' . $associationName;
         if (method_exists(static::class, $validationMethod)) {
             $errors = static::$validationMethod($idEntity, $associated);
         }
-        else if (!Manager::getConf('jsonApi')['allowSkipAuthorization']) {
+        else if (!Manager::getOptions('allowSkipValidation')) {
             $errors = [$associationName => 'Refused'];
         }
         return $errors ?? [];
     }
 
-    public static function create(array $attributes, array $associations, ?int $id = null, bool $allowFk = false): object
+    public static function create(array $attributes, array $associations, ?int $id = null, bool $allowFk = false, bool $validate = false): object
     {
         $transaction = static::beginTransaction();
         try {
@@ -275,20 +275,20 @@ class MModelMaestro
                 if ($associationMap->getFromKey() == $classMap->getKeyAttributeName()) {
                     $delayedAssociations[] = $associationName;
                 } else {
-                    $errors = array_merge($errors, static::validateSaveAssociation($associationName, $entity, $associationItem));
+                    $errors = array_merge($errors, static::validateSaveAssociation($associationName, $id, $associationItem, $validate));
                     if (empty($errors)) {
                         $entity->{$associationMap->getFromKey()} = $associationItem;
                     }
                 }
             }
-            $errors = static::validate($entity, $oldEntity);
+            $errors = array_merge($errors, static::validate($entity, $oldEntity));
             if ($errors) {
                 throw new EValidationException($errors);
             }
             static::save($entity);
 
             foreach ($delayedAssociations as $associationName) {
-                static::saveAssociation($entity, $associationName, $associations[$associationName]);
+                static::saveAssociation($entity, $associationName, $associations[$associationName], $validate);
             }
             static::onAfterCreate($entity, $oldEntity);
             $transaction->commit();
@@ -299,14 +299,14 @@ class MModelMaestro
         }
     }
 
-    protected static function saveMasterAssociation(int $idEntity, string $associationName, array|int|null $associated)
+    protected static function saveMasterAssociation(int $idEntity, string $associationName, array|int|null $associated, bool $validate = false)
     {
-        $createAssociatedObject = function(int $idEntity, array $data, string $associationName, AssociationMap $associationMap) {
+        $createAssociatedObject = function(int $idEntity, array $data, string $associationName, AssociationMap $associationMap) use ($validate) {
             $toModel = $associationMap->getToClassMap()->getModel();
             $data['attributes'] = $data['attributes'] ?? [];
             $data['attributes'][$associationMap->getToKey()] = $idEntity;
             $toObject = $toModel->create($data['attributes'], $data['associations'] ?? [], $data['id'] ?? null, true);
-            $errors = static::validateSaveAssociation($associationName, $idEntity, $toObject);
+            $errors = static::validateSaveAssociation($associationName, $idEntity, $toObject, $validate);
             if (!empty($errors)) {
                 throw new EValidationException($errors);
             }
@@ -337,8 +337,8 @@ class MModelMaestro
         $count = count($associatedIds);
         if ($count > 0) {
             $errors = $count == 1 ?
-                static::validateSaveAssociation($associationName, $idEntity, $associatedIds[0]) :
-                static::validateSaveAssociation($associationName, $idEntity, $associatedIds);
+                static::validateSaveAssociation($associationName, $idEntity, $associatedIds[0], $validate) :
+                static::validateSaveAssociation($associationName, $idEntity, $associatedIds, $validate);
             if (!empty($errors)) {
                 throw new EValidationException($errors);
             }
@@ -349,7 +349,15 @@ class MModelMaestro
         }
     }
 
-    public static function saveAssociation(object|int $entity, string $associationName, int|array $associated)
+    public static function deleteFromCache(int $id, ?ClassMap $classMap = null)
+    {
+        $classMap = $classMap ?? static::getClassMap();
+        $cache = Manager::getCache();
+        $key = md5($classMap->getName() . $id);
+        $cache->delete($key);
+    }
+
+    public static function saveAssociation(object|int $entity, string $associationName, int|array|null $associated, bool $validate = false)
     {
         $tryGetId = fn(object|int $e, ClassMap $classMap) => is_int($e) ? $e : $classMap->getObjectKey($e);
         $fromClassMap = static::getClassMap();
@@ -368,16 +376,25 @@ class MModelMaestro
             }
             if ($cardinality == 'oneToOne') {
                 if ($associationMap->getFromKey() == $fromClassMap->getKeyAttributeName()) {
+                    static::deleteAssociation($idEntity, $associationName);
                     static::saveMasterAssociation($idEntity,  $associationName, $associated);
                 } else {
                     if (is_array($associated)) {
                         throw new EOrkesterException('saveAssociation 1:1 where entity is slave expects $associated to be an id');
                     }
-                    $errors = static::validateSaveAssociation($associationName, $idEntity, $associated);
+                    $errors = static::validateSaveAssociation($associationName, $idEntity, $associated, $validate);
                     if (empty($errors)) {
+                        $where = [$fromClassMap->getKeyAttributeName(), '=', $idEntity];
+                        $rows = [];
+                        static::deleteFromCache($idEntity, $fromClassMap);
+
                         $fromModel->getUpdateCriteria()
-                            ->where($fromClassMap->getKeyAttributeName(), '=', $idEntity)
+                            ->where(...$where)
                             ->update([$associationMap->getFromKey() => $associated])->execute();
+                        if ($associationMap->useHooks()) {
+                            $method = 'onAfterSave' . $associationName;
+                            static::$method($idEntity, $rows);
+                        }
                     }
                     else {
                         throw new EValidationException($errors);
@@ -388,6 +405,10 @@ class MModelMaestro
             } else if ($cardinality == 'manyToMany') {
                 if (!is_array($associated)) {
                     throw new EOrkesterException('save association N:M expected $associated to be array of ids');
+                }
+                $errors = static::validateSaveAssociation($associationName, $idEntity, $associated, $validate);
+                if (!empty($errors)) {
+                    throw new EValidationException($errors);
                 }
                 $db = Manager::getDatabase($fromClassMap->getDatabaseName());
                 $commands = array_map(
@@ -425,12 +446,12 @@ class MModelMaestro
         $criteria->execute();
     }
 
-    public static function deleteAssociation(int $idEntity, string $associationName, int|array|null $associated = null)
+    public static function deleteAssociation(int $idEntity, string $associationName, int|array|null $associated = null, bool $validate = false)
     {
         $fromClassMap = static::getClassMap();
         $associationMap = $fromClassMap->getAssociationMap($associationName);
         $associatedIds = $associated == null ? null : (is_array($associated) ? $associated : [$associated]);
-        $errors = static::validateDeleteAssociation($associationName, $idEntity, $associatedIds);
+        $errors = static::validateDeleteAssociation($associationName, $idEntity, $associatedIds, $validate);
         if(!empty($errors)) {
             throw new EValidationException($errors);
         }
@@ -446,6 +467,7 @@ class MModelMaestro
                 } else {
                     static::deleteAssociationSelf([$idEntity], $associationMap->getFromKey(), $associatedIds);
                 }
+                static::deleteFromCache($idEntity, $fromClassMap);
             }
             $transaction->commit();
         } catch(\Exception $e) {
@@ -454,13 +476,13 @@ class MModelMaestro
         }
     }
 
-    public static function updateAssociation(object|int $entity, string $associationName, int|array $associated)
+    public static function updateAssociation(object|int $entity, string $associationName, int|array $associated, bool $validate = false)
     {
         $transaction = static::beginTransaction();
         try {
             $id = is_int($entity) ? $entity : static::getClassMap()->getObjectKey($entity);
-            static::deleteAssociation($id, $associationName);
-            static::saveAssociation($entity, $associationName, $associated);
+            static::deleteAssociation($id, $associationName, null, $validate);
+            static::saveAssociation($entity, $associationName, $associated, $validate);
             $transaction->commit();
         }catch(\Exception $e) {
             $transaction->rollback();
