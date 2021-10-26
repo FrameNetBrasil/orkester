@@ -195,9 +195,17 @@ class RetrieveCriteria extends PersistentCriteria
                         }
                     }
                 } else {
+                    if (empty($exp->alias)) {
+                        $attributeMap = $this->classMap->getAttributeMap($exp->expr);
+                        $alias = $attributeMap && $attributeMap->getReference() ?
+                            $attributeMap->getName() : '';
+                    }
+                    else {
+                        $alias = $exp->alias;
+                    }
                     //$this->columns[] = addslashes($attribute);
-                    $alias = ($exp->alias != '') ? ' as ' . $exp->alias : '';
-                    $this->columns[] = $attribute . $alias;
+//                    $alias = ($exp->alias != '') ? ' as ' . $exp->alias : '';
+                    $this->columns[] = empty($alias) ? $attribute : "$attribute as $alias";
                 }
             }
             /*
