@@ -75,14 +75,14 @@ class JsonApi extends MController
             if (!$model->existsId($args['id'])) {
                 throw new \InvalidArgumentException('Resource id not found', 404);
             }
-            $model->saveAssociation($args['id'], $args['relationship'], $this->data->data);
+            $model->saveAssociation($args['id'], $args['relationship'], $this->data->data, true);
             return [(object) [], 204];
         }
         else {
             $create = function($data) use ($model) {
                 $attributes = $data['attributes'] ?? [];
                 $relationships = $data['relationships'] ?? [];
-                return $model->create($attributes, $relationships);
+                return $model->create($attributes, $relationships, validate: true);
             };
             if (array_key_exists(0, $this->data->data)) {
                 array_walk($this->data->data, $create);
@@ -98,7 +98,7 @@ class JsonApi extends MController
     public function patch(array $args, MModelMaestro $model): array
     {
         if (array_key_exists('relationship', $args)) {
-            $model->updateAssociation($args['id'], $args['relationship'], $this->data->data);
+            $model->updateAssociation($args['id'], $args['relationship'], $this->data->data, true);
             return [(object) [], 200];
         }
         else {
@@ -107,7 +107,7 @@ class JsonApi extends MController
             }
             $attributes = $this->data->data['attributes'] ?? [];
             $relationships = $this->data->data['relationships'] ?? [];
-            $entity = $model->create($attributes, $relationships, $args['id']);
+            $entity = $model->create($attributes, $relationships, $args['id'], validate: true);
             return [(object)['data' => Retrieve::getResourceObject($model->getClassMap(), (array)$entity)], 200];
         }
     }
@@ -118,7 +118,7 @@ class JsonApi extends MController
             if (!$model->existsId($args['id'])) {
                 throw new \InvalidArgumentException('Resource id not found', 404);
             }
-            $model->deleteAssociation($args['id'], $args['relationship'], $this->data->data);
+            $model->deleteAssociation($args['id'], $args['relationship'], $this->data->data, true);
             return [(object) [], 204];
         }
         else {
