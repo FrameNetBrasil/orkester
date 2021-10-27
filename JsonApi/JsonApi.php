@@ -82,7 +82,8 @@ class JsonApi extends MController
             $create = function($data) use ($model) {
                 $attributes = $data['attributes'] ?? [];
                 $relationships = $data['relationships'] ?? [];
-                return $model->create($attributes, $relationships, validate: true);
+                $id = $data['id'] ?? null;
+                return $model->create($attributes, $relationships, $id, validate: true);
             };
             if (array_key_exists(0, $this->data->data)) {
                 array_walk($this->data->data, $create);
@@ -122,7 +123,7 @@ class JsonApi extends MController
             return [(object) [], 204];
         }
         else {
-            $errors = $model->validateDelete($args['id']);
+            $errors = $model->validateDeleteEntity($args['id'], true);
             if (!empty($errors)) {
                 throw new EValidationException($errors);
             }
