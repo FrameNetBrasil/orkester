@@ -235,6 +235,7 @@ class JsonApi extends MController
         ['service' => $service, 'action' => $action] = $args;
         $instance = static::getResourceInstance($service);
         if (method_exists($instance, $action)) {
+            $instance->setRequestResponse($request, $response);
             $method = new \ReflectionMethod($instance, $action);
             if ($method->isStatic()) {
                 throw new \InvalidArgumentException('Service not found', 404);
