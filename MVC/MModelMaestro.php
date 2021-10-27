@@ -195,20 +195,28 @@ class MModelMaestro
             );
     }
 
-    public static function validateDelete(int $id): array
+    public static function validateDeleteEntity(int $id, bool $validate = false): array
     {
-        if (!Manager::getOptions('allowSkipValidation')) {
-            throw new ESecurityException();
+        if (!$validate) return [];
+        if (method_exists(static::class, 'validateDelete')) {
+            $errors = static::validateDelete($id);
         }
-        return [];
+        else if (!Manager::getOptions('allowSkipValidation')) {
+            $errors = ['validation' => 'Refused'];
+        }
+        return $errors ?? [];
     }
 
-    public static function validate(object $entity, object|null $old): array
+    public static function validateEntity(object $entity, object|null $old, bool $validate = false): array
     {
-        if (!Manager::getOptions('allowSkipValidation')) {
-            throw new ESecurityException();
+        if (!$validate) return [];
+        if (method_exists(static::class, 'validate')) {
+            $errors = static::validate($entity, $old);
         }
-        return [];
+        else if (!Manager::getOptions('allowSkipValidation')) {
+            $errors = ['validation' => 'Refused'];
+        }
+        return $errors ?? [];
     }
 
     public static function authorizeResource(string $method, ?int $id, ?string $relationship): bool
@@ -281,7 +289,7 @@ class MModelMaestro
                     }
                 }
             }
-            $errors = array_merge($errors, static::validate($entity, $oldEntity));
+            $errors = array_merge($errors, static::validateEntity($entity, $oldEntity, $validate));
             if ($errors) {
                 throw new EValidationException($errors);
             }
@@ -391,10 +399,6 @@ class MModelMaestro
                         $fromModel->getUpdateCriteria()
                             ->where(...$where)
                             ->update([$associationMap->getFromKey() => $associated])->execute();
-                        if ($associationMap->useHooks()) {
-                            $method = 'onAfterSave' . $associationName;
-                            static::$method($idEntity, $rows);
-                        }
                     }
                     else {
                         throw new EValidationException($errors);
