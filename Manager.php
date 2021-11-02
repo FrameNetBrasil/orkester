@@ -185,6 +185,9 @@ class Manager
         if (file_exists(self::$confPath . '/arangodb.php')) {
             self::loadConf(self::$confPath . '/arangodb.php');
         }
+        if (file_exists(self::$confPath . '/api.php')) {
+            self::loadConf(self::$confPath . '/api.php');
+        }
 
         Manager::$data = (object)[];
 
