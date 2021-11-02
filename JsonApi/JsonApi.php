@@ -17,18 +17,19 @@ use Slim\Psr7\Response;
 
 class JsonApi extends MController
 {
-    public static function getResourceInstance($resource)
+    public static function getEndpointInstance(string $name, bool $isService)
     {
-        $conf = Manager::getConf('jsonApi');
-        if (empty($conf) || empty($conf['resources'][$resource])) {
-            throw new \InvalidArgumentException('Resource not found', 404);
+        $conf = Manager::getConf('api');
+        $key = $isService ? 'services' : 'resources';
+        if (empty($conf) || empty($conf[$key][$name])) {
+            throw new \InvalidArgumentException('Endpoint not found', 404);
         }
-        return new ($conf['resources'][$resource])();
+        return new ($conf[$key][$name])();
     }
 
     public static function modelFromResource($resource): MModelMaestro
     {
-        $instance = static::getResourceInstance($resource);
+        $instance = static::getEndpointInstance($resource, false);
         if ($instance instanceof MModelMaestro) {
             return $instance;
         }
@@ -41,7 +42,7 @@ class JsonApi extends MController
         if (method_exists($model, $validationMethod)) {
             $errors = $model->$validationMethod($entity, $associated);
         }
-        else if (!Manager::getConf('jsonApi')['allowSkipAuthorization']) {
+        else if (!Manager::getConf('api')['allowSkipAuthorization']) {
             $errors = [$associationName => 'Refused'];
         }
         if ($throw && !empty($errors)) {
@@ -151,7 +152,7 @@ class JsonApi extends MController
     {
         $this->request = $request;
         $this->response = $response;
-        $middleware = Manager::getConf('jsonApi')['middleware'];
+        $middleware = Manager::getConf('api')['middleware'];
         try {
             if (!empty($middleware)) {
                 ($middleware . '::beforeRequest')($request, $args);
@@ -200,7 +201,7 @@ class JsonApi extends MController
     public function handleModel(Request $request, Response $response, array $args): array
     {
         $transaction = null;
-        $middleware = Manager::getConf('jsonApi')['middleware'];
+        $middleware = Manager::getConf('api')['middleware'];
         $method = match ($request->getMethod()) {
             'GET' => 'get',
             'DELETE' => 'delete',
@@ -233,7 +234,7 @@ class JsonApi extends MController
     public function handleService(Request $request, Response $response, array $args): array
     {
         ['service' => $service, 'action' => $action] = $args;
-        $instance = static::getResourceInstance($service);
+        $instance = static::getEndpointInstance($service, true);
         if (method_exists($instance, $action)) {
             $instance->setRequestResponse($request, $response);
             $method = new \ReflectionMethod($instance, $action);
