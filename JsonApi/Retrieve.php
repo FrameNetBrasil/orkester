@@ -165,6 +165,7 @@ class Retrieve
                 $criteria->orderBy($field . $order);
             }
         }
+        $criteria->select($select);
         if (!empty($limit)) {
             if ($limit <= 0) {
                 throw new \InvalidArgumentException("Invalid limit: $limit", 400);
@@ -177,8 +178,6 @@ class Retrieve
             }
             $criteria->range($page ?? 1, $limit);
         }
-        $criteria->clearSelect();
-        $criteria->select($select);
         return [$total ?? 0, $criteria];
     }
 
