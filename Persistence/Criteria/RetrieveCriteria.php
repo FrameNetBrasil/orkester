@@ -244,9 +244,10 @@ class RetrieveCriteria extends PersistentCriteria
 
     public function count(): int
     {
-        $pk = $this->getClassMap()->getKeyAttributeName();
-        $this->select("count($pk) as cnt");
-        return $this->asResult()[0]['cnt'];
+        $criteria = Manager::getPersistentManager()->getCriteria($this->getClassMap());
+        $criteria->select("count(*) as cnt");
+        $criteria->from($this);
+        return $criteria->asResult()[0]['cnt'];
     }
 
     public function clearSelect() {
