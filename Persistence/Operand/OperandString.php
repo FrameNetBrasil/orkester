@@ -45,6 +45,8 @@ class OperandString extends PersistentOperand
             $sql = $token;
         } elseif (str_contains($token, '\'')) {
             $sql = $token;
+        } elseif ($token == '*') {
+            $sql = $token;
         } else {
             $attributeCriteria = $this->criteria->getAttributeCriteria($token);
             $attributeMap = $attributeCriteria->getAttributeMap();
@@ -183,4 +185,3 @@ class OperandString extends PersistentOperand
     }
 
 }
-
