@@ -237,10 +237,6 @@ class JsonApi extends MController
         $instance = static::getEndpointInstance($service, true);
         if (method_exists($instance, $action)) {
             $instance->setRequestResponse($request, $response);
-            $method = new \ReflectionMethod($instance, $action);
-            if ($method->isStatic()) {
-                throw new \InvalidArgumentException('Service not found', 404);
-            }
             Manager::getData()->id = $args['id'] ?? null;
             $content = (object)['data' => $instance->$action()];
             return [$content, 200];
