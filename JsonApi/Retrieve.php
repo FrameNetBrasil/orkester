@@ -121,18 +121,26 @@ class Retrieve
         foreach ($filters as $field => $conditions) {
             foreach($conditions as $matchMode => $value) {
                 if ($value !== '0' && empty($value)) continue;
-                $criteria->where(...match ($matchMode) {
-                    'startsWith' => [$field, 'LIKE', "$value%"],
-                    'contains' => [$field, 'LIKE', "%$value%"],
-                    'endsWith' => [$field, 'LIKE', "%$value"],
-                    'notContains' => [$field, 'NOT LIKE', "%$value%"],
-                    'lessEquals' => [$field, '<=', $value],
-                    'greater' => [$field, '>', $value],
-                    'greaterEquals' => [$field, '>=', $value],
-                    'notEquals' => [$field, '<>', $value],
-                    'in' => [$field, 'IN', explode(',', $value)],
-                    default => [$field, '=', $value]
-                });
+                if ($value == 'null') {
+                    $criteria->where(...match($matchMode) {
+                        'equals' => [$field, 'IS NULL'],
+                        'notEquals' => [$field, 'IS NOT NULL'],
+                    });
+                }
+                else {
+                    $criteria->where(...match ($matchMode) {
+                        'startsWith' => [$field, 'LIKE', "$value%"],
+                        'contains' => [$field, 'LIKE', "%$value%"],
+                        'endsWith' => [$field, 'LIKE', "%$value"],
+                        'notContains' => [$field, 'NOT LIKE', "%$value%"],
+                        'lessEquals' => [$field, '<=', $value],
+                        'greater' => [$field, '>', $value],
+                        'greaterEquals' => [$field, '>=', $value],
+                        'notEquals' => [$field, '<>', $value],
+                        'in' => [$field, 'IN', explode(',', $value)],
+                        default => [$field, '=', $value]
+                    });
+                }
             }
         }
         return $criteria;
