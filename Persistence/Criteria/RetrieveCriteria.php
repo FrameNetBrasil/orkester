@@ -343,6 +343,16 @@ class RetrieveCriteria extends PersistentCriteria
         return $this;
     }
 
+    public function whereAny(array $conditions): RetrieveCriteria
+    {
+        $criteria = $this->getNewConditionCriteria();
+        foreach($conditions as $condition) {
+            $criteria->or_(...$condition);
+        }
+        $this->whereConditionCriteria->add($criteria);
+        return $this;
+    }
+
     public function condition()
     {
         if ($numargs = func_num_args()) {

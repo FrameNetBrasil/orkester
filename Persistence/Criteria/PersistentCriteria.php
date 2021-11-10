@@ -69,7 +69,7 @@ class PersistentCriteria
         $this->havingConditionCriteria = $this->getNewConditionCriteria();
     }
 
-    private function getNewConditionCriteria(): ConditionCriteria
+    protected function getNewConditionCriteria(): ConditionCriteria
     {
         $conditionCriteria = new ConditionCriteria();
         $conditionCriteria->setCriteria($this);
@@ -87,7 +87,6 @@ class PersistentCriteria
     {
         return $this->classMap;
     }
-
 
     public function getWhereConditionCriteria(): ConditionCriteria
     {
