@@ -15,8 +15,7 @@ class OperandArray extends PersistentOperand
         $sql = "(";
         if (is_array($this->operand)) {
             $operand = array_map(fn($x) => (is_string($x) ? "'{$x}'" : $x), $this->operand);
-            $list = implode(',', $operand);
-            $sql .= $list;
+            $sql .= empty($operand) ? "''" : implode(',', $operand);
         } else {
             $sql .= "'{$this->operand}'";
         }

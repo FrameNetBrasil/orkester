@@ -104,8 +104,7 @@ class OperandString extends PersistentOperand
         */
         $value = trim($this->operand);
         $token = $value;
-
-        if (str_contains($token, '(')) {
+        if (str_contains($token, '(') && OperandFunction::isValid($token)) {
             $o = new OperandFunction($token, $this->criteria);
             $sql = $o->getSql();
         } elseif (str_starts_with($token, ':')) {
