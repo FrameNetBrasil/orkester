@@ -46,5 +46,12 @@ class OperandFunction extends PersistentOperand
         return '';
     }
 
-}
+    public static function isValid(string $string): bool
+    {
+        $value = trim($string);
+        $output = [];
+        preg_match('/([^(^ ]*)\((.*)\)/', $value, $output);
+        return !empty($output[1]);
+    }
 
+}

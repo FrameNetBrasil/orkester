@@ -345,11 +345,13 @@ class RetrieveCriteria extends PersistentCriteria
 
     public function whereAny(array $conditions): RetrieveCriteria
     {
-        $criteria = $this->getNewConditionCriteria();
-        foreach($conditions as $condition) {
-            $criteria->or_(...$condition);
+        if (!empty($conditions)) {
+            $criteria = $this->getNewConditionCriteria();
+            foreach ($conditions as $condition) {
+                $criteria->or_(...$condition);
+            }
+            $this->whereConditionCriteria->add($criteria);
         }
-        $this->whereConditionCriteria->add($criteria);
         return $this;
     }
 
