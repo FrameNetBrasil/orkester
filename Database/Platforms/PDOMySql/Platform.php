@@ -3,10 +3,11 @@
 namespace Orkester\Database\Platforms\PDOMySql;
 
 use Carbon\Carbon;
+use Doctrine\DBAL\Platforms\MySqlPlatform;
 use Orkester\Manager;
 use Orkester\Types\MRange;
 
-class Platform extends \Doctrine\DBAL\Platforms\MySqlPlatform {
+class Platform extends MySqlPlatform {
 
     public $db;
 

@@ -2,10 +2,9 @@
 
 namespace Orkester;
 
-use Atk4\Data\Persistence;
+use Composer\Factory;
 use Orkester\Exception\EOrkesterException;
 use Orkester\Handlers\HttpErrorHandler;
-use Composer\Script\Event;
 
 use DI\ContainerBuilder;
 use DI\Container;
@@ -19,10 +18,7 @@ use Orkester\Security\MLogin;
 use Orkester\Security\MAuth;
 use Orkester\Security\MSSL;
 use Orkester\Services\Cache\MCacheFast;
-use Orkester\Services\Cache\MCachePHP;
 use Orkester\Services\Http\MAjax;
-use Orkester\Services\Http\MRequest;
-use Orkester\Services\Http\MResponse;
 use Orkester\Services\MLog;
 use Orkester\Services\MSession;
 use Orkester\UI\MBasePainter;
@@ -31,7 +27,6 @@ use Phpfastcache\Helper\Psr16Adapter;
 use Slim\Factory\AppFactory;
 use Slim\App;
 use Slim\Factory\ServerRequestCreatorFactory;
-use Psr\Http\Message\ServerRequestInterface;
 use Slim\Handlers\ErrorHandler;
 use Slim\Psr7\Request;
 
@@ -130,12 +125,13 @@ class Manager
 
     public static function init()
     {
-        $basePath = realpath(__DIR__ . '/../');
+        $reflection = new \ReflectionClass(\Composer\Autoload\ClassLoader::class);
+        $basePath = dirname($reflection->getFileName(), 3);
         self::$basePath = $basePath;
-        self::$appPath = $basePath . '/app';
+        self::$appPath = $basePath . '/src';
         self::$confPath = $basePath . '/conf';
         self::$publicPath = $basePath . '/public';
-        self::$classPath = $basePath . '/orkester';
+        self::$classPath = $basePath . '/vendor/elymatos/orkester';
         self::$varPath = $basePath . '/var';
         self::loadConf(self::$confPath . '/conf.php');
         self::$mode = self::getOptions("mode");
@@ -304,7 +300,7 @@ class Manager
 
     public static function getOptions(string $key)
     {
-        return self::$conf['options'][$key] ?: '';
+        return self::$conf['options'][$key] ?? '';
     }
 
     public static function setOptions(string $key, string $value)
