@@ -196,8 +196,7 @@ class MController
             $view = $this->action;
         }
         //$this->addParameters($parameters);
-        $base = str_replace("App\\", "", $controller);
-        $base = str_replace("Controllers", "Views", $base);
+        $base = preg_replace("/.*Controllers/i", "Modules/Views", $controller);
         $base = str_replace("Controller", "", $base);
         $path = str_replace("\\", "/", Manager::getAppPath() . "/" . $base . '/' . $view);
         $extensions = ['.blade.php', '.js', '.blade.xml', '.xml', '.vue'];
@@ -220,8 +219,7 @@ class MController
             $view = $this->action;
         }
         //$this->addParameters($parameters);
-        $base = str_replace("App\\", "", $controller);
-        $base = str_replace("Controllers", "Views", $base);
+        $base = preg_replace("/.*Controllers/i", "Modules/Views", $controller);
         $base = str_replace("Controller", "", $base);
         $path = str_replace("\\", "/", Manager::getAppPath() . "/" . $base . '/' . $view);
         $stream = fopen($path, 'r');

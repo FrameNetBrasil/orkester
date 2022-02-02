@@ -1,0 +1,41 @@
+{
+    "name": "elymatos/orkester",
+    "type": "framework-orkester",
+    "version": "0.1.0",
+    "authors": [
+        {
+            "name": "fnzr",
+            "email": "admin@fmatos.net"
+        },
+        {
+            "name": "Ely Matos",
+            "email": "admin@ematos.net"
+        }
+    ],
+    "require": {
+        "php": "^8.0",
+        "slim/slim": "4.*",
+        "slim/psr7": "^1.2",
+        "ext-pdo": "*",
+        "php-di/php-di": "6.2",
+        "monolog/monolog": "^2.3",
+        "aura/session": "^2.1",
+        "ramsey/uuid": "^4.2",
+        "php-ds/php-ds": "^1.4",
+        "phpfastcache/phpfastcache": "8",
+        "jenssegers/blade": "^1.4",
+        "composer/composer": "^2.2",
+        "doctrine/dbal": "2.13",
+        "doctrine/common": "2.13.1",
+        "phpmyadmin/sql-parser": "^5.5",
+        "webonyx/graphql-php": "^14.11"
+    },
+    "autoload": {
+        "files": [
+          "./functions.php"
+        ],
+        "psr-4": {
+          "Orkester\\": "./"
+        }
+    }
+}

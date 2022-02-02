@@ -159,7 +159,7 @@ function shutdown()
 {
     $error = error_get_last();
     if ($error) {
-        var_dump($error);
+//        var_dump($error);
         errorHandler($error['type'], $error['message'], $error['file'], $error['line']);
         //if ($error & $error['type'] & (E_ALL & ~E_NOTICE & ~E_STRICT)) {
         //    Manager::logError($error['message']);
