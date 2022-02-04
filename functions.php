@@ -53,6 +53,14 @@ function buildPath(array $parts): string
     return implode(DIRECTORY_SEPARATOR, $parts);
 }
 
+function array_find($xs, $f) {
+    foreach ($xs as $x) {
+        if (call_user_func($f, $x) === true)
+            return $x;
+    }
+    return null;
+}
+
 function mrequest($vars, $from = 'ALL', $order = '')
 {
     if (is_array($vars)) {

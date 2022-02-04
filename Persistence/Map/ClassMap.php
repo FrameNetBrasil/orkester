@@ -195,6 +195,11 @@ class ClassMap
         return $attributeMap;
     }
 
+    public function attributeExists(string $name): bool
+    {
+        return !is_null($this->getAttributeMap($name));
+    }
+
     public function getUpdateAttributeMaps(): array
     {
         return $this->updateAttributeMaps;

@@ -8,20 +8,21 @@ use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\ValueNode;
 use GraphQL\Language\AST\VariableNode;
 use Orkester\GraphQL\Executor;
+use Orkester\Persistence\Criteria\RetrieveCriteria;
 
-class Where extends AbstractOperator
+class WhereOperator extends AbstractOperator
 {
     public function __construct(
-        \Orkester\Persistence\Criteria\RetrieveCriteria $criteria,
         ObjectValueNode|VariableNode $node,
-        array $variables) {
-        parent::__construct($criteria, $node, $variables);
+        array                        $variables)
+    {
+        parent::__construct($node, $variables);
 
     }
 
     protected function getCriteriaOperator(string $operator, mixed &$value): string
     {
-        $result = match($operator) {
+        $result = match ($operator) {
             'eq' => '=',
             'neq' => '<>',
             'lt' => '<',
@@ -47,9 +48,8 @@ class Where extends AbstractOperator
             $op = array_key_first($var);
             $value = $var[$op];
             $operator = $this->getCriteriaOperator($op, $value);
-        }
-        else {
-            foreach($node->value->fields->getIterator() as $entry) {
+        } else {
+            foreach ($node->value->fields->getIterator() as $entry) {
                 $value = $this->getNodeValue($entry->value);
                 $operator = $this->getCriteriaOperator($entry->name->value, $value);
             }
@@ -57,47 +57,44 @@ class Where extends AbstractOperator
         return [$field, $operator, $value];
     }
 
-    protected function processConditionGroup(NodeList $root, string $conjunction)
+    protected function processConditionGroup(RetrieveCriteria $criteria, NodeList $root, string $conjunction)
     {
         $conditions = [];
-        foreach($root->getIterator() as $node) {
+        foreach ($root->getIterator() as $node) {
             $conditions[] = $this->processCondition($node);
         }
         if ($conjunction == 'and') {
-            foreach($conditions as $condition) {
-                $this->criteria->where(...$condition);
+            foreach ($conditions as $condition) {
+                $criteria->where(...$condition);
             }
-        }
-        else {
-            $this->criteria->whereAny($conditions);
+        } else {
+            $criteria->whereAny($conditions);
         }
     }
 
-    public function apply() : \Orkester\Persistence\Criteria\RetrieveCriteria
+    public function apply(RetrieveCriteria $criteria): \Orkester\Persistence\Criteria\RetrieveCriteria
     {
         $topLevelConditions = [];
         if ($this->node instanceof ObjectValueNode) {
             /** @var ObjectFieldNode $node */
-            foreach($this->node->fields->getIterator() as $node){
-                if($node->name->value == 'and' || $node->name->value == 'or') {
-                    $this->processConditionGroup($node->value->fields, $node->name->value);
-                }
-                else {
+            foreach ($this->node->fields->getIterator() as $node) {
+                if ($node->name->value == 'and' || $node->name->value == 'or') {
+                    $this->processConditionGroup($criteria, $node->value->fields, $node->name->value);
+                } else {
                     $topLevelConditions[] = $this->processCondition($node);
                 }
             }
-        }
-        else if ($this->node instanceof VariableNode) {
+        } else if ($this->node instanceof VariableNode) {
             $conditions = $this->getNodeValue($this->node);
-            foreach($conditions as $field => $condition) {
-                foreach($condition as $op => $value) {
+            foreach ($conditions as $field => $condition) {
+                foreach ($condition as $op => $value) {
                     $topLevelConditions[] = [$field, $this->getCriteriaOperator($op, $value), $value];
                 }
             }
         }
-        foreach($topLevelConditions as $condition) {
-            $this->criteria->where(...$condition);
+        foreach ($topLevelConditions as $condition) {
+            $criteria->where(...$condition);
         }
-        return $this->criteria;
+        return $criteria;
     }
 }

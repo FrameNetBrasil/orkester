@@ -12,6 +12,7 @@ class Platform extends MySqlPlatform {
     public $db;
 
     public function __construct($db) {
+        parent::__construct();
         $this->db = $db;
     }
 
@@ -92,7 +93,7 @@ class Platform extends MySqlPlatform {
     }
 
     public function getSQLRange(MRange $range) {
-        return "LIMIT " . $range->offset . "," . $range->rows;
+        return ($range->rows ? "LIMIT $range->rows" : '') . ($range->offset ? "OFFSET $range->offset" : '');
     }
 
     public function fetchAll($query) {

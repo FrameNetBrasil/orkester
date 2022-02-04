@@ -4,18 +4,19 @@ namespace Orkester\GraphQL\Operator;
 
 use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\VariableNode;
+use Orkester\Persistence\Criteria\RetrieveCriteria;
 
-class OrderBy extends AbstractOperator
+class OrderByOperator extends AbstractOperator
 {
 
-    public function apply() : \Orkester\Persistence\Criteria\RetrieveCriteria
+    public function apply(RetrieveCriteria $criteria) : \Orkester\Persistence\Criteria\RetrieveCriteria
     {
-        $apply = function ($node) {
+        $apply = function ($node) use ($criteria) {
             if ($node instanceof ObjectValueNode) {
                 /** @var \GraphQL\Language\AST\ObjectFieldNode $fieldNode */
                 $fieldNode = $node->fields->offsetGet(0);
                 $value = $this->getNodeValue($fieldNode->value);
-                $this->criteria->orderBy("{$fieldNode->name->value} {$value}");
+                $criteria->orderBy("{$fieldNode->name->value} {$value}");
             }
         };
         if ($this->node instanceof VariableNode) {
@@ -23,7 +24,7 @@ class OrderBy extends AbstractOperator
             $entries = array_key_exists(0, $value) ? $value : [$value];
             foreach ($entries as $entry) {
                 foreach ($entry as $field => $order) {
-                    $this->criteria->orderBy("$field $order");
+                    $criteria->orderBy("$field $order");
                 }
             }
         } else if ($this->node instanceof ObjectValueNode) {
@@ -33,6 +34,6 @@ class OrderBy extends AbstractOperator
                 $apply($node);
             }
         }
-        return $this->criteria;
+        return $criteria;
     }
 }

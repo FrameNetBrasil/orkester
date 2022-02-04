@@ -9,11 +9,11 @@ use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\SelectionSetNode;
 use GraphQL\Language\AST\VariableNode;
 use Orkester\GraphQL\Executor;
-use Orkester\GraphQL\Operator\OrderBy;
+use Orkester\GraphQL\Operator\OrderByOperator;
 use Orkester\MVC\MModelMaestro;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 
-class Query
+class QueryOperation
 {
     public function __construct(
         private FieldNode     $root,
@@ -65,7 +65,7 @@ class Query
         /** @var ArgumentNode $argument */
         foreach ($this->root->arguments->getIterator() as $argument) {
             $operation = match ($argument->name->value) {
-                'order_by' => new OrderBy($this->criteria, $argument->value, $this->variables),
+                'order_by' => new OrderByOperator($this->criteria, $argument->value, $this->variables),
                 default => null
             };
             $operation->apply();
