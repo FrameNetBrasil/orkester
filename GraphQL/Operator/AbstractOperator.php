@@ -6,12 +6,12 @@ use GraphQL\Language\AST\ListValueNode;
 use GraphQL\Language\AST\Node;
 use GraphQL\Language\AST\NodeKind;
 use GraphQL\Language\AST\VariableNode;
+use Orkester\Persistence\Criteria\RetrieveCriteria;
 
 abstract class AbstractOperator
 {
 
     public function __construct(
-        protected \Orkester\Persistence\Criteria\RetrieveCriteria $criteria,
         protected \GraphQL\Language\AST\Node $node,
         protected array $variables) {
 
@@ -43,5 +43,5 @@ abstract class AbstractOperator
         }
     }
 
-    abstract public function apply() : \Orkester\Persistence\Criteria\RetrieveCriteria;
+    abstract public function apply(RetrieveCriteria $criteria) : RetrieveCriteria;
 }

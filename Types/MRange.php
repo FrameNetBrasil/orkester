@@ -6,7 +6,7 @@ class MRange
 {
 
     public $page;
-    public $offset;
+    public $offset = 0;
     public $rows;
     public $total;
 

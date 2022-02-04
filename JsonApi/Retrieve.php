@@ -4,18 +4,6 @@
 namespace Orkester\JsonApi;
 
 
-use JsonApiPhp\JsonApi\Attribute;
-use JsonApiPhp\JsonApi\DataDocument;
-use JsonApiPhp\JsonApi\EmptyRelationship;
-use JsonApiPhp\JsonApi\Link\RelatedLink;
-use JsonApiPhp\JsonApi\Link\SelfLink;
-use JsonApiPhp\JsonApi\Meta;
-use JsonApiPhp\JsonApi\NullData;
-use JsonApiPhp\JsonApi\ResourceCollection;
-use JsonApiPhp\JsonApi\ResourceIdentifier;
-use JsonApiPhp\JsonApi\ResourceIdentifierCollection;
-use JsonApiPhp\JsonApi\ResourceObject;
-use JsonApiPhp\JsonApi\ToOne;
 use Orkester\Manager;
 use Orkester\MVC\MModelMaestro;
 use Orkester\Persistence\Criteria\RetrieveCriteria;

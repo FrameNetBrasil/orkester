@@ -9,7 +9,7 @@ use GraphQL\Language\AST\Node;
 use GraphQL\Language\AST\OperationDefinitionNode;
 use GraphQL\Language\AST\ValueNode;
 use GraphQL\Language\AST\VariableNode;
-use Orkester\GraphQL\Operation\Query;
+use Orkester\GraphQL\Operation\QueryOperation;
 use Orkester\Manager;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 
@@ -49,7 +49,7 @@ class Executor
         foreach ($this->doc->definitions->getIterator() as $definition) {
 //            minfo("Executing operation")
             $class = match ($definition->operation) {
-                'query' => Query::class,
+                'query' => QueryOperation::class,
                 'mutation' => '',
                 default => null
             };
@@ -80,7 +80,7 @@ class Executor
         $modelNameMap = (require Manager::getConfPath() . '/api.php')['models'];
         $node = $executor->doc->definitions->offsetGet(0)->selectionSet->selections->offsetGet(0);
         $modelName = $node->name->value;
-        $o = new Query($node, $variables, new $modelNameMap[$modelName]());
+        $o = new QueryOperation($node, $variables, new $modelNameMap[$modelName]());
         $o->prepare();
         return $o->getCriteria();
     }

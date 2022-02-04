@@ -30,7 +30,7 @@ class RetrieveCriteria extends PersistentCriteria
         }
     }
 
-    public function getRange()
+    public function getRange(): ?MRange
     {
         return $this->range;
     }
@@ -164,6 +164,20 @@ class RetrieveCriteria extends PersistentCriteria
         } elseif ($numargs == 2) {
             $this->range = new MRange($page, $rows);
         }
+        return $this;
+    }
+
+    public function offset(int $offset): RetrieveCriteria
+    {
+        $this->range ??= new MRange(0, 0);
+        $this->range->offset = $offset;
+        return $this;
+    }
+
+    public function limit(int $limit): RetrieveCriteria
+    {
+        $this->range ??= new MRange(0, 0);
+        $this->range->rows = $limit;
         return $this;
     }
 

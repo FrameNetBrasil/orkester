@@ -15,6 +15,8 @@ use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Criteria\UpdateCriteria;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\PersistenceTransaction;
+use Orkester\Security\Authorization\AllowAllAuthorization;
+use Orkester\Security\Authorization\IAuthorization;
 
 class MModelMaestro
 {
@@ -22,6 +24,11 @@ class MModelMaestro
     public static RetrieveCriteria $criteria;
     public static array $map = [];
     public static string $entityClass = '';
+
+    public function __construct(public ?IAuthorization $authorization = null)
+    {
+        $this->authorization ??= new AllowAllAuthorization();
+    }
 
     public static function init(): void
     {
