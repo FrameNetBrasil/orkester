@@ -7,21 +7,24 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\ObjectFieldNode;
 use GraphQL\Language\AST\SelectionSetNode;
+use Orkester\GraphQL\ExecutionContext;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\ClassMap;
 
-class SelectOperator extends AbstractOperator
+class _SelectOperator extends AbstractOperator
 {
 
     protected array $fieldAssociationPathMap;
     protected Set $associationIdKeys;
+    protected Set $selection;
+    protected Set $associationTypes;
 
-    public function __construct(
-        SelectionSetNode                                $node,
-        array                                           $variables)
+    public function __construct(ExecutionContext $context, protected SelectionSetNode $node)
     {
-        parent::__construct($node, $variables);
+        parent::__construct($context);
         $this->associationIdKeys = new Set();
+        $this->selection = new Set();
+        $this->associationTypes = new Set();
     }
 
     /**
@@ -70,8 +73,9 @@ class SelectOperator extends AbstractOperator
         }
         $final = [];
         foreach ($grouped as $group) {
-            foreach ($associationsByDepth[$depth + 1] ?? [] as ['value' => $value]) {
-                $group[0][$value] = $this->groupRecursive(array_map(fn($row) => $row[$value], $group), $associationsByDepth, $depth + 1);
+            foreach ($associationsByDepth[$depth + 1] ?? [] as ['value' => $value, 'cardinality' => $cardinality]) {
+                $intermediate = $this->groupRecursive(array_map(fn($row) => $row[$value], $group), $associationsByDepth, $depth + 1);
+                $group[0][$value] = $cardinality == 'oneToOne' ? $intermediate[0] : $intermediate;
             }
             $final[] = $group[0];
         }
@@ -110,67 +114,80 @@ class SelectOperator extends AbstractOperator
          *  key: the key in the array containing the value of the PrimaryKey of the associated model
          *  value: the key in the array containing the data retrieved for the associated model
          **/
-        $associationKeyAttributeMap = [0 => [['key' => '__pk']]];
-        foreach ($this->associationIdKeys->getIterator() as $key) {
+        $associationKeyAttributeMap = [0 => [['key' => '__pk', 'cardinality' => 'many']]];
+        foreach ($this->associationIdKeys->getIterator() as ['key' => $key, 'cardinality' => $cardinality]) {
             $path = array_filter(explode('__', $key), fn($e) => !empty($e));
             $depth = count($path);
             $associationKeyAttributeMap[$depth][] = [
                 'key' => $key,
-                'value' => last($path)
+                'value' => last($path),
+                'cardinality' => $cardinality
             ];
         }
         $forest = $this->createResultForest($rows);
         return $this->groupRecursive($forest, $associationKeyAttributeMap, 0);
     }
 
-    public function selectNode(RetrieveCriteria $criteria, FieldNode $node, array &$selection, $associationPath, ClassMap $classMap)
+    public function selectNode(FieldNode $node, $associationPath, ClassMap $classMap)
     {
         if (is_null($node->selectionSet)) {
             if ($node->arguments->count() > 0) {
                 /** @var ArgumentNode $argument */
                 $argument = $node->arguments->offsetGet(0);
-                if ($argument->name->value == 'field') {
-                    $select = "{$argument->value->value} as {$node->name->value}";
-                } else if ($argument->name->value == 'expr') {
-                    $select = "{$argument->value->value} as {$node->name->value}";
-                }
+                $select = "{$argument->value->value} as {$node->name->value}";
+//                if ($argument->name->value == 'field') {
+//                    $select = "{$argument->value->value} as {$node->name->value}";
+//                } else if ($argument->name->value == 'expr') {
+//                    $select = "{$argument->value->value} as {$node->name->value}";
+//                }
             } else {
                 $select = ($associationPath ? "$associationPath." : "") . $node->name->value;
             }
             $this->fieldAssociationPathMap[$node->name->value] = $associationPath;
-            $selection[] = $select;
+            $this->selection->add($select);
         } else {
             $prefix = ($associationPath ? "$associationPath." : "") . $node->name->value;
             $associationMap = $classMap->getAssociationMap($node->name->value);
             $toKey = $associationMap->getToClassMap()->getKeyAttributeName();
             $associationKeySelect = str_replace('.', '__', "__$prefix");
-            $this->associationIdKeys->add($associationKeySelect);
+            $this->associationIdKeys->add(['key' => $associationKeySelect, 'cardinality' => $associationMap->getCardinality()]);
             $this->fieldAssociationPathMap[$associationKeySelect] = $prefix;
-            $selection[] = "$prefix.$toKey as $associationKeySelect";
+            $this->selection->add("$prefix.$toKey as $associationKeySelect");
             foreach ($node->arguments->getIterator() as $argument) {
-                $value = $this->getNodeValue($argument->value);
+                $value = $this->context->getNodeValue($argument->value);
                 if ($argument->name->value == 'join') {
-                    $criteria->associationType($prefix, $value);
+                    $this->associationTypes->add(['name' => $prefix, 'type' => $value]);
                 }
             }
             /** @var FieldNode $child */
             foreach ($node->selectionSet->selections->getIterator() as $child) {
-                $this->selectNode($criteria, $child, $selection, $prefix, $associationMap->getToClassMap());
+                $this->selectNode($child, $prefix, $associationMap->getToClassMap());
+            }
+        }
+    }
+
+    public function prepare(ClassMap $classMap)
+    {
+        $pk =$classMap->getKeyAttributeName();
+        $this->selection = new Set(["$pk as __pk"]);
+        $this->fieldAssociationPathMap['__pk'] = '';
+        /** @var FieldNode|ObjectFieldNode $node */
+        foreach ($this->node->selections->getIterator() as $node) {
+            if ($node instanceof FieldNode) {
+                $this->selectNode($node, '', $classMap);
             }
         }
     }
 
     public function apply(RetrieveCriteria $criteria): \Orkester\Persistence\Criteria\RetrieveCriteria
     {
-        $selection = [];
-        /** @var FieldNode|ObjectFieldNode $node */
-        foreach ($this->node->selections->getIterator() as $node) {
-            if ($node instanceof FieldNode) {
-                $this->selectNode($criteria, $node, $selection, '', $criteria->getClassMap());
-            }
+        if ($this->selection->isEmpty()) {
+            $this->prepare($criteria->getClassMap());
         }
-        $pk = $criteria->getClassMap()->getKeyAttributeName();
-        $this->fieldAssociationPathMap['__pk'] = '';
-        return $criteria->select("$pk as __pk," . join(',', $selection));
+        $selection = join(",", $this->selection->toArray());
+        foreach($this->associationTypes as ['name' => $name, 'type' => $type]) {
+            $criteria->setAssociationType($name, $type);
+        }
+        return $criteria->select($selection);
     }
 }

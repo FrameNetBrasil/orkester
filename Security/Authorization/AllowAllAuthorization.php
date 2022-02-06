@@ -20,7 +20,7 @@ class AllowAllAuthorization implements IAuthorization
         return true;
     }
 
-    function isAttributeWritable(string $name): bool
+    function isAttributeWritable(string $name, ?object $entity): bool
     {
         return true;
     }
@@ -30,7 +30,17 @@ class AllowAllAuthorization implements IAuthorization
         return true;
     }
 
-    function isAssociationWritable(string $name): bool
+    function isAssociationWritable(string $name, ?object $entity): bool
+    {
+        return true;
+    }
+
+    public function isEntityDeletable(int $pk): bool
+    {
+        return true;
+    }
+
+    public function isModelDeletable(): bool
     {
         return true;
     }

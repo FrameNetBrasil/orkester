@@ -2,13 +2,20 @@
 
 namespace Orkester\GraphQL\Operator;
 
+use GraphQL\Language\AST\IntValueNode;
+use GraphQL\Language\AST\VariableNode;
+use Orkester\GraphQL\ExecutionContext;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 
 class OffsetOperator extends AbstractOperator
 {
-
-    public function apply(RetrieveCriteria $criteria): \Orkester\Persistence\Criteria\RetrieveCriteria
+    public function __construct(ExecutionContext $context, protected IntValueNode|VariableNode $node)
     {
-        return $criteria->offset($this->getNodeValue($this->node));
+        parent::__construct($context);
+    }
+
+    public function apply(RetrieveCriteria $criteria): RetrieveCriteria
+    {
+        return $criteria->offset($this->context->getNodeValue($this->node));
     }
 }
