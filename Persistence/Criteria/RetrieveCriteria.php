@@ -314,6 +314,13 @@ class RetrieveCriteria extends PersistentCriteria
         return $this;
     }
 
+    public function forceJoin(ClassMap $c1, string $aliasC1, ClassMap $c2, string $aliasC2, $condition = '', $joinType = 'INNER')
+    {
+        $this->joins[] = array($c1, $c2, $condition, $joinType);
+        $this->addClass($c1, $aliasC1);
+        $this->addClass($c2, $aliasC2);
+    }
+
     private function addMultipleClasses(array $classes)
     {
         foreach ($classes as $class) {

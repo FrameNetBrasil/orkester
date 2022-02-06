@@ -195,9 +195,34 @@ class ClassMap
         return $attributeMap;
     }
 
-    public function attributeExists(string $name): bool
+    public function attributeExists(string $path): bool
     {
-        return !is_null($this->getAttributeMap($name));
+        $parts = explode('.', $path);
+        $classMap = $this;
+        for($i = 0; $i < count($parts) - 1; $i++){
+            if($associationMap = $classMap->getAssociationMap($parts[$i])) {
+                $classMap = $associationMap->getToClassMap();
+            }
+            else {
+                return false;
+            }
+        }
+        return $classMap->getAttributeMap(last($parts)) != null;
+    }
+
+    public function associationExists(string $path): bool
+    {
+        $parts = explode('.', $path);
+        $classMap = $this;
+        for($i = 0; $i < count($parts) - 1; $i++){
+            if($associationMap = $classMap->getAssociationMap($parts[$i])) {
+                $classMap = $associationMap->getToClassMap();
+            }
+            else {
+                return false;
+            }
+        }
+        return $classMap->getAssociationMap(last($parts)) != null;
     }
 
     public function getUpdateAttributeMaps(): array

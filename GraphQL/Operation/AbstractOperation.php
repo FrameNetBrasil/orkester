@@ -10,5 +10,4 @@ abstract class AbstractOperation
     {
     }
 
-    abstract function execute(): array;
 }

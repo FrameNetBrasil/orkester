@@ -132,7 +132,7 @@ class PersistentManager
      *
      */
 
-    public function retrieveObjectById(ClassMap $classMap, int $id): object
+    public function retrieveObjectById(ClassMap $classMap, int $id): ?object
     {
         return $this->retrieveObjectFromCacheOrQuery($classMap, $id);
     }
@@ -142,7 +142,7 @@ class PersistentManager
         return $this->retrieveObjectFromCacheOrQuery($classMap, $id);
     }
 
-    private function retrieveObjectFromCacheOrQuery(ClassMap $classMap, int $id): object
+    private function retrieveObjectFromCacheOrQuery(ClassMap $classMap, int $id): ?object
     {
         $cache = Manager::getCache();
         $key = md5($classMap->getName() . $id);
@@ -150,6 +150,9 @@ class PersistentManager
             return $cache->get($key);
         } else {
             $tempObject = $this->persistence->retrieveObject($classMap, $id);
+            if (is_null($tempObject)) {
+                return null;
+            }
             $object = $this->objectHandler($classMap, $tempObject, 'retrieve');
             $cache->set($key, $object, 300);
             return $object;

@@ -4,16 +4,16 @@ namespace Orkester\GraphQL\Operator;
 
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 
-class WhereOperator extends AbstractConditionOperator
+class HavingOperator extends AbstractConditionOperator
 {
 
     protected function applyCondition(RetrieveCriteria $criteria, array $condition)
     {
-        $criteria->where(...$condition);
+        $criteria->having(...$condition);
     }
 
     protected function applyAnyConditions(RetrieveCriteria $criteria, array $conditions)
     {
-        $criteria->whereAny($conditions);
+        // TODO: Implement applyAnyConditions() method.
     }
 }

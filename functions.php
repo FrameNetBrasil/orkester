@@ -61,6 +61,16 @@ function array_find($xs, $f) {
     return null;
 }
 
+function group_by(array $data, mixed $key, bool $unset_key = true): array
+{
+    return array_reduce($data, function (array $accumulator, array $element) use ($key, $unset_key) {
+        $groupKey = $element[$key];
+        if ($unset_key) unset($element[$key]);
+        $accumulator[$groupKey][] = $element;
+        return $accumulator;
+    }, []);
+}
+
 function mrequest($vars, $from = 'ALL', $order = '')
 {
     if (is_array($vars)) {

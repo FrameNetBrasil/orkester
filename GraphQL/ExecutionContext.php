@@ -5,6 +5,7 @@ namespace Orkester\GraphQL;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\FieldNode;
+use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\ListValueNode;
 use GraphQL\Language\AST\Node;
 use GraphQL\Language\AST\NodeKind;
@@ -14,13 +15,16 @@ use GraphQL\Language\AST\VariableNode;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Manager;
 use Orkester\MVC\MModelMaestro;
+use Orkester\Persistence\Map\ClassMap;
 
 class ExecutionContext
 {
 
     protected array $conf;
+    protected array $permissionsCache = [];
+    protected array $classMapToModelMap = [];
 
-    public function __construct(public array $variables)
+    public function __construct(public array $variables, public array $fragments = [])
     {
     }
 
@@ -67,16 +71,50 @@ class ExecutionContext
         }
     }
 
-    public function getModel(string $name): ?MModelMaestro
+    public function getModelName(string $name): ?string
     {
+        if ($modelName = $this->conf['models'][$name] ?? false) {
+            return $modelName;
+        }
+        return $this->conf['models'][$this->conf['singular'][$name] ?? null] ?? null;
+    }
+
+    public function getModel(string|ClassMap $nameOrClassMap): ?MModelMaestro
+    {
+        if ($nameOrClassMap instanceof ClassMap) {
+            return $this->classMapToModelMap[get_class($nameOrClassMap)] ?? null;
+        }
         if (empty($this->conf)) {
             $this->conf = require Manager::getConfPath() . '/graphql.php';
         }
-        $modelName = $this->conf['models'][$name] ?? null;
+        $modelName = $this->getModelName($nameOrClassMap);
         if (empty($modelName)) {
-            throw new EGraphQLException("Model not found: $name");
+            throw new EGraphQLException([$nameOrClassMap => "Model not found"]);
         }
-        return Manager::getContainer()->get($modelName);
+        $model = Manager::getContainer()->get($modelName);
+        $this->classMapToModelMap[get_class($model->getClassMap())] = $model;
+        return $model;
+    }
+
+    public function isSingular(string $name): bool
+    {
+        return array_key_exists($name, $this->conf['singular']);
+    }
+
+    public function allowBatchUpdate(): bool
+    {
+        return $this->conf['allowBatchUpdate'] ?? false;
+    }
+
+    public function getFragment($name): ?FragmentDefinitionNode
+    {
+        /** @var FragmentDefinitionNode $fragment */
+        foreach($this->fragments as $fragment) {
+            if ($fragment->name->value == $name) {
+                return $fragment;
+            }
+        }
+        return null;
     }
 
 }

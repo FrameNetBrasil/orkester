@@ -60,6 +60,11 @@ class MModelMaestro
 
     public static function getResourceCriteria(ClassMap $classMap = null): RetrieveCriteria
     {
+        return static::getAPICriteria();
+    }
+
+    public static function getAPICriteria(ClassMap $classMap = null): RetrieveCriteria
+    {
         return static::getCriteria($classMap);
     }
 
