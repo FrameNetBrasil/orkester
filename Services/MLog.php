@@ -45,12 +45,12 @@ class MLog
 
         $this->logger = new Logger($this->channel);
         // Create the handlers
-        $handlerFile = new StreamHandler($this->errorLog, Logger::DEBUG);
+        $handlerFile = new StreamHandler($this->errorLog, Logger::DEBUG, filePermission: 0777);
         $handlerFile->setFormatter($formatter);
         $this->logger->pushHandler($handlerFile);
 
         $this->loggerSQL = new Logger($this->channel);
-        $handlerSQL = new StreamHandler($this->SQLLog, Logger::DEBUG);
+        $handlerSQL = new StreamHandler($this->SQLLog, Logger::DEBUG, filePermission: 0777);
         $handlerSQL->setFormatter($formatter);
         $this->loggerSQL->pushHandler($handlerSQL);
 
@@ -60,7 +60,7 @@ class MLog
             $host = $this->peer;
             if ($allow) {
                 $errno = $errstr = '';
-                $this->socket = fsockopen($host, $this->port, $errno, $errstr, 30);
+                $this->socket = fsockopen($host, $this->port, $errno, $errstr, 5);
             }
         } else {
             $this->socket = false;
@@ -218,4 +218,3 @@ class MLog
     }
 
 }
-
