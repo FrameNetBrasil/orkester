@@ -15,7 +15,7 @@ class MUtil
      * @returns (tipo) desc
      *
      */
-    public function NVL($value1, $value2)
+    public static function NVL($value1, $value2)
     {
         return ($value1 != null) ? $value1 : $value2;
     }
@@ -31,7 +31,7 @@ class MUtil
      * @returns (tipo) desc
      *
      */
-    public function ifNull($value1, $value2, $value3)
+    public static function ifNull($value1, $value2, $value3)
     {
         return ($value1 == null) ? $value2 : $value3;
     }
@@ -46,7 +46,7 @@ class MUtil
      * @returns (tipo) desc
      *
      */
-    public function setIfNull(&$value1, $value2)
+    public static function setIfNull(&$value1, $value2)
     {
         if ($value1 == null) {
             $value1 = $value2;
@@ -63,7 +63,7 @@ class MUtil
      * @returns (tipo) desc
      *
      */
-    public function setIfNotNull(&$value1, $value2)
+    public static function setIfNotNull(&$value1, $value2)
     {
         if ($value2 != null) {
             $value1 = $value2;
@@ -122,7 +122,7 @@ class MUtil
      * @returns (string) value
      *
      */
-    public function removeSpaceChars($value)
+    public static function removeSpaceChars($value)
     {
         $blanks = array(
             "\r" => '',
@@ -337,7 +337,7 @@ class MUtil
      *
      * @returns (string) value
      */
-    public function copyDirectory($sourceDir, $destinDir)
+    public static function copyDirectory($sourceDir, $destinDir)
     {
         if (file_exists($sourceDir) && file_exists($destinDir)) {
             $open_dir = opendir($sourceDir);
@@ -378,7 +378,7 @@ class MUtil
      *
      * @returns (string) value
      */
-    public function removeDirectory($directory, $empty = false)
+    public static function removeDirectory($directory, $empty = false)
     {
         if (substr($directory, -1) == '/') {
             $directory = substr($directory, 0, -1);
@@ -420,7 +420,7 @@ class MUtil
      *
      * @returns (string) directory name
      */
-    static public function getSystemTempDir()
+    public static function getSystemTempDir()
     {
         $tempFile = tempnam(md5(uniqid(rand(), true)), '');
         if ($tempFile) {
@@ -433,7 +433,7 @@ class MUtil
         }
     }
 
-    function getMemUsage()
+    public static function getMemUsage()
     {
 
         if (function_exists('memory_get_usage')) {
@@ -451,7 +451,7 @@ class MUtil
         }
     }
 
-    function unix2dos($arquivo)
+    public static function unix2dos($arquivo)
     {
         $file = file("$arquivo");
         $conteudo = "";

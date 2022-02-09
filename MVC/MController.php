@@ -196,7 +196,8 @@ class MController
             $view = $this->action;
         }
         //$this->addParameters($parameters);
-        $base = preg_replace("/.*Controllers/i", "Modules/Views", $controller);
+        $base = preg_replace("/Controllers/i", "Views", $controller);
+        $base = str_replace("App\\", "", $base);
         $base = str_replace("Controller", "", $base);
         $path = str_replace("\\", "/", Manager::getAppPath() . "/" . $base . '/' . $view);
         $extensions = ['.blade.php', '.js', '.blade.xml', '.xml', '.vue'];
