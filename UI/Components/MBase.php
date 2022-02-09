@@ -3,6 +3,7 @@
 namespace Orkester\UI\Components;
 
 use Orkester\Exception\EControlException;
+use Orkester\Exception\ERuntimeException;
 use Orkester\Manager;
 use Orkester\MVC\MView;
 use Orkester\UI\MBasePainter;
@@ -66,7 +67,7 @@ class MBase
             call_user_func_array($this->$name, $args);
         } else {
             $className = $this::class;
-            throw new EControlException("Method {$name} is not defined for control {$className}!");
+            throw new ERuntimeException("Method {$name} is not defined for control {$className}!");
         }
     }
 
