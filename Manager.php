@@ -128,7 +128,7 @@ class Manager
         $reflection = new \ReflectionClass(\Composer\Autoload\ClassLoader::class);
         $basePath = dirname($reflection->getFileName(), 3);
         self::$basePath = $basePath;
-        self::$appPath = $basePath . '/src';
+        self::$appPath = $basePath . '/app';
         self::$confPath = $basePath . '/conf';
         self::$publicPath = $basePath . '/public';
         self::$classPath = $basePath . '/vendor/elymatos/orkester';
