@@ -330,6 +330,13 @@ class PersistentCriteria
         return $this;
     }
 
+    public function getAssociationType(string $associationName): ?string
+    {
+        $associationCriteria = $this->getAssociationCriteria($associationName);
+        if ($associationCriteria == null) return null;
+        return $associationCriteria->getJoinType();
+    }
+
     public function setAutoAssociation(string $alias1, string $alias2, string $condition = '', string $joinType = 'INNER')
     {
         $className = $this->classMap->getName();

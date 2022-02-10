@@ -93,7 +93,7 @@ class Platform extends MySqlPlatform {
     }
 
     public function getSQLRange(MRange $range) {
-        return ($range->rows ? "LIMIT $range->rows" : '') . ($range->offset ? "OFFSET $range->offset" : '');
+        return ($range->rows ? "LIMIT $range->rows" : '') . ($range->offset ? " OFFSET $range->offset" : '');
     }
 
     public function fetchAll($query) {

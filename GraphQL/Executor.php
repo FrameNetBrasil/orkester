@@ -100,7 +100,7 @@ class Executor
                 throw new EGraphQLException(['duplicate_alias' => $alias]);
             }
             $this->aliases->add($alias);
-            $this->mutations[$alias] = ['name' => $fieldNode->name->value, 'model' => $model, 'operation' => $operation];
+            $this->mutations[$alias] = ['model' => $model, 'operation' => $operation];
         }
     }
 
@@ -132,12 +132,18 @@ class Executor
         if (!$this->isPrepared) {
             $this->prepare();
         }
-        $response = [];
-        foreach ($this->mutations as $_ => [$alias => ['model' => $model, 'operation' => $op]]) {
-            $response[$alias] = $op->execute($model->getCriteria());
-        }
         foreach ($this->queries as $alias => ['name' => $name, 'model' => $model, 'operation' => $op]) {
-            $response[$alias] = $this->executeQuery($alias, $name, $model, $op);
+            $this->context->results[$alias] = $this->executeQuery($alias, $name, $model, $op);
+        }
+        foreach ($this->mutations as $alias => ['model' => $model, 'operation' => $op]) {
+            $this->context->results[$alias] = $op->execute($model->getCriteria());
+        }
+
+        $response = [];
+        foreach($this->context->results as $alias => $result) {
+            if (!$this->context->ommitted->contains($alias)) {
+                $response[$alias] = $result;
+            }
         }
         return $response;
     }
