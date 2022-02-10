@@ -12,6 +12,7 @@ use Orkester\Exception\EValidationException;
 use Orkester\Manager;
 use Orkester\MVC\MController;
 use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
 
@@ -27,10 +28,10 @@ class JsonApi extends MController
         return new ($conf[$key][$name])();
     }
 
-    public static function modelFromResource($resource): MModelMaestro
+    public static function modelFromResource($resource): MModelMaestro|MModel
     {
         $instance = static::getEndpointInstance($resource, false);
-        if ($instance instanceof MModelMaestro) {
+        if (($instance instanceof MModelMaestro) || ($instance instanceof MModel)) {
             return $instance;
         }
         throw new \InvalidArgumentException('Resource model not found', 404);
@@ -51,7 +52,7 @@ class JsonApi extends MController
         return $errors ?? [];
     }
 
-    public function get(array $args, MModelMaestro $model, Request $request): array
+    public function get(array $args, MModelMaestro|MModel $model, Request $request): array
     {
         $params = $request->getQueryParams();
         return Retrieve::process(
