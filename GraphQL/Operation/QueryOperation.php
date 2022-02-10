@@ -11,7 +11,6 @@ use GraphQL\Language\AST\NodeList;
 use GraphQL\Language\AST\SelectionSetNode;
 use Orkester\Exception\EGraphQLException;
 use Orkester\GraphQL\ExecutionContext;
-use Orkester\GraphQL\Operation\AbstractOperation;
 use Orkester\GraphQL\Operator\AbstractOperator;
 use Orkester\GraphQL\Operator\GroupOperator;
 use Orkester\GraphQL\Operator\HavingOperator;
@@ -21,6 +20,7 @@ use Orkester\GraphQL\Operator\LimitOperator;
 use Orkester\GraphQL\Operator\OffsetOperator;
 use Orkester\GraphQL\Operator\OrderByOperator;
 use Orkester\GraphQL\Operator\WhereOperator;
+use Orkester\Manager;
 use Orkester\MVC\MModelMaestro;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\AssociationMap;
@@ -33,6 +33,7 @@ class QueryOperation extends AbstractOperation
     public array $subOperations = [];
     public array $operators = [];
     public bool $isPrepared = false;
+    public bool $omit = false;
     public MModelMaestro $model;
 
     public function __construct(ExecutionContext $context, protected FieldNode $node)
@@ -70,6 +71,11 @@ class QueryOperation extends AbstractOperation
     {
         /** @var ArgumentNode $argument */
         foreach ($arguments->getIterator() as $argument) {
+            if ($argument->name->value == 'omit') {
+                if($this->context->getNodeValue($argument->value)) {
+                    $this->context->addOmitted($this->getName());
+                };
+            }
             $class = match ($argument->name->value) {
                 'id' => IdOperator::class,
                 'where' => WhereOperator::class,
@@ -97,8 +103,9 @@ class QueryOperation extends AbstractOperation
     public function handleAttribute(FieldNode $node, MModelMaestro $model)
     {
         if (!static::isAttributeReadable($model, $node->name->value)) {
-            throw new EGraphQLException(["read_{$node->name->value}" => 'access denied']);
+            throw new EGraphQLException(["read_field_forbidden" => $node->name->value]);
         }
+        $canValidate = true;
         $alias = $node->alias?->value;
         $name = $alias ?? $node->name->value;
         $field = $node->name->value;
@@ -107,6 +114,7 @@ class QueryOperation extends AbstractOperation
             $field = $argument->value->value;
             if ($argument->name->value == 'expr') {
                 $select = "{$argument->value->value} as {$name}";
+                $canValidate = false;
             } else if ($argument->name->value == 'field') {
                 $select = "{$argument->value->value} as {$name}";
             } else {
@@ -117,7 +125,7 @@ class QueryOperation extends AbstractOperation
         } else {
             $select = $name;
         }
-        if (!$model->getClassMap()->attributeExists($field)) {
+        if ($canValidate && !$model->getClassMap()->attributeExists($field)) {
             throw new EGraphQLException(["unknown_field" => $field]);
         }
         $this->selection->add($select);
@@ -131,8 +139,10 @@ class QueryOperation extends AbstractOperation
         if (!static::isAssociationReadable($model, $node->name->value)) {
             throw new EGraphQLException(["read_{$node->name->value}" => 'access denied']);
         }
+        $associationName = explode('.', $node->name->value)[0];
+        $associationMap = $model->getClassMap()->getAssociationMap($associationName);
         $operation = new QueryOperation($this->context, $node);
-        $operation->prepare($model);
+        $operation->prepare(Manager::getContainer()->get($associationMap->getToClassName()));
         $name = $node->alias ? $node->alias->value : $node->name->value;
         $this->subOperations[$name] = $operation;
     }
@@ -178,9 +188,12 @@ class QueryOperation extends AbstractOperation
         $name = '_gql';
         $associationMap = new AssociationMap($name, $fromClassMap);
         $associationMap->setToClassName($toClassMap->getName());
+        $associationMap->setToClassMap($toClassMap);
         $key = $fromClassMap->getKeyAttributeName();
-        $associationMap->addKeys($key, $key);
         $associationMap->setCardinality('oneToOne');
+
+        $associationMap->addKeys($key, $key);
+        $associationMap->setKeysAttributes();
         $fromClassMap->putAssociationMap($associationMap);
         return $associationMap;
     }
@@ -190,26 +203,35 @@ class QueryOperation extends AbstractOperation
         if (!$this->isPrepared) {
             $this->prepare($model);
         }
+        $shouldExcludePK = true;
         $classMap = $criteria->getClassMap();
-        $pk = $classMap->getKeyAttributeName();
-        $this->selection->add($pk);
+        if (count($this->subOperations) > 0) {
+            $pk = $classMap->getKeyAttributeName();
+            $shouldExcludePK = !$this->selection->contains($pk);
+            $this->selection->add($pk);
+        }
+
         $criteria->select(join(",", $this->selection->toArray()));
         $this->applyArguments($criteria);
         $rows = $criteria->asResult();
-        $ids = array_map(fn($row) => $row[$pk], $rows);
 
+        if (count($this->subOperations) > 0) {
+            $ids = array_map(fn($row) => $row[$pk], $rows);
+        }
         foreach ($this->subOperations as $associationName => $operation) {
             if ($associationMap = $classMap->getAssociationMap($associationName)) {
                 $toClassMap = $associationMap->getToClassMap();
                 $subCriteria = $toClassMap->getCriteria();
                 $cardinality = $associationMap->getCardinality();
                 $fk = $classMap->getKeyAttributeName();
+
+                $shouldIncludeEmpty = strcasecmp($criteria->getAssociationType($associationName), 'LEFT') == 0;
                 if ($cardinality == 'oneToOne') {
                     $newAssociation = $this->createTemporaryAssociation($toClassMap, $classMap);
                     $joinField = $newAssociation->getName() . "." . $classMap->getKeyAttributeName();
                     $subCriteria->where($joinField, 'IN', $ids);
                     $subCriteria->select($joinField);
-                } else if ($cardinality == 'manyToOne') {
+                } else if ($cardinality == 'manyToOne' || $cardinality == 'oneToMany') {
                     $subCriteria->where($fk, 'IN', $ids);
                     $subCriteria->select($fk);
                 } else {
@@ -217,15 +239,25 @@ class QueryOperation extends AbstractOperation
                 }
                 $subResult = $operation->execute($subCriteria);
                 $subResult = group_by($subResult[$operation->getName()], $fk);
-                $rows = array_map(function ($row) use ($subResult, $associationName, $pk, $cardinality) {
+                $updatedRows = [];
+                foreach ($rows as $row) {
                     $value = $subResult[$row[$pk]] ?? [];
                     if ($cardinality == 'oneToOne') {
-                        $row[$associationName] = $value[0] ?? null;
-                    } else {
-                        $row[$associationName] = $value;
+                        $value = $value[0] ?? null;
                     }
-                    return $row;
-                }, $rows);
+                    if ($shouldExcludePK) {
+                        unset($row[$pk]);
+                    }
+                    $row[$associationName] = $value;
+                    if (empty($value)) {
+                        if ($shouldIncludeEmpty) {
+                            $updatedRows[] = $row;
+                        }
+                    } else {
+                        $updatedRows[] = $row;
+                    }
+                }
+                $rows = $updatedRows;
             }
         }
         return [$this->getName() => $rows];

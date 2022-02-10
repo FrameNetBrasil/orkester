@@ -39,7 +39,7 @@ class WriteOperation
     {
         $name = $associationMap->getName();
         if (!static::isAssociationWritable($model, $name, $this->currentObject)) {
-            $errors[] = [$name => 'access denied'];
+            $errors[] = ["association_write_denied" => $name];
         } else if ($model instanceof IFieldValidator) {
             $model->validateField($name, $value, $errors);
         }
@@ -50,7 +50,7 @@ class WriteOperation
     {
         $name = $attributeMap->getName();
         if (!static::isAttributeWritable($model, $name, $this->currentObject)) {
-            $errors[] = [$name => "access denied"];
+            $errors[] = ["attribute_write_denied" => $name];
         } else if ($model instanceof IFieldValidator) {
             $model->validateField($name, $value, $errors);
         }
@@ -65,7 +65,7 @@ class WriteOperation
         foreach ($values as $name => $value) {
             if ($attributeMap = $classMap->getAttributeMap($name)) {
                 if ($attributeMap->getKeyType() == 'primary') {
-                    $errors[] = [$attributeMap->getName() => 'PrimaryKey cannot be manually set'];
+                    $errors[] = ["pk_not_writable" => $attributeMap->getName()];
                 } else if ($attributeMap->getKeyType() == 'foreign') {
                     $associationMap = array_find($classMap->getAssociationMaps(), fn($map) => $map->getFromKey() == $attributeMap->getName());
                     $entity[$name] = $this->handleAssociation($model, $associationMap, $value, $errors);
@@ -75,7 +75,7 @@ class WriteOperation
             } else if ($associationMap = $classMap->getAssociationMap($name)) {
                 $entity[$associationMap->getFromKey()] = $this->handleAssociation($model, $associationMap, $value, $errors);
             } else {
-                $errors[] = [$name => 'Field not found'];
+                $errors[] = ["attribute_not_found" => $name];
             }
         }
         return empty($errors) ? $entity : null;

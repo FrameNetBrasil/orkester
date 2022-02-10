@@ -5,6 +5,7 @@ namespace Orkester\JsonApi;
 
 
 use Doctrine\DBAL\Exception\InvalidFieldNameException;
+use JetBrains\PhpStorm\ArrayShape;
 use Orkester\Exception\EDBException;
 use Orkester\Exception\EOrkesterException;
 use Orkester\Exception\ESecurityException;
@@ -134,6 +135,7 @@ class JsonApi extends MController
         }
     }
 
+    #[ArrayShape(['status' => "int", 'title' => "string", 'detail' => "string"])]
     public static function createError(int $code, string $title, string $detail): array
     {
         return [

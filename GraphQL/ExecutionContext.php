@@ -2,6 +2,8 @@
 
 namespace Orkester\GraphQL;
 
+use Composer\Package\Package;
+use Ds\Set;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\FieldNode;
@@ -23,9 +25,13 @@ class ExecutionContext
     protected array $conf;
     protected array $permissionsCache = [];
     protected array $classMapToModelMap = [];
+    public array $results = [];
+    public Set $ommitted;
+
 
     public function __construct(public array $variables, public array $fragments = [])
     {
+        $this->ommitted = new Set();
     }
 
     public function getArgumentValueNode(FieldNode $root, string $name): ?Node
@@ -39,12 +45,34 @@ class ExecutionContext
         return null;
     }
 
+    protected function getStringValue(string $value)
+    {
+        $result = $value;
+        if (preg_match('/^\$q:(.+)/', $value, $matches)) {
+            $parts = explode('.', $matches[1]);
+            $key = last($parts);
+            if (!array_key_exists($parts[0], $this->results)) {
+                throw new EGraphQLException(['subquery_not_found' => $parts[0]]);
+            }
+            $subResult = $this->results[$parts[0]];
+            if (array_key_exists(0, $subResult)) {
+                $result = array_map(fn($row) => $row[$key], $subResult);
+            }
+            else {
+                $result = $subResult[$key];
+            }
+
+        }
+        return $result;
+    }
+
+
     protected function getPHPValue(Node $node): mixed
     {
         return match ($node->kind) {
             NodeKind::BOOLEAN => boolval($node->value),
             NodeKind::INT => intval($node->value),
-            default => $node->value
+            default => $this->getStringValue($node->value)
         };
     }
 
@@ -82,6 +110,8 @@ class ExecutionContext
     public function getModel(string|ClassMap $nameOrClassMap): ?MModelMaestro
     {
         if ($nameOrClassMap instanceof ClassMap) {
+            mfatal($nameOrClassMap->getTableName());
+            mdump(get_class($this->classMapToModelMap[get_class($nameOrClassMap)] ));
             return $this->classMapToModelMap[get_class($nameOrClassMap)] ?? null;
         }
         if (empty($this->conf)) {
@@ -89,10 +119,10 @@ class ExecutionContext
         }
         $modelName = $this->getModelName($nameOrClassMap);
         if (empty($modelName)) {
-            throw new EGraphQLException([$nameOrClassMap => "Model not found"]);
+            throw new EGraphQLException(["model_not_found" => $nameOrClassMap]);
         }
         $model = Manager::getContainer()->get($modelName);
-        $this->classMapToModelMap[get_class($model->getClassMap())] = $model;
+        $this->classMapToModelMap[get_class($model)] = $model;
         return $model;
     }
 
@@ -104,6 +134,11 @@ class ExecutionContext
     public function allowBatchUpdate(): bool
     {
         return $this->conf['allowBatchUpdate'] ?? false;
+    }
+
+    public function addOmitted($alias)
+    {
+        $this->ommitted->add($alias);
     }
 
     public function getFragment($name): ?FragmentDefinitionNode

@@ -2,6 +2,8 @@
 
 namespace Orkester\GraphQL\Operator;
 
+use GraphQL\Language\AST\ListTypeNode;
+use GraphQL\Language\AST\ListValueNode;
 use GraphQL\Language\AST\NodeList;
 use GraphQL\Language\AST\ObjectFieldNode;
 use GraphQL\Language\AST\ObjectValueNode;
@@ -19,6 +21,7 @@ abstract class AbstractConditionOperator extends AbstractOperation
     }
 
     protected abstract function applyCondition(RetrieveCriteria $criteria, array $condition);
+
     protected abstract function applyAnyConditions(RetrieveCriteria $criteria, array $conditions);
 
     protected function getCriteriaOperator(string $operator, mixed &$value): string
@@ -33,6 +36,9 @@ abstract class AbstractConditionOperator extends AbstractOperation
             'in' => 'IN',
             'nin' => 'NOT IN',
             'is_null' => $value ? 'IS NULL' : 'IS NOT NULL',
+            'like' => 'LIKE',
+            'nlike' => 'NOT LIKE',
+            'regex' => 'RLIKE',
             default => null
         };
         if (is_null($result)) {
@@ -44,20 +50,16 @@ abstract class AbstractConditionOperator extends AbstractOperation
         return $result;
     }
 
-    protected function prepareExpression(ObjectValueNode $node)
+    protected function prepareExpression(ListValueNode $node)
     {
+        $field = $node->values->offsetGet(0)->value;
+        /** @var ObjectValueNode $conditionsNode */
+        $conditionsNode = $node->values->offsetGet(1);
+        $conditions = [];
         /** @var ObjectFieldNode $fieldNode */
-        foreach ($node->fields->getIterator() as $fieldNode) {
-            if ($fieldNode->name->value == 'field') {
-                $field = $this->context->getNodeValue($fieldNode->value);
-            } else if ($fieldNode->name->value == 'conditions') {
-                foreach ($this->context->getNodeValue($fieldNode->value) as $item) {
-                    foreach ($item as $cond => $value) {
-                        $operator = $this->getCriteriaOperator($cond, $value);
-                        $conditions[] = ['op' => $operator, 'value' => $value];
-                    }
-                }
-            }
+        foreach ($this->context->getNodeValue($conditionsNode) as $cond => $value) {
+            $operator = $this->getCriteriaOperator($cond, $value);
+            $conditions[] = ['op' => $operator, 'value' => $value];
         }
         if (is_null($field) || empty($conditions)) {
             throw new EGraphQLException(['condition' => 'Invalid where expression']);
@@ -72,7 +74,7 @@ abstract class AbstractConditionOperator extends AbstractOperation
     protected function prepareCondition(mixed $node): array
     {
         $field = $node->name->value;
-        if ($field == '_expr') {
+        if ($field == '_condition') {
             return $this->prepareExpression($node->value);
         }
         if ($node->value instanceof VariableNode) {
@@ -81,10 +83,9 @@ abstract class AbstractConditionOperator extends AbstractOperation
             $value = $var[$op];
             $operator = $this->getCriteriaOperator($op, $value);
         } else {
-            foreach ($node->value->fields->getIterator() as $entry) {
-                $value = $this->context->getNodeValue($entry->value);
-                $operator = $this->getCriteriaOperator($entry->name->value, $value);
-            }
+            $entry = $node->value->fields->offsetGet(0);
+            $value = $this->context->getNodeValue($entry->value);;
+            $operator = $this->getCriteriaOperator($entry->name->value, $value);
         }
         return [[$field, $operator, $value]];
     }
