@@ -22,6 +22,7 @@ use Orkester\GraphQL\Operator\OrderByOperator;
 use Orkester\GraphQL\Operator\WhereOperator;
 use Orkester\Manager;
 use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\ClassMap;
@@ -34,7 +35,7 @@ class QueryOperation extends AbstractOperation
     public array $operators = [];
     public bool $isPrepared = false;
     public bool $omit = false;
-    public MModelMaestro $model;
+    public MModelMaestro|MModel $model;
 
     public function __construct(ExecutionContext $context, protected FieldNode $node)
     {
@@ -42,7 +43,7 @@ class QueryOperation extends AbstractOperation
         $this->selection = new Set();
     }
 
-    public static function isAssociationReadable(MModelMaestro $model, string $name)
+    public static function isAssociationReadable(MModelMaestro|MModel $model, string $name)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['association'] ?? [])) {
             static::$authorizationCache[get_class($model)]['association'][$name] = $model->authorization->isAssociationReadable($name);
@@ -50,7 +51,7 @@ class QueryOperation extends AbstractOperation
         return static::$authorizationCache[get_class($model)]['association'][$name];
     }
 
-    public static function isAttributeReadable(MModelMaestro $model, string $name)
+    public static function isAttributeReadable(MModelMaestro|MModel $model, string $name)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['attribute'] ?? [])) {
             static::$authorizationCache[get_class($model)]['attribute'][$name] = $model->authorization->isAttributeReadable($name);
@@ -58,7 +59,7 @@ class QueryOperation extends AbstractOperation
         return static::$authorizationCache[get_class($model)]['attribute'][$name];
     }
 
-    public static function isModelReadable(MModelMaestro $model)
+    public static function isModelReadable(MModelMaestro|MModel $model)
     {
         $name = get_class($model);
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['model'] ?? [])) {
@@ -100,7 +101,7 @@ class QueryOperation extends AbstractOperation
         }
     }
 
-    public function handleAttribute(FieldNode $node, MModelMaestro $model)
+    public function handleAttribute(FieldNode $node, MModelMaestro|MModel $model)
     {
         if (!static::isAttributeReadable($model, $node->name->value)) {
             throw new EGraphQLException(["read_field_forbidden" => $node->name->value]);
@@ -131,7 +132,7 @@ class QueryOperation extends AbstractOperation
         $this->selection->add($select);
     }
 
-    public function handleAssociation(FieldNode $node, MModelMaestro $model)
+    public function handleAssociation(FieldNode $node, MModelMaestro|MModel $model)
     {
         if (!$model->getClassMap()->associationExists($node->name->value)) {
             throw new EGraphQLException(["unknown_association" => $node->name->value]);
@@ -147,7 +148,7 @@ class QueryOperation extends AbstractOperation
         $this->subOperations[$name] = $operation;
     }
 
-    public function handleSelection(SelectionSetNode $node, MModelMaestro $model)
+    public function handleSelection(SelectionSetNode $node, MModelMaestro|MModel $model)
     {
         if (is_null($node)) {
             return;
@@ -168,7 +169,7 @@ class QueryOperation extends AbstractOperation
         }
     }
 
-    public function prepare(MModelMaestro $model)
+    public function prepare(MModelMaestro|MModel $model)
     {
         if (!static::isModelReadable($model)) {
             throw new EGraphQLException(["model_read" => 'access denied']);
@@ -198,7 +199,7 @@ class QueryOperation extends AbstractOperation
         return $associationMap;
     }
 
-    public function execute(RetrieveCriteria $criteria, ?MModelMaestro $model = null): array
+    public function execute(RetrieveCriteria $criteria, null|MModelMaestro|MModel $model = null): array
     {
         if (!$this->isPrepared) {
             $this->prepare($model);
