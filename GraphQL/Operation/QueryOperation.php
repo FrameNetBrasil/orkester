@@ -29,15 +29,15 @@ use Orkester\Persistence\Map\ClassMap;
 
 class QueryOperation extends AbstractOperation
 {
-    public static $authorizationCache = [];
+    public static array $authorizationCache = [];
     public Set $selection;
     public array $subOperations = [];
     public array $operators = [];
     public bool $isPrepared = false;
-    public bool $omit = false;
+    public bool $isSingleResult = false;
     public MModelMaestro|MModel $model;
 
-    public function __construct(ExecutionContext $context, protected FieldNode $node)
+    public function __construct(ExecutionContext $context, protected FieldNode $node, protected bool $isMutationResult = false)
     {
         parent::__construct($context);
         $this->selection = new Set();
@@ -77,6 +77,12 @@ class QueryOperation extends AbstractOperation
                     $this->context->addOmitted($this->getName());
                 };
             }
+            else if ($argument->name->value == 'one') {
+                if($this->context->getNodeValue($argument->value)) {
+                    $this->isSingleResult = true;
+                };
+            }
+            if ($this->isMutationResult) continue;
             $class = match ($argument->name->value) {
                 'id' => IdOperator::class,
                 'where' => WhereOperator::class,
@@ -88,7 +94,9 @@ class QueryOperation extends AbstractOperation
                 'having' => HavingOperator::class,
                 default => null
             };
-            if (is_null($class)) continue;
+            if (is_null($class)) {
+                continue;
+            }
             /** @var AbstractOperator $operator */
             $this->operators[] = new $class($this->context, $argument->value);
         }
@@ -153,6 +161,9 @@ class QueryOperation extends AbstractOperation
         if (is_null($node)) {
             return;
         }
+        if ($this->context->includeId()) {
+            $this->selection->add("{$model->getClassMap()->getKeyAttributeName()} as id");
+        }
         foreach ($node->selections as $selection) {
             if ($selection instanceof FieldNode) {
                 if (is_null($selection->selectionSet)) {
@@ -169,14 +180,14 @@ class QueryOperation extends AbstractOperation
         }
     }
 
-    public function prepare(MModelMaestro|MModel $model)
+    public function prepare(?MModel $model)
     {
         if (!static::isModelReadable($model)) {
             throw new EGraphQLException(["model_read" => 'access denied']);
         }
-        $this->isPrepared = true;
         $this->prepareArguments($this->node->arguments);
         $this->handleSelection($this->node->selectionSet, $model);
+        $this->isPrepared = true;
     }
 
     public function getName(): string
@@ -206,12 +217,11 @@ class QueryOperation extends AbstractOperation
         }
         $shouldExcludePK = true;
         $classMap = $criteria->getClassMap();
+        $pk = $classMap->getKeyAttributeName();
         if (count($this->subOperations) > 0) {
-            $pk = $classMap->getKeyAttributeName();
             $shouldExcludePK = !$this->selection->contains($pk);
             $this->selection->add($pk);
         }
-
         $criteria->select(join(",", $this->selection->toArray()));
         $this->applyArguments($criteria);
         $rows = $criteria->asResult();
@@ -239,7 +249,7 @@ class QueryOperation extends AbstractOperation
                     throw new EGraphQLException([$cardinality => 'Unhandled cardinality']);
                 }
                 $subResult = $operation->execute($subCriteria);
-                $subResult = group_by($subResult[$operation->getName()], $fk);
+                $subResult = group_by($subResult, $fk);
                 $updatedRows = [];
                 foreach ($rows as $row) {
                     $value = $subResult[$row[$pk]] ?? [];
@@ -261,6 +271,6 @@ class QueryOperation extends AbstractOperation
                 $rows = $updatedRows;
             }
         }
-        return [$this->getName() => $rows];
+        return ($this->isSingleResult || $this->context->isSingular($this->node->name->value)) ? $rows[0] : $rows;
     }
 }

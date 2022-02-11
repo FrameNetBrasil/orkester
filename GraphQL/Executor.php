@@ -3,19 +3,16 @@
 namespace Orkester\GraphQL;
 
 use Ds\Set;
-use GraphQL\Error\SyntaxError;
 use GraphQL\Language\AST\DocumentNode;
-use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentDefinitionNode;
-use GraphQL\Language\AST\Node;
 use GraphQL\Language\AST\OperationDefinitionNode;
-use GraphQL\Language\AST\SelectionSetNode;
-use GraphQL\Language\AST\VariableNode;
 use GraphQL\Language\Parser;
+use GraphQL\Utils\BuildSchema;
 use Orkester\Exception\EGraphQLException;
 use Orkester\GraphQL\Operation\DeleteOperation;
 use Orkester\GraphQL\Operation\InsertOperation;
 use Orkester\GraphQL\Operation\QueryOperation;
+use Orkester\GraphQL\Operation\ServiceOperation;
 use Orkester\GraphQL\Operation\UpdateOperation;
 use Orkester\MVC\MModelMaestro;
 use Orkester\MVC\MModel;
@@ -30,6 +27,8 @@ class Executor
 
     protected array $queries = [];
     protected array $mutations = [];
+    protected array $services = [];
+    protected bool $isIntrospection = false;
     protected Set $aliases;
     protected array $operations = [];
 
@@ -63,15 +62,20 @@ class Executor
             return;
         }
         foreach ($definition->selectionSet->selections->getIterator() as $fieldNode) {
-            $model = $this->context->getModel($fieldNode->name->value);
-            $operation = new QueryOperation($this->context, $fieldNode);
-            $operation->prepare($model);
-            $alias = $fieldNode->alias?->value ?? $fieldNode->name->value;
-            if ($this->aliases->contains($alias)) {
-                throw new EGraphQLException(['duplicate_alias' => $alias]);
+            if ($fieldNode->name->value == '__schema' || $fieldNode->name->value == '__typename') {
+                $this->isIntrospection = true;
+                return;
+            } else {
+                $model = $this->context->getModel($fieldNode->name->value);
+                $operation = new QueryOperation($this->context, $fieldNode);
+                $operation->prepare($model);
+                $alias = $fieldNode->alias?->value ?? $fieldNode->name->value;
+                if ($this->aliases->contains($alias)) {
+                    throw new EGraphQLException(['duplicate_alias' => $alias]);
+                }
+                $this->aliases->add($alias);
+                $this->queries[$alias] = ['name' => $fieldNode->name->value, 'model' => $model, 'operation' => $operation];
             }
-            $this->aliases->add($alias);
-            $this->queries[$alias] = ['name' => $fieldNode->name->value, 'model' => $model, 'operation' => $operation];
         }
     }
 
@@ -87,21 +91,26 @@ class Executor
             'insert' => InsertOperation::class,
             'delete' => DeleteOperation::class,
             'update' => UpdateOperation::class,
+            'service' => ServiceOperation::class,
             default => null
         };
         if (is_null($operationName)) {
             throw new EGraphQLException(['unknown_mutation' => $definition->name->value]);
         }
         foreach ($definition->selectionSet->selections->getIterator() as $fieldNode) {
-            $model = $this->context->getModel($fieldNode->name->value);
-            $operation = new $operationName($this->context, $fieldNode);
-            $operation->prepare($model);
             $alias = $fieldNode->alias?->value ?? $fieldNode->name->value ?? $operationName;
             if ($this->aliases->contains($alias)) {
                 throw new EGraphQLException(['duplicate_alias' => $alias]);
             }
-            $this->aliases->add($alias);
-            $this->mutations[$alias] = ['model' => $model, 'operation' => $operation];
+            $operation = new $operationName($this->context, $fieldNode);
+            if ($operationName == ServiceOperation::class) {
+                $this->services[$alias] = $operation;
+            } else {
+                $model = $this->context->getModel($fieldNode->name->value);
+                $operation->prepare($model);
+                $this->aliases->add($alias);
+                $this->mutations[$alias] = ['model' => $model, 'operation' => $operation];
+            }
         }
     }
 
@@ -117,15 +126,49 @@ class Executor
         }
     }
 
-    public function executeQuery(string $alias, string $modelName, MModelMaestro|MModel $model, QueryOperation $operation)
+    public function executeCommands(): ?array
     {
-        $response = $operation->execute($model->getCriteria());
-        if ($this->context->isSingular($modelName)) {
-            $response = $response[$alias][0];
-        } else {
-            $response = $response[$alias];
+        $errors = [];
+        foreach ($this->queries as $alias => ['model' => $model, 'operation' => $op]) {
+            try {
+                $this->context->results[$alias] = $op->execute($model->getCriteria());
+            } catch (EGraphQLException $e) {
+                $errors[$alias] = $e->errors;
+            }
         }
-        return $response;
+        foreach ($this->mutations as $alias => ['model' => $model, 'operation' => $op]) {
+            try {
+                $this->context->results[$alias] = $op->execute($model->getCriteria());
+            } catch (EGraphQLException $e) {
+                $errors[$alias] = $e->errors;
+            }
+        }
+        foreach ($this->services as $alias => $op) {
+            try {
+                $this->context->results[$alias] = $op->execute();
+            } catch (EGraphQLException $e) {
+                $errors[$alias] = $e->errors;
+            }
+        }
+
+        if (empty($errors)) {
+            $response = [];
+            foreach ($this->context->results as $alias => $result) {
+                if (!$this->context->omitted->contains($alias)) {
+                    $response[$alias] = $result;
+                }
+            }
+            return $response;
+        }
+        throw new EGraphQLException($errors);
+    }
+
+    public function executeIntrospection(): array
+    {
+//        $contents = file_get_contents(Manager::getBasePath() . '/vendor/elymatos/orkester/GraphQL/Schema/Core.graphql');
+//        $schema = BuildSchema::build($contents);
+//        $executor = \GraphQL\Executor\Executor::execute($schema, $this->document);
+        return [];
     }
 
     public function execute()
@@ -133,20 +176,11 @@ class Executor
         if (!$this->isPrepared) {
             $this->prepare();
         }
-        foreach ($this->queries as $alias => ['name' => $name, 'model' => $model, 'operation' => $op]) {
-            $this->context->results[$alias] = $this->executeQuery($alias, $name, $model, $op);
+        if ($this->isIntrospection) {
+            return $this->executeIntrospection();
+        } else {
+            return ['data' => $this->executeCommands()];
         }
-        foreach ($this->mutations as $alias => ['model' => $model, 'operation' => $op]) {
-            $this->context->results[$alias] = $op->execute($model->getCriteria());
-        }
-
-        $response = [];
-        foreach($this->context->results as $alias => $result) {
-            if (!$this->context->ommitted->contains($alias)) {
-                $response[$alias] = $result;
-            }
-        }
-        return $response;
     }
 
 }

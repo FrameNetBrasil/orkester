@@ -5,16 +5,12 @@ namespace Orkester\GraphQL\Operation;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
-use GraphQL\Language\AST\ObjectValueNode;
 use Orkester\Exception\EDBException;
 use Orkester\Exception\EGraphQLException;
-use Orkester\Exception\EValidationException;
 use Orkester\GraphQL\ExecutionContext;
-use Orkester\GraphQL\Hook\IDeleteHook;
 use Orkester\GraphQL\Operator\IdOperator;
-use Orkester\GraphQL\Operator\SetOperator;
 use Orkester\GraphQL\Operator\WhereOperator;
-use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 
 class DeleteOperation extends AbstractOperation
 {
@@ -42,17 +38,17 @@ class DeleteOperation extends AbstractOperation
         }
     }
 
-    public function collectExistingRows(MModelMaestro $model): array
+    public function collectExistingRows(MModel $model): array
     {
         $operator = new QueryOperation($this->context, $this->root);
         $operator->operators = $this->operators;
         $operator->isPrepared = true;
 
         $pk = $model->getClassMap()->getKeyAttributeName();
-        return $operator->execute($model->getCriteria()->select($pk))[$operator->getName()];
+        return $operator->execute($model->getCriteria()->select($pk));
     }
 
-    public function execute()
+    public function execute(): ?array
     {
         $this->prepareArguments($this->root->arguments);
         $model = $this->context->getModel($this->root->name->value);
@@ -66,18 +62,10 @@ class DeleteOperation extends AbstractOperation
         foreach ($rows as $row) {
             if ($model->authorization->isEntityDeletable($row[$pk])) {
                 try {
-                    if ($model instanceof IDeleteHook) {
-                        $model->onBeforeDelete($row[$pk]);
-                    }
                     $model->delete($row[$pk]);
-                    if ($model instanceof IDeleteHook) {
-                        $model->onAfterDelete($row[$pk]);
-                    }
                 } catch(EDBException $e) {
                     merror($e->getMessage());
                     $errors[] = ["delete_{$modelName}_row" => 'constraint failed'];
-                } catch(EValidationException $e) {
-                    array_push($errors, ...$e->errors);
                 }
             } else {
                 $errors[] = ["delete_{$modelName}_row" => 'access denied'];

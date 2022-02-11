@@ -2,10 +2,8 @@
 
 namespace Orkester\GraphQL;
 
-use Composer\Package\Package;
 use Ds\Set;
 use GraphQL\Language\AST\ArgumentNode;
-use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\ListValueNode;
@@ -16,23 +14,26 @@ use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\VariableNode;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Manager;
-use Orkester\MVC\MModelMaestro;
 use Orkester\MVC\MModel;
+use Orkester\MVC\MModelMaestro;
 use Orkester\Persistence\Map\ClassMap;
 
 class ExecutionContext
 {
 
-    protected array $conf;
-    protected array $permissionsCache = [];
+    protected static array $conf;
     protected array $classMapToModelMap = [];
     public array $results = [];
-    public Set $ommitted;
+    public Set $omitted;
 
 
     public function __construct(public array $variables, public array $fragments = [])
     {
-        $this->ommitted = new Set();
+        $this->omitted = new Set();
+        if (empty(static::$conf)) {
+            static::$conf = require Manager::getConfPath() . '/graphql.php';
+        }
+
     }
 
     public function getArgumentValueNode(FieldNode $root, string $name): ?Node
@@ -67,12 +68,12 @@ class ExecutionContext
         return $result;
     }
 
-
     protected function getPHPValue(Node $node): mixed
     {
         return match ($node->kind) {
             NodeKind::BOOLEAN => boolval($node->value),
             NodeKind::INT => intval($node->value),
+            NodeKind::NULL => null,
             default => $this->getStringValue($node->value)
         };
     }
@@ -102,21 +103,16 @@ class ExecutionContext
 
     public function getModelName(string $name): ?string
     {
-        if ($modelName = $this->conf['models'][$name] ?? false) {
+        if ($modelName = static::$conf['models'][$name] ?? false) {
             return $modelName;
         }
-        return $this->conf['models'][$this->conf['singular'][$name] ?? null] ?? null;
+        return static::$conf['models'][static::$conf['singular'][$name] ?? null] ?? null;
     }
 
     public function getModel(string|ClassMap $nameOrClassMap): null|MModelMaestro|MModel
     {
         if ($nameOrClassMap instanceof ClassMap) {
-            mfatal($nameOrClassMap->getTableName());
-            mdump(get_class($this->classMapToModelMap[get_class($nameOrClassMap)] ));
             return $this->classMapToModelMap[get_class($nameOrClassMap)] ?? null;
-        }
-        if (empty($this->conf)) {
-            $this->conf = require Manager::getConfPath() . '/graphql.php';
         }
         $modelName = $this->getModelName($nameOrClassMap);
         if (empty($modelName)) {
@@ -127,19 +123,35 @@ class ExecutionContext
         return $model;
     }
 
+    public function getCallableService(string $name): ?string
+    {
+        if ($callable = static::$conf['services'][$name] ?? false) {
+            return $callable;
+        }
+        else if ($callable = static::$conf['serviceResolver']($name)) {
+            return $callable;
+        }
+        return null;
+    }
+
     public function isSingular(string $name): bool
     {
-        return array_key_exists($name, $this->conf['singular']);
+        return array_key_exists($name, static::$conf['singular']);
+    }
+
+    public function includeId(): bool
+    {
+        return static::$conf['includeId'] ?? false;
     }
 
     public function allowBatchUpdate(): bool
     {
-        return $this->conf['allowBatchUpdate'] ?? false;
+        return static::$conf['allowBatchUpdate'] ?? false;
     }
 
     public function addOmitted($alias)
     {
-        $this->ommitted->add($alias);
+        $this->omitted->add($alias);
     }
 
     public function getFragment($name): ?FragmentDefinitionNode

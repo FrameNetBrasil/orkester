@@ -3,10 +3,8 @@
 namespace Orkester\GraphQL\Operation;
 
 use GraphQL\Language\AST\ObjectFieldNode;
-use GraphQL\Language\AST\ObjectValueNode;
 use Orkester\GraphQL\ExecutionContext;
-use Orkester\GraphQL\Hook\IFieldValidator;
-use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 
@@ -19,7 +17,7 @@ class WriteOperation
     {
     }
 
-    public static function isAssociationWritable(MModelMaestro $model, string $name, ?object $object)
+    public static function isAssociationWritable(MModel $model, string $name, ?object $object)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)]??['association']??[])) {
             static::$authorizationCache[get_class($model)]['association'][$name] = $model->authorization->isAssociationWritable($name, $object);
@@ -27,7 +25,7 @@ class WriteOperation
         return static::$authorizationCache[get_class($model)]['association'][$name];
     }
 
-    public static function isAttributeWritable(MModelMaestro $model, string $name, ?object $object)
+    public static function isAttributeWritable(MModel $model, string $name, ?object $object)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)]??['attribute']??[])) {
             static::$authorizationCache[get_class($model)]['attribute'][$name] = $model->authorization->isAttributeWritable($name, $object);
@@ -35,29 +33,23 @@ class WriteOperation
         return static::$authorizationCache[get_class($model)]['attribute'][$name];
     }
 
-    protected function handleAssociation(MModelMaestro $model, AssociationMap $associationMap, mixed &$value, array &$errors)
+    protected function handleAssociation(MModel $model, AssociationMap $associationMap, array &$errors)
     {
         $name = $associationMap->getName();
         if (!static::isAssociationWritable($model, $name, $this->currentObject)) {
             $errors[] = ["association_write_denied" => $name];
-        } else if ($model instanceof IFieldValidator) {
-            $model->validateField($name, $value, $errors);
         }
-        return $value;
     }
 
-    protected function handleAttribute(MModelMaestro $model, AttributeMap $attributeMap, mixed &$value, array &$errors): mixed
+    protected function handleAttribute(MModel $model, AttributeMap $attributeMap, array &$errors)
     {
         $name = $attributeMap->getName();
         if (!static::isAttributeWritable($model, $name, $this->currentObject)) {
             $errors[] = ["attribute_write_denied" => $name];
-        } else if ($model instanceof IFieldValidator) {
-            $model->validateField($name, $value, $errors);
         }
-        return $value;
     }
 
-    public function createEntityArray(array $values, MModelMaestro $model, array &$errors): ?array
+    public function createEntityArray(array $values, MModel $model, array &$errors): ?array
     {
         $classMap = $model->getClassMap();
         $entity = [];
@@ -68,12 +60,14 @@ class WriteOperation
                     $errors[] = ["pk_not_writable" => $attributeMap->getName()];
                 } else if ($attributeMap->getKeyType() == 'foreign') {
                     $associationMap = array_find($classMap->getAssociationMaps(), fn($map) => $map->getFromKey() == $attributeMap->getName());
-                    $entity[$name] = $this->handleAssociation($model, $associationMap, $value, $errors);
+                     $this->handleAssociation($model, $associationMap, $errors);
                 } else {
-                    $entity[$name] = $this->handleAttribute($model, $attributeMap, $value, $errors);
+                    $this->handleAttribute($model, $attributeMap, $errors);
                 }
+                $entity[$name] = $value;
             } else if ($associationMap = $classMap->getAssociationMap($name)) {
-                $entity[$associationMap->getFromKey()] = $this->handleAssociation($model, $associationMap, $value, $errors);
+                $this->handleAssociation($model, $associationMap, $errors);
+                $entity[$associationMap->getFromKey()] = $value;
             } else {
                 $errors[] = ["attribute_not_found" => $name];
             }
