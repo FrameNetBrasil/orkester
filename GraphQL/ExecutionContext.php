@@ -17,6 +17,7 @@ use GraphQL\Language\AST\VariableNode;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Manager;
 use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 use Orkester\Persistence\Map\ClassMap;
 
 class ExecutionContext
@@ -107,7 +108,7 @@ class ExecutionContext
         return $this->conf['models'][$this->conf['singular'][$name] ?? null] ?? null;
     }
 
-    public function getModel(string|ClassMap $nameOrClassMap): ?MModelMaestro
+    public function getModel(string|ClassMap $nameOrClassMap): null|MModelMaestro|MModel
     {
         if ($nameOrClassMap instanceof ClassMap) {
             mfatal($nameOrClassMap->getTableName());

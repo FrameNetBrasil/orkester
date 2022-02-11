@@ -18,6 +18,7 @@ use Orkester\GraphQL\Operation\InsertOperation;
 use Orkester\GraphQL\Operation\QueryOperation;
 use Orkester\GraphQL\Operation\UpdateOperation;
 use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 
 class Executor
 {
@@ -116,7 +117,7 @@ class Executor
         }
     }
 
-    public function executeQuery(string $alias, string $modelName, MModelMaestro $model, QueryOperation $operation)
+    public function executeQuery(string $alias, string $modelName, MModelMaestro|MModel $model, QueryOperation $operation)
     {
         $response = $operation->execute($model->getCriteria());
         if ($this->context->isSingular($modelName)) {
