@@ -34,7 +34,7 @@ class MGraphQLController
             $content = ['error' => ['internal_server_error' => '']];
             $httpCode = 400;
         }
-        return $this->send(json_encode($content), $httpCode);
+        return $this->send(empty($content) ? '' : json_encode($content), $httpCode);
     }
 
     protected function send(string $content, int $httpCode = 200): Response

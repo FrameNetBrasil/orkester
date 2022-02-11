@@ -154,6 +154,11 @@ class ExecutionContext
         $this->omitted->add($alias);
     }
 
+    public function getModelTypename(MModel $model): string
+    {
+        return str_replace('\\', '_', get_class($model));
+    }
+
     public function getFragment($name): ?FragmentDefinitionNode
     {
         /** @var FragmentDefinitionNode $fragment */

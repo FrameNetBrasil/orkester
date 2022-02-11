@@ -35,6 +35,8 @@ class QueryOperation extends AbstractOperation
     public array $operators = [];
     public bool $isPrepared = false;
     public bool $isSingleResult = false;
+    public bool $includeTypename = false;
+    public string $typename = '';
     public MModelMaestro|MModel $model;
 
     public function __construct(ExecutionContext $context, protected FieldNode $node, protected bool $isMutationResult = false)
@@ -73,12 +75,11 @@ class QueryOperation extends AbstractOperation
         /** @var ArgumentNode $argument */
         foreach ($arguments->getIterator() as $argument) {
             if ($argument->name->value == 'omit') {
-                if($this->context->getNodeValue($argument->value)) {
+                if ($this->context->getNodeValue($argument->value)) {
                     $this->context->addOmitted($this->getName());
                 };
-            }
-            else if ($argument->name->value == 'one') {
-                if($this->context->getNodeValue($argument->value)) {
+            } else if ($argument->name->value == 'one') {
+                if ($this->context->getNodeValue($argument->value)) {
                     $this->isSingleResult = true;
                 };
             }
@@ -164,12 +165,17 @@ class QueryOperation extends AbstractOperation
         if ($this->context->includeId()) {
             $this->selection->add("{$model->getClassMap()->getKeyAttributeName()} as id");
         }
+        /** @var FieldNode $selection */
         foreach ($node->selections as $selection) {
             if ($selection instanceof FieldNode) {
-                if (is_null($selection->selectionSet)) {
-                    $this->handleAttribute($selection, $model);
+                if ($selection->name->value == '__typename') {
+                    $this->includeTypename = true;
                 } else {
-                    $this->handleAssociation($selection, $model);
+                    if (is_null($selection->selectionSet)) {
+                        $this->handleAttribute($selection, $model);
+                    } else {
+                        $this->handleAssociation($selection, $model);
+                    }
                 }
             } else if ($selection instanceof FragmentSpreadNode) {
                 $fragment = $this->context->getFragment($selection->name->value);
@@ -188,6 +194,7 @@ class QueryOperation extends AbstractOperation
         $this->prepareArguments($this->node->arguments);
         $this->handleSelection($this->node->selectionSet, $model);
         $this->isPrepared = true;
+        $this->typename = $this->context->getModelTypename($model);
     }
 
     public function getName(): string
@@ -229,6 +236,12 @@ class QueryOperation extends AbstractOperation
         if (count($this->subOperations) > 0) {
             $ids = array_map(fn($row) => $row[$pk], $rows);
         }
+        if ($this->includeTypename) {
+            foreach ($rows as &$row) {
+                $row['__typename'] = $this->typename;
+            }
+        }
+
         foreach ($this->subOperations as $associationName => $operation) {
             if ($associationMap = $classMap->getAssociationMap($associationName)) {
                 $toClassMap = $associationMap->getToClassMap();
