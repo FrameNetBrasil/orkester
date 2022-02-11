@@ -2,6 +2,7 @@
 
 namespace Orkester\Persistence\Map;
 
+use Closure;
 use Orkester\Manager;
 use Orkester\Types\MType;
 
@@ -24,6 +25,7 @@ class AttributeMap
     private $idGenerator;
     private $db;
     private $platform;
+    private string|Closure|null $validator;
 
     public function __construct($name, $classMap)
     {
@@ -117,9 +119,24 @@ class AttributeMap
         return $this->converter;
     }
 
+    public function setValidator(mixed $validator)
+    {
+        $this->validator = $validator;
+    }
+
+    public function getValidator()
+    {
+        return $this->validator;
+    }
+
     public function setDefault(mixed $default)
     {
         $this->default = $default;
+    }
+
+    public function getDefault()
+    {
+        return $this->default;
     }
 
     public function setValue($object, $value)

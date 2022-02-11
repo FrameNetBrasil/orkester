@@ -5,11 +5,11 @@ namespace Orkester\GraphQL\Operation;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\ObjectValueNode;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EValidationException;
 use Orkester\GraphQL\ExecutionContext;
-use Orkester\GraphQL\Hook\IInsertHook;
-use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 
-class InsertOperation extends AbstractOperation
+class InsertOperation extends AbstractMutationOperation
 {
 
     protected WriteOperation $writer;
@@ -20,20 +20,7 @@ class InsertOperation extends AbstractOperation
         $this->writer = new WriteOperation($this->context);
     }
 
-    public function createSelectionResult(MModelMaestro $model, ?QueryOperation $operation, object|array $object)
-    {
-        if (is_null($operation)) {
-            return null;
-        }
-        $pk = $model->getClassMap()->getKeyAttributeName();
-        $ids = is_array($object) ? array_map(fn($o) => $o->$pk, $object) : [$object->$pk];
-        $criteria = $model->getCriteria()->where($pk, 'IN', $ids);
-        $name = $operation->getName();
-        $r = $operation->execute($criteria);
-        return is_array($object) ? $r[$name] : $r[$name][0];
-    }
-
-    public function insertSingle(MModelMaestro $model, ObjectValueNode $node, ?QueryOperation $operation, array &$errors): ?object
+    public function insertSingle(MModel $model, ObjectValueNode $node, array &$errors): ?object
     {
         $value = $this->context->getNodeValue($node);
         $data = $this->writer->createEntityArray($value, $model, $errors);
@@ -41,19 +28,8 @@ class InsertOperation extends AbstractOperation
             return null;
         }
         $object = (object)$data;
-        if ($model instanceof IInsertHook) {
-            $model->onBeforeInsert($object);
-        }
         $model->save($object);
-        if ($model instanceof IInsertHook) {
-            $model->onAfterInsert($object);
-        }
         return $object;
-    }
-
-    public function prepare()
-    {
-
     }
 
     function execute(): ?array
@@ -66,16 +42,20 @@ class InsertOperation extends AbstractOperation
         if (!$model->authorization->isModelWritable()) {
             throw new EGraphQLException(["insert_$modelName" => 'access denied']);
         }
-
-        $queryOperation = null;
+        $result = null;
+        $pk = $model->getClassMap()->getKeyAttributeName();
         if (!is_null($this->root->selectionSet)) {
             $queryOperation = new QueryOperation($this->context, $this->root);
             $queryOperation->prepare($model);
         }
         if ($objectNode) {
-            $object = $this->insertSingle($model, $objectNode, $queryOperation, $errors);
-            if ($object) {
-                $result = $this->createSelectionResult($model, $queryOperation, $object);
+            try {
+                $object = $this->insertSingle($model, $objectNode, $errors);
+                if ($object) {
+                    $result = $this->createSelectionResult($model, $this->root, [$object->$pk], true);
+                }
+            } catch(EValidationException $e) {
+                $errors[] = $this->handleValidationErrors($e->errors);
             }
         } else {
             $objects = [];
@@ -85,10 +65,15 @@ class InsertOperation extends AbstractOperation
             } else {
                 /** @var ObjectValueNode $objectValueNode */
                 foreach ($objectListNode->values as $objectValueNode) {
-                    $objects[] = $this->insertSingle($model, $objectValueNode, $queryOperation, $errors);
+                    try {
+                        $objects[] = $this->insertSingle($model, $objectValueNode, $errors);
+                    } catch(EValidationException $e) {
+                        $errors[] = $this->handleValidationErrors($e->errors);
+                    }
                 }
             }
-            $result = $this->createSelectionResult($model, $queryOperation, $objects);
+            $ids = array_map(fn($o) => $o->$pk, $objects);
+            $result = $this->createSelectionResult($model, $this->root, $ids, $this->context->isSingular($modelName));
         }
         if (!empty($errors)) {
             throw new EGraphQLException($errors);

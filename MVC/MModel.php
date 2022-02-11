@@ -7,6 +7,7 @@ use Orkester\Exception\EOrkesterException;
 use Orkester\Exception\ESecurityException;
 use Orkester\Exception\EValidationException;
 use Orkester\Manager;
+use Orkester\Persistence\IAttributeValidator;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Criteria\DeleteCriteria;
@@ -102,7 +103,48 @@ class MModel
     public static function save(object $object, ClassMap $classMap = null): int
     {
         $classMap = $classMap ?? static::getClassMap();
-        return Manager::getPersistentManager()->saveObject($classMap, $object);
+        $errors = [];
+        /** @var AttributeMap $attributeMap */
+        foreach($classMap->getAttributesMap() as $attributeMap) {
+            try {
+                $value = $object->{$attributeMap->getName()} ?? null;
+                if ($validator = $attributeMap->getValidator()) {
+                    if(is_callable($validator)) {
+                        $validator($value);
+                    }
+                    $object->{$attributeMap->getName()} = $value;
+                }
+                if (is_null($value) && ($default = $attributeMap->getDefault())) {
+                    if (is_callable($default)) {
+                        $default($value);
+                    }
+                    else {
+                        $value = $default;
+                    }
+                }
+                if (is_null($value) && !$attributeMap->isNullable()) {
+                    throw new EValidationException([$attributeMap->getName() => 'attribute_not_nullable']);
+                }
+                $object->{$attributeMap->getName()} = $value;
+            } catch(EValidationException $e) {
+                $errors[] = $e->errors;
+            }
+        }
+        if (!empty($errors)) {
+            throw new EValidationException($errors);
+        }
+        static::beforeSave($object);
+        $pk = Manager::getPersistentManager()->saveObject($classMap, $object);
+        static::afterSave($object, $pk);
+        return $pk;
+    }
+
+    public static function beforeSave(object $object)
+    {
+    }
+
+    public static function afterSave(object $object, int $pk)
+    {
     }
 
     public static function delete(int $id): void

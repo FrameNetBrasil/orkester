@@ -5,7 +5,7 @@ namespace Orkester\JsonApi;
 
 
 use Orkester\Manager;
-use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 use Orkester\MVC\MModel;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\AssociationMap;
@@ -15,7 +15,7 @@ class Retrieve
 {
 
     public static function process(
-        MModelMaestro|MModel $model,
+        MModel|MModel $model,
         ?int          $id, //{resource}/{id}
         ?string       $association, //{resource}/{id}/{association}
         ?string       $relationship, //{resource}/relationships/{relationship}
@@ -151,7 +151,7 @@ class Retrieve
     }
 
     public static function buildCriteria(
-        MModelMaestro|MModel $model,
+        MModel|MModel $model,
         string        $select,
         ?string       $sort,
         ?array        $filter,

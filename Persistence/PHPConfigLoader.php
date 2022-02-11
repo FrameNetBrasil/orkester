@@ -3,7 +3,7 @@
 namespace Orkester\Persistence;
 
 use Orkester\Manager;
-use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
@@ -19,7 +19,7 @@ class PHPConfigLoader extends PersistentConfigLoader
     public function getSignature(string $className)
     {
         $class = $className;
-        /** @var MModelMaestro $class */
+        /** @var MModel $class */
         $map = $class::$map;
         return md5($className . serialize($map));
     }
@@ -27,7 +27,7 @@ class PHPConfigLoader extends PersistentConfigLoader
     public function getMap(string $className): array
     {
         $class = $className;
-        /** @var MModelMaestro $class */
+        /** @var MModel $class */
         $this->phpMaps[$className] = $class::$ORMMap;
         return $this->phpMaps[$className];
     }
@@ -35,7 +35,7 @@ class PHPConfigLoader extends PersistentConfigLoader
     public function getClassMap(string $className): ?ClassMap
     {
         $this->className = $className;
-        /** @var MModelMaestro $className array */
+        /** @var MModel $className array */
         $map = $className::getMap();
         //mdump($map);
         $this->classMap = new ClassMap($this->className);
@@ -117,7 +117,8 @@ class PHPConfigLoader extends PersistentConfigLoader
         $attributeMap->setKeyType($key);
         $attributeMap->setIdGenerator($attr['idgenerator'] ?? null);
         $attributeMap->setDefault($attr['default'] ?? null);
-        $attributeMap->setNullable($attr['nullable'] ?? false);
+        $attributeMap->setNullable($attr['nullable'] ?? true);
+        $attributeMap->setValidator($attr['validator'] ?? null);
         $this->classMap->addAttributeMap($attributeMap);
     }
 

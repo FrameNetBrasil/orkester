@@ -6,14 +6,15 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EValidationException;
 use Orkester\GraphQL\ExecutionContext;
 use Orkester\GraphQL\Hook\IUpdateHook;
 use Orkester\GraphQL\Operator\IdOperator;
 use Orkester\GraphQL\Operator\SetOperator;
 use Orkester\GraphQL\Operator\WhereOperator;
-use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 
-class UpdateOperation extends AbstractOperation
+class UpdateOperation extends AbstractMutationOperation
 {
     protected array $operators = [];
     protected array $set;
@@ -31,13 +32,11 @@ class UpdateOperation extends AbstractOperation
         foreach ($arguments->getIterator() as $argument) {
             if ($argument->name->value == 'set') {
                 $this->set = $this->context->getNodeValue($argument->value);
-            }
-            else if ($argument->name->value == 'batch') {
+            } else if ($argument->name->value == 'batch') {
                 if ($this->context->allowBatchUpdate() && $this->context->getNodeValue($argument->value)) {
                     $this->batch = true;
                 }
-            }
-            else {
+            } else {
                 $class = match ($argument->name->value) {
                     'where' => WhereOperator::class,
                     'id' => IdOperator::class,
@@ -50,22 +49,27 @@ class UpdateOperation extends AbstractOperation
         }
     }
 
-    public function collectExistingRows(MModelMaestro $model): array
+    public function collectExistingRows(MModel $model): array
     {
         $operator = new QueryOperation($this->context, $this->root);
         $operator->operators = $this->operators;
         $operator->isPrepared = true;
 
-        return $operator->execute($model->getCriteria()->select('*'))[$operator->getName()];
+        return $operator->execute($model->getCriteria()->select('*'));
     }
 
-    public function execute()
+    public function prepare(?MModel $model)
     {
-        if (empty($this->set)) {
-            $this->prepareArguments($this->root->arguments);
-        }
+        $this->prepareArguments($this->root->arguments);
+    }
+
+    public function execute(): ?array
+    {
         $modelName = $this->root->name->value;
         $model = $this->context->getModel($modelName);
+        if (empty($this->set)) {
+            $this->prepare($model);
+        }
         if (!$model->authorization->isModelWritable()) {
             throw new EGraphQLException(["write_$modelName" => 'access denied']);
         }
@@ -76,11 +80,12 @@ class UpdateOperation extends AbstractOperation
         $modified = [];
 
         $errors = [];
-        foreach($rows as $row) {
-            $writer->currentObject = (object) $row;
+        foreach ($rows as $row) {
+            $currentRowObject = (object)$row;
+            $writer->currentObject = $currentRowObject;
             $values = $writer->createEntityArray($this->set, $model, $errors);
             if (!empty($values)) {
-                $modified[] = (object)array_merge($row, $values);
+                $modified[] = [(object)array_merge($row, $values), $currentRowObject];
             }
         }
         if (!empty($errors)) {
@@ -89,18 +94,24 @@ class UpdateOperation extends AbstractOperation
 
         $pk = $model->getClassMap()->getKeyAttributeName();
         $modifiedKeys = [];
-        foreach($modified as $mod) {
+        $errors = [];
+        foreach ($modified as [$new, $old]) {
             if ($model instanceof IUpdateHook) {
-                $model->onBeforeUpdate($mod);
+                $model->onBeforeUpdate($new, $old);
             }
-            $modifiedKeys[] = $mod->$pk;
-            $model->save($mod);
+            $modifiedKeys[] = $new->$pk;
+            try {
+                $model->save($new);
+            } catch (EValidationException $e) {
+                $errors[] = $this->handleValidationErrors($e->errors);
+            }
             if ($model instanceof IUpdateHook) {
-                $model->onAfterUpdate($mod);
+                $model->onAfterUpdate($new, $old);
             }
         }
-
-        $operation = new QueryOperation($this->context, $this->root);
-        return $operation->execute($model->getCriteria()->where($pk, 'IN', $modifiedKeys), $model);
+        if (!empty($errors)) {
+            throw new EGraphQLException($errors);
+        }
+        return $this->createSelectionResult($model, $this->root, $modifiedKeys, $this->context->isSingular($modelName));
     }
 }
