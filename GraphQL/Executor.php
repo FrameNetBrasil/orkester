@@ -179,7 +179,8 @@ class Executor
         if ($this->isIntrospection) {
             return $this->executeIntrospection();
         } else {
-            return ['data' => $this->executeCommands()];
+            $result = $this->executeCommands();
+            return empty($result) ? null : ['data' => $result];
         }
     }
 
