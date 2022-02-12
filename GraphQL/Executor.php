@@ -2,13 +2,20 @@
 
 namespace Orkester\GraphQL;
 
+use DI\DependencyException;
+use DI\NotFoundException;
 use Ds\Set;
+use GraphQL\Error\SyntaxError;
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\OperationDefinitionNode;
 use GraphQL\Language\Parser;
 use GraphQL\Utils\BuildSchema;
+use JetBrains\PhpStorm\ArrayShape;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLForbiddenException;
+use Orkester\Exception\EGraphQLNotFoundException;
+use Orkester\Exception\EGraphQLValidationException;
 use Orkester\GraphQL\Operation\DeleteOperation;
 use Orkester\GraphQL\Operation\InsertOperation;
 use Orkester\GraphQL\Operation\QueryOperation;
@@ -25,10 +32,8 @@ class Executor
     protected ExecutionContext $context;
     public bool $isPrepared = false;
 
-    protected array $queries = [];
-    protected array $mutations = [];
     protected array $services = [];
-    protected bool $isIntrospection = false;
+//    protected bool $isIntrospection = false;
     protected Set $aliases;
     protected array $operations = [];
 
@@ -39,6 +44,13 @@ class Executor
         $this->aliases = new Set();
     }
 
+    /**
+     * @throws EGraphQLException
+     * @throws EGraphQLNotFoundException
+     * @throws SyntaxError
+     * @throws \DI\DependencyException
+     * @throws \DI\NotFoundException
+     */
     public function prepare()
     {
         $this->document = Parser::parse($this->query);
@@ -56,29 +68,36 @@ class Executor
     }
 
 
+    /**
+     * @throws EGraphQLException
+     * @throws EGraphQLNotFoundException
+     * @throws \DI\NotFoundException
+     * @throws \DI\DependencyException
+     */
     public function prepareQueries(OperationDefinitionNode $definition)
     {
         if (is_null($definition->selectionSet)) {
             return;
         }
         foreach ($definition->selectionSet->selections->getIterator() as $fieldNode) {
-            if ($fieldNode->name->value == '__schema' || $fieldNode->name->value == '__typename') {
-                $this->isIntrospection = true;
-                return;
-            } else {
-                $model = $this->context->getModel($fieldNode->name->value);
-                $operation = new QueryOperation($this->context, $fieldNode);
-                $operation->prepare($model);
-                $alias = $fieldNode->alias?->value ?? $fieldNode->name->value;
-                if ($this->aliases->contains($alias)) {
-                    throw new EGraphQLException(['duplicate_alias' => $alias]);
-                }
-                $this->aliases->add($alias);
-                $this->queries[$alias] = ['name' => $fieldNode->name->value, 'model' => $model, 'operation' => $operation];
+            $alias = $fieldNode->alias?->value ?? $fieldNode->name->value;
+            if ($this->aliases->contains($alias)) {
+                throw new EGraphQLException(['duplicate_alias' => $alias]);
             }
+            $this->aliases->add($alias);
+
+            $model = $this->context->getModel($fieldNode->name->value);
+            $operation = new QueryOperation($this->context, $fieldNode);
+            $this->operations[$alias] = ['name' => $fieldNode->name->value, 'model' => $model, 'operation' => $operation];
         }
     }
 
+    /**
+     * @throws EGraphQLException
+     * @throws EGraphQLNotFoundException
+     * @throws \DI\NotFoundException
+     * @throws \DI\DependencyException
+     */
     public function prepareMutations(OperationDefinitionNode $definition)
     {
         if (is_null($definition->selectionSet)) {
@@ -95,25 +114,30 @@ class Executor
             default => null
         };
         if (is_null($operationName)) {
-            throw new EGraphQLException(['unknown_mutation' => $definition->name->value]);
+            throw new EGraphQLException([$definition->name->value => 'unknown_operation']);
         }
         foreach ($definition->selectionSet->selections->getIterator() as $fieldNode) {
             $alias = $fieldNode->alias?->value ?? $fieldNode->name->value ?? $operationName;
             if ($this->aliases->contains($alias)) {
-                throw new EGraphQLException(['duplicate_alias' => $alias]);
+                throw new EGraphQLException([$alias => 'duplicate_alias']);
             }
             $operation = new $operationName($this->context, $fieldNode);
             if ($operationName == ServiceOperation::class) {
                 $this->services[$alias] = $operation;
             } else {
                 $model = $this->context->getModel($fieldNode->name->value);
-                $operation->prepare($model);
                 $this->aliases->add($alias);
-                $this->mutations[$alias] = ['model' => $model, 'operation' => $operation];
+                $this->operations[$alias] = ['model' => $model, 'operation' => $operation];
             }
         }
     }
 
+    /**
+     * @throws EGraphQLException
+     * @throws EGraphQLNotFoundException
+     * @throws \DI\DependencyException
+     * @throws \DI\NotFoundException
+     */
     public function prepareOperations()
     {
         /** @var OperationDefinitionNode $definition */
@@ -126,61 +150,75 @@ class Executor
         }
     }
 
+    #[ArrayShape(['data' => "array", 'errors' => "array"])]
     public function executeCommands(): ?array
     {
         $errors = [];
-        foreach ($this->queries as $alias => ['model' => $model, 'operation' => $op]) {
+        foreach ($this->operations as $alias => ['model' => $model, 'operation' => $op]) {
             try {
+                $op->prepare($model);
                 $this->context->results[$alias] = $op->execute($model->getCriteria());
+            } catch (EGraphQLNotFoundException $e) {
+                $errors[$alias]['not_found'] = $e->errors;
+            } catch (EGraphQLForbiddenException $e) {
+                $errors[$alias]['forbidden'] = $e->errors;
+            } catch (EGraphQLValidationException $e) {
+                $errors[$alias]['validation'] = $e->errors;
             } catch (EGraphQLException $e) {
-                $errors[$alias] = $e->errors;
-            }
-        }
-        foreach ($this->mutations as $alias => ['model' => $model, 'operation' => $op]) {
-            try {
-                $this->context->results[$alias] = $op->execute($model->getCriteria());
-            } catch (EGraphQLException $e) {
-                $errors[$alias] = $e->errors;
+                $errors[$alias]['meta'] = $e->errors;
+            } catch (\Exception) {
+                $errors[$alias]['server'] = 'internal_server_error';
             }
         }
         foreach ($this->services as $alias => $op) {
             try {
                 $this->context->results[$alias] = $op->execute();
+            } catch (EGraphQLNotFoundException $e) {
+                $errors[$alias]['not_found'] = $e->errors;
+            } catch (EGraphQLForbiddenException $e) {
+                $errors[$alias]['forbidden'] = $e->errors;
+            } catch (EGraphQLValidationException $e) {
+                $errors[$alias]['validation'] = $e->errors;
             } catch (EGraphQLException $e) {
-                $errors[$alias] = $e->errors;
+                $errors[$alias]['meta'] = $e->errors;
+            } catch (\Exception) {
+                $errors[$alias]['server'] = 'internal_server_error';
             }
         }
 
-        if (empty($errors)) {
-            $response = [];
-            foreach ($this->context->results as $alias => $result) {
-                if (!$this->context->omitted->contains($alias)) {
-                    $response[$alias] = $result;
-                }
+        $response = [];
+        foreach ($this->context->results as $alias => $result) {
+            if (!$this->context->omitted->contains($alias)) {
+                $response[$alias] = $result;
             }
-            return $response;
         }
-        throw new EGraphQLException($errors);
+        return ['data' => $response, 'errors' => $errors];
     }
 
-    public function executeIntrospection(): array
-    {
+//    public function executeIntrospection(): array
+//    {
 //        $contents = file_get_contents(Manager::getBasePath() . '/vendor/elymatos/orkester/GraphQL/Schema/Core.graphql');
 //        $schema = BuildSchema::build($contents);
 //        $executor = \GraphQL\Executor\Executor::execute($schema, $this->document);
-        return [];
-    }
+//        return [];
+//    }
 
-    public function execute()
+    #[ArrayShape(['data' => "array", 'errors' => "array"])]
+    public function execute(): ?array
     {
-        if (!$this->isPrepared) {
-            $this->prepare();
-        }
-        if ($this->isIntrospection) {
-            return $this->executeIntrospection();
-        } else {
-            $result = $this->executeCommands();
-            return empty($result) ? null : ['data' => $result];
+        try {
+            if (!$this->isPrepared) {
+                $this->prepare();
+            }
+            return $this->executeCommands();
+        } catch (SyntaxError $e) {
+            return ['data' => null, 'errors' => ['$meta' => ['syntax_error' => $e->getMessage()]]];
+        } catch(EGraphQLNotFoundException $e) {
+            return ['data' => null, 'errors' => ['$meta' => ['not_found' => $e->errors]]];
+        } catch (EGraphQLException $e) {
+            return ['data' => null, 'errors' => ['$meta' => ['execution_error' => $e->errors]]];
+        } catch (DependencyException | NotFoundException $e) {
+            return ['data' => null, 'errors' => ['$meta' => ['internal_error' => 'failed instantiating model']]];
         }
     }
 

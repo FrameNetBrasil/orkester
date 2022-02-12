@@ -3,7 +3,8 @@
 namespace Orkester\GraphQL\Operation;
 
 use GraphQL\Language\AST\ObjectFieldNode;
-use Orkester\GraphQL\ExecutionContext;
+use Orkester\Exception\EGraphQLForbiddenException;
+use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\MVC\MModel;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
@@ -12,10 +13,7 @@ class WriteOperation
 {
     public ?object $currentObject = null;
 
-    public static $authorizationCache = [];
-    public function __construct(protected ExecutionContext $context, bool $isInsert = true)
-    {
-    }
+    public static array $authorizationCache = [];
 
     public static function isAssociationWritable(MModel $model, string $name, ?object $object)
     {
@@ -33,23 +31,32 @@ class WriteOperation
         return static::$authorizationCache[get_class($model)]['attribute'][$name];
     }
 
-    protected function handleAssociation(MModel $model, AssociationMap $associationMap, array &$errors)
+    /**
+     * @throws EGraphQLForbiddenException
+     */
+    protected function handleAssociation(MModel $model, AssociationMap $associationMap)
     {
         $name = $associationMap->getName();
         if (!static::isAssociationWritable($model, $name, $this->currentObject)) {
-            $errors[] = ["association_write_denied" => $name];
+            throw new EGraphQLForbiddenException($name, 'association_write');
         }
     }
 
-    protected function handleAttribute(MModel $model, AttributeMap $attributeMap, array &$errors)
+    /**
+     * @throws EGraphQLForbiddenException
+     */
+    protected function handleAttribute(MModel $model, AttributeMap $attributeMap)
     {
         $name = $attributeMap->getName();
         if (!static::isAttributeWritable($model, $name, $this->currentObject)) {
-            $errors[] = ["attribute_write_denied" => $name];
+            throw new EGraphQLForbiddenException($name, 'attribute_write');
         }
     }
 
-    public function createEntityArray(array $values, MModel $model, array &$errors): ?array
+    /**
+     * @throws EGraphQLForbiddenException|EGraphQLNotFoundException
+     */
+    public function createEntityArray(array $values, MModel $model): ?array
     {
         $classMap = $model->getClassMap();
         $entity = [];
@@ -57,19 +64,19 @@ class WriteOperation
         foreach ($values as $name => $value) {
             if ($attributeMap = $classMap->getAttributeMap($name)) {
                 if ($attributeMap->getKeyType() == 'primary') {
-                    $errors[] = ["pk_not_writable" => $attributeMap->getName()];
+                    throw new EGraphQLForbiddenException($attributeMap->getName(), 'pk_write');
                 } else if ($attributeMap->getKeyType() == 'foreign') {
                     $associationMap = array_find($classMap->getAssociationMaps(), fn($map) => $map->getFromKey() == $attributeMap->getName());
-                     $this->handleAssociation($model, $associationMap, $errors);
+                     $this->handleAssociation($model, $associationMap);
                 } else {
-                    $this->handleAttribute($model, $attributeMap, $errors);
+                    $this->handleAttribute($model, $attributeMap);
                 }
                 $entity[$name] = $value;
             } else if ($associationMap = $classMap->getAssociationMap($name)) {
-                $this->handleAssociation($model, $associationMap, $errors);
+                $this->handleAssociation($model, $associationMap);
                 $entity[$associationMap->getFromKey()] = $value;
             } else {
-                $errors[] = ["attribute_not_found" => $name];
+                throw new EGraphQLNotFoundException($name, 'attribute');
             }
         }
         return empty($errors) ? $entity : null;

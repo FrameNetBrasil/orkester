@@ -13,6 +13,7 @@ use GraphQL\Language\AST\ObjectFieldNode;
 use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\VariableNode;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\Manager;
 use Orkester\MVC\MModel;
 use Orkester\MVC\MModelMaestro;
@@ -109,6 +110,11 @@ class ExecutionContext
         return static::$conf['models'][static::$conf['singular'][$name] ?? null] ?? null;
     }
 
+    /**
+     * @throws EGraphQLNotFoundException
+     * @throws \DI\DependencyException
+     * @throws \DI\NotFoundException
+     */
     public function getModel(string|ClassMap $nameOrClassMap): null|MModelMaestro|MModel
     {
         if ($nameOrClassMap instanceof ClassMap) {
@@ -116,7 +122,7 @@ class ExecutionContext
         }
         $modelName = $this->getModelName($nameOrClassMap);
         if (empty($modelName)) {
-            throw new EGraphQLException(["model_not_found" => $nameOrClassMap]);
+            throw new EGraphQLNotFoundException($nameOrClassMap, 'model');
         }
         $model = Manager::getContainer()->get($modelName);
         $this->classMapToModelMap[get_class($model)] = $model;
