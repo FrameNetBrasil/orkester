@@ -6,6 +6,9 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLForbiddenException;
+use Orkester\Exception\EGraphQLNotFoundException;
+use Orkester\Exception\EGraphQLValidationException;
 use Orkester\Exception\EValidationException;
 use Orkester\GraphQL\ExecutionContext;
 use Orkester\GraphQL\Hook\IUpdateHook;
@@ -49,6 +52,13 @@ class UpdateOperation extends AbstractMutationOperation
         }
     }
 
+    /**
+     * @throws EGraphQLNotFoundException
+     * @throws EGraphQLException
+     * @throws \DI\NotFoundException
+     * @throws EGraphQLForbiddenException
+     * @throws \DI\DependencyException
+     */
     public function collectExistingRows(MModel $model): array
     {
         $operator = new QueryOperation($this->context, $this->root);
@@ -63,6 +73,15 @@ class UpdateOperation extends AbstractMutationOperation
         $this->prepareArguments($this->root->arguments);
     }
 
+    /**
+     * @return array|null
+     * @throws EGraphQLForbiddenException
+     * @throws EGraphQLValidationException
+     * @throws \DI\DependencyException
+     * @throws \DI\NotFoundException
+     * @throws EGraphQLNotFoundException
+     * @throws EGraphQLException
+     */
     public function execute(): ?array
     {
         $modelName = $this->root->name->value;
@@ -71,46 +90,37 @@ class UpdateOperation extends AbstractMutationOperation
             $this->prepare($model);
         }
         if (!$model->authorization->isModelWritable()) {
-            throw new EGraphQLException(["write_$modelName" => 'access denied']);
+            throw new EGraphQLForbiddenException($modelName, 'write');
         }
         $rows = $this->collectExistingRows($model);
 
-        $writer = new WriteOperation($this->context);
-
+        $writer = new WriteOperation();
         $modified = [];
 
-        $errors = [];
         foreach ($rows as $row) {
             $currentRowObject = (object)$row;
             $writer->currentObject = $currentRowObject;
-            $values = $writer->createEntityArray($this->set, $model, $errors);
+            $values = $writer->createEntityArray($this->set, $model);
             if (!empty($values)) {
                 $modified[] = [(object)array_merge($row, $values), $currentRowObject];
             }
         }
-        if (!empty($errors)) {
-            throw new EGraphQLException($errors);
-        }
 
         $pk = $model->getClassMap()->getKeyAttributeName();
         $modifiedKeys = [];
-        $errors = [];
-        foreach ($modified as [$new, $old]) {
-            if ($model instanceof IUpdateHook) {
-                $model->onBeforeUpdate($new, $old);
+        try {
+            foreach ($modified as [$new, $old]) {
+                if ($model instanceof IUpdateHook) {
+                    $model->onBeforeUpdate($new, $old);
+                }
+                $modifiedKeys[] = $new->$pk;
+                    $model->save($new);
+                if ($model instanceof IUpdateHook) {
+                    $model->onAfterUpdate($new, $old);
+                }
             }
-            $modifiedKeys[] = $new->$pk;
-            try {
-                $model->save($new);
-            } catch (EValidationException $e) {
-                $errors[] = $this->handleValidationErrors($e->errors);
-            }
-            if ($model instanceof IUpdateHook) {
-                $model->onAfterUpdate($new, $old);
-            }
-        }
-        if (!empty($errors)) {
-            throw new EGraphQLException($errors);
+        } catch(EValidationException $e) {
+            throw new EGraphQLValidationException($this->handleValidationErrors($e->errors));
         }
         return $this->createSelectionResult($model, $this->root, $modifiedKeys, $this->context->isSingular($modelName));
     }

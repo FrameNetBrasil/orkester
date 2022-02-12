@@ -3,6 +3,9 @@
 namespace Orkester\MVC;
 
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLForbiddenException;
+use Orkester\Exception\EGraphQLNotFoundException;
+use Orkester\Exception\EValidationException;
 use Orkester\GraphQL\Executor;
 use Orkester\Manager;
 use Slim\Psr7\Request;
@@ -20,21 +23,19 @@ class MGraphQLController
         $this->variables = $data->variables ?? [];
     }
 
+    /**
+     * @throws EGraphQLException
+     * @throws \GraphQL\Error\SyntaxError
+     */
     public function render(): Response
     {
-        $httpCode = 200;
-        try {
-            $executor = new Executor($this->query, $this->variables);
-            $content = $executor->execute();
-        } catch(EGraphQLException $e) {
-            $content = ['error' => $e->errors];
-            $httpCode = 400;
-        } catch(\Exception $e) {
-            mfatal($e->getMessage());
-            $content = ['error' => ['internal_server_error' => '']];
-            $httpCode = 400;
+        $executor = new Executor($this->query, $this->variables);
+        ['data' => $data, 'errors' => $errors] = $executor->execute();
+        if (empty($errors)) {
+            return $this->send(empty($data) ? '' : json_encode(['data' => $data]));
+        } else {
+            return $this->send(json_encode(['errors' => $errors]), 400);
         }
-        return $this->send(empty($content) ? '' : json_encode($content), $httpCode);
     }
 
     protected function send(string $content, int $httpCode = 200): Response

@@ -10,6 +10,8 @@ use GraphQL\Language\AST\FragmentSpreadNode;
 use GraphQL\Language\AST\NodeList;
 use GraphQL\Language\AST\SelectionSetNode;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLForbiddenException;
+use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\GraphQL\ExecutionContext;
 use Orkester\GraphQL\Operator\AbstractOperator;
 use Orkester\GraphQL\Operator\GroupOperator;
@@ -136,18 +138,24 @@ class QueryOperation extends AbstractOperation
             $select = $name;
         }
         if ($canValidate && !$model->getClassMap()->attributeExists($field)) {
-            throw new EGraphQLException(["unknown_field" => $field]);
+            throw new EGraphQLNotFoundException($field, "attribute");
         }
         $this->selection->add($select);
     }
 
+    /**
+     * @throws EGraphQLNotFoundException
+     * @throws EGraphQLForbiddenException
+     * @throws \DI\NotFoundException
+     * @throws \DI\DependencyException|EGraphQLException
+     */
     public function handleAssociation(FieldNode $node, MModelMaestro|MModel $model)
     {
         if (!$model->getClassMap()->associationExists($node->name->value)) {
-            throw new EGraphQLException(["unknown_association" => $node->name->value]);
+            throw new EGraphQLNotFoundException($node->name->value, 'association');
         }
         if (!static::isAssociationReadable($model, $node->name->value)) {
-            throw new EGraphQLException(["read_{$node->name->value}" => 'access denied']);
+            throw new EGraphQLForbiddenException($node->name->value, 'read');
         }
         $associationName = explode('.', $node->name->value)[0];
         $associationMap = $model->getClassMap()->getAssociationMap($associationName);
@@ -157,7 +165,14 @@ class QueryOperation extends AbstractOperation
         $this->subOperations[$name] = $operation;
     }
 
-    public function handleSelection(SelectionSetNode $node, MModelMaestro|MModel $model)
+    /**
+     * @throws EGraphQLNotFoundException
+     * @throws EGraphQLException
+     * @throws EGraphQLForbiddenException
+     * @throws \DI\NotFoundException
+     * @throws \DI\DependencyException
+     */
+    public function handleSelection(?SelectionSetNode $node, MModelMaestro|MModel $model)
     {
         if (is_null($node)) {
             return;
@@ -181,15 +196,23 @@ class QueryOperation extends AbstractOperation
                 $fragment = $this->context->getFragment($selection->name->value);
                 $this->handleSelection($fragment->selectionSet, $model);
             } else {
-                throw new \InvalidArgumentException("Unhandled: " . get_class($selection));
+                throw new EGraphQLNotFoundException($selection->name->value, 'selection');
             }
         }
     }
 
+    /**
+     * @param MModel|null $model
+     * @throws EGraphQLException
+     * @throws EGraphQLForbiddenException
+     * @throws EGraphQLNotFoundException
+     * @throws \DI\DependencyException
+     * @throws \DI\NotFoundException
+     */
     public function prepare(?MModel $model)
     {
         if (!static::isModelReadable($model)) {
-            throw new EGraphQLException(["model_read" => 'access denied']);
+            throw new EGraphQLForbiddenException($this->node->name->value, 'read');
         }
         $this->prepareArguments($this->node->arguments);
         $this->handleSelection($this->node->selectionSet, $model);
@@ -202,7 +225,7 @@ class QueryOperation extends AbstractOperation
         return $this->node->alias ? $this->node->alias->value : $this->node->name->value;
     }
 
-    public function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap)
+    public function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap): AssociationMap
     {
         $name = '_gql';
         $associationMap = new AssociationMap($name, $fromClassMap);
@@ -217,6 +240,16 @@ class QueryOperation extends AbstractOperation
         return $associationMap;
     }
 
+    /**
+     * @param RetrieveCriteria $criteria
+     * @param MModelMaestro|MModel|null $model
+     * @return array
+     * @throws EGraphQLException
+     * @throws EGraphQLForbiddenException
+     * @throws EGraphQLNotFoundException
+     * @throws \DI\DependencyException
+     * @throws \DI\NotFoundException
+     */
     public function execute(RetrieveCriteria $criteria, null|MModelMaestro|MModel $model = null): array
     {
         if (!$this->isPrepared) {

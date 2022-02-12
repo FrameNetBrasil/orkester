@@ -7,6 +7,8 @@ use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Orkester\Exception\EDBException;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLForbiddenException;
+use Orkester\Exception\EGraphQLValidationException;
 use Orkester\GraphQL\ExecutionContext;
 use Orkester\GraphQL\Operator\IdOperator;
 use Orkester\GraphQL\Operator\WhereOperator;
@@ -38,6 +40,9 @@ class DeleteOperation extends AbstractOperation
         }
     }
 
+    /**
+     * @throws EGraphQLException
+     */
     public function collectExistingRows(MModel $model): array
     {
         $operator = new QueryOperation($this->context, $this->root);
@@ -48,16 +53,18 @@ class DeleteOperation extends AbstractOperation
         return $operator->execute($model->getCriteria()->select($pk));
     }
 
+    /**
+     * @throws EGraphQLException
+     */
     public function execute(): ?array
     {
         $this->prepareArguments($this->root->arguments);
         $model = $this->context->getModel($this->root->name->value);
         $modelName = $this->root->name->value;
         if (!$model->authorization->isModelDeletable()) {
-            throw new EGraphQLException(["delete_$modelName" => 'access denied']);
+            throw new EGraphQLForbiddenException($modelName, 'delete');
         }
         $rows = $this->collectExistingRows($model);
-        $errors = [];
         $pk = $model->getClassMap()->getKeyAttributeName();
         foreach ($rows as $row) {
             if ($model->authorization->isEntityDeletable($row[$pk])) {
@@ -65,15 +72,11 @@ class DeleteOperation extends AbstractOperation
                     $model->delete($row[$pk]);
                 } catch(EDBException $e) {
                     merror($e->getMessage());
-                    $errors[] = ["delete_{$modelName}_row" => 'constraint failed'];
+                    throw new EGraphQLException(["delete_row_{$modelName}" => 'constraint failed']);
                 }
             } else {
-                $errors[] = ["delete_{$modelName}_row" => 'access denied'];
+                throw new EGraphQLForbiddenException($modelName, 'delete_entity');
             }
-        }
-
-        if (!empty($errors)) {
-            throw new EGraphQLException($errors);
         }
     }
 }
