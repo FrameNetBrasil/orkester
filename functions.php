@@ -8,29 +8,29 @@ function _M($msg, $params = NULL)
     return $msg;
 }
 
-function mdump($var, $tag = null)
+function mdump(...$var)
 {
-    MTrace::traceDump($var, false, 0, $tag);
+    MTrace::traceDebug("DEBUG", ...$var);
 }
 
-function mfatal($var)
+function mfatal(...$var)
 {
-    MTrace::traceDebug("FATAL", $var);
+    MTrace::traceDebug("FATAL", ...$var);
 }
 
-function merror($var)
+function merror(...$var)
 {
-    MTrace::traceDebug("ERROR", $var);
+    MTrace::traceDebug("ERROR", ...$var);
 }
 
-function mwarn($var)
+function mwarn(...$var)
 {
-    MTrace::traceDebug("WARN", $var);
+    MTrace::traceDebug("WARN", ...$var);
 }
 
-function minfo($var)
+function minfo(...$var)
 {
-    MTrace::traceDebug("INFO", $var);
+    MTrace::traceDebug("INFO", ...$var);
 }
 
 function mtrace($var)

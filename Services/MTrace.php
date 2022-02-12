@@ -51,10 +51,13 @@ class MTrace
         Manager::getLog()->logMessage('[TRACE]' . $strStack);
     }
 
-    public static function traceDebug($tag, $msg)
+    public static function traceDebug($tag, ...$messages)
     {
-        $message = print_r($msg, true);
-        Manager::getLog()->logMessage("[$tag] $message");
+        foreach($messages as $message) {
+            $message = print_r($message, true);
+            Manager::getLog()->logMessage("[$tag] $message");
+        }
+
     }
 
 }
