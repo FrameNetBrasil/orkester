@@ -250,7 +250,7 @@ class QueryOperation extends AbstractOperation
      * @throws \DI\DependencyException
      * @throws \DI\NotFoundException
      */
-    public function execute(RetrieveCriteria $criteria, null|MModelMaestro|MModel $model = null): array
+    public function execute(RetrieveCriteria $criteria, null|MModelMaestro|MModel $model = null): ?array
     {
         if (!$this->isPrepared) {
             $this->prepare($model);
