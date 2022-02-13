@@ -32,7 +32,6 @@ class Executor
     protected ExecutionContext $context;
     public bool $isPrepared = false;
 
-    protected array $services = [];
 //    protected bool $isIntrospection = false;
     protected Set $aliases;
     protected array $operations = [];
@@ -123,7 +122,7 @@ class Executor
             }
             $operation = new $operationName($this->context, $fieldNode);
             if ($operationName == ServiceOperation::class) {
-                $this->services[$alias] = $operation;
+                $this->operations[$alias] = ['model' => null, 'operation' => $operation];
             } else {
                 $model = $this->context->getModel($fieldNode->name->value);
                 $this->aliases->add($alias);
@@ -157,22 +156,10 @@ class Executor
         foreach ($this->operations as $alias => ['model' => $model, 'operation' => $op]) {
             try {
                 $op->prepare($model);
-                $this->context->results[$alias] = $op->execute($model->getCriteria());
-            } catch (EGraphQLNotFoundException $e) {
-                $errors[$alias]['not_found'] = $e->errors;
-            } catch (EGraphQLForbiddenException $e) {
-                $errors[$alias]['forbidden'] = $e->errors;
-            } catch (EGraphQLValidationException $e) {
-                $errors[$alias]['validation'] = $e->errors;
-            } catch (EGraphQLException $e) {
-                $errors[$alias]['meta'] = $e->errors;
-            } catch (\Exception) {
-                $errors[$alias]['server'] = 'internal_server_error';
-            }
-        }
-        foreach ($this->services as $alias => $op) {
-            try {
-                $this->context->results[$alias] = $op->execute();
+                $result = $op->execute($model?->getCriteria());
+                if (!empty($result)) {
+                    $this->context->results[$alias] = $result;
+                }
             } catch (EGraphQLNotFoundException $e) {
                 $errors[$alias]['not_found'] = $e->errors;
             } catch (EGraphQLForbiddenException $e) {
@@ -213,12 +200,12 @@ class Executor
             return $this->executeCommands();
         } catch (SyntaxError $e) {
             return ['data' => null, 'errors' => ['$meta' => ['syntax_error' => $e->getMessage()]]];
-        } catch(EGraphQLNotFoundException $e) {
+        } catch (EGraphQLNotFoundException $e) {
             return ['data' => null, 'errors' => ['$meta' => ['not_found' => $e->errors]]];
         } catch (EGraphQLException $e) {
             return ['data' => null, 'errors' => ['$meta' => ['execution_error' => $e->errors]]];
         } catch (DependencyException | NotFoundException $e) {
-            return ['data' => null, 'errors' => ['$meta' => ['internal_error' => 'failed instantiating model']]];
+            return ['data' => null, 'errors' => ['$meta' => ['server_error' => 'failed instantiating model']]];
         }
     }
 

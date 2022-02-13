@@ -78,5 +78,6 @@ class DeleteOperation extends AbstractOperation
                 throw new EGraphQLForbiddenException($modelName, 'delete_entity');
             }
         }
+        return null;
     }
 }
