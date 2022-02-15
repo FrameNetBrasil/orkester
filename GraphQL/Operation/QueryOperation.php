@@ -115,7 +115,7 @@ class QueryOperation extends AbstractOperation
     public function handleAttribute(FieldNode $node, MModelMaestro|MModel $model)
     {
         if (!static::isAttributeReadable($model, $node->name->value)) {
-            throw new EGraphQLException(["read_field_forbidden" => $node->name->value]);
+            throw new EGraphQLForbiddenException($node->name->value, 'field');
         }
         $canValidate = true;
         $alias = $node->alias?->value;
@@ -185,6 +185,8 @@ class QueryOperation extends AbstractOperation
             if ($selection instanceof FieldNode) {
                 if ($selection->name->value == '__typename') {
                     $this->includeTypename = true;
+                } else if ($selection->name->value == 'id') {
+                    $this->selection->add("{$model->getClassMap()->getKeyAttributeName()} as id");
                 } else {
                     if (is_null($selection->selectionSet)) {
                         $this->handleAttribute($selection, $model);
