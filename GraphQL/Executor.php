@@ -155,17 +155,12 @@ class Executor
         $errors = [];
         $serverErrors = [];
         $response = [];
-        $resultCount = 0;
         foreach ($this->operations as $alias => ['model' => $model, 'operation' => $op]) {
-            $resultCount++;
             try {
                 $op->prepare($model);
                 $result = $op->execute($model?->getCriteria());
                 $this->context->results[$alias] = $result;
-                if ($this->context->omitted->contains($alias)) {
-                    $resultCount--;
-                }
-                else {
+                if (!$this->context->omitted->contains($alias)) {
                     $response[$alias] = $result;
                 }
             } catch (EGraphQLNotFoundException $e) {
@@ -177,18 +172,11 @@ class Executor
             } catch (EGraphQLException $e) {
                 $serverErrors[$alias]['bad_request'] = $e->errors;
                 merror($e->getMessage());
-            } catch (\Exception|\Error $e) {
+            } catch (\Exception | \Error $e) {
                 mfatal($e->getMessage());
                 $serverErrors[$alias]['bad_request'] = 'internal_server_error';
             }
         }
-
-        if ($resultCount < 2) {
-            $response = reset($response);
-            $serverErrors = reset($serverErrors);
-            $errors = reset($errors);
-        }
-
         return ['data' => $response, 'errors' => $errors, 'serverErrors' => $serverErrors];
     }
 
