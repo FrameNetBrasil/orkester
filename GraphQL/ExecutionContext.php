@@ -60,8 +60,7 @@ class ExecutionContext
             $subResult = $this->results[$parts[0]];
             if (array_key_exists(0, $subResult)) {
                 $result = array_map(fn($row) => $row[$key], $subResult);
-            }
-            else {
+            } else {
                 $result = $subResult[$key];
             }
 
@@ -90,7 +89,7 @@ class ExecutionContext
         } else if ($node instanceof ObjectFieldNode) {
             return $this->getNodeValue($node->value);
         } else if ($node instanceof VariableNode) {
-            return $this->variables[$node->name->value];
+            return $this->variables[$node->name->value] ?? null;
         } else if ($node instanceof ListValueNode) {
             $values = [];
             foreach ($node->values->getIterator() as $item) {
@@ -133,8 +132,7 @@ class ExecutionContext
     {
         if ($callable = static::$conf['services'][$name] ?? false) {
             return $callable;
-        }
-        else if ($callable = static::$conf['serviceResolver']($name)) {
+        } else if ($callable = static::$conf['serviceResolver']($name)) {
             return $callable;
         }
         return null;
@@ -162,13 +160,17 @@ class ExecutionContext
 
     public function getModelTypename(MModel $model): string
     {
-        return str_replace('\\', '_', get_class($model));
+        if (preg_match_all("/([\w\d_]+)Model$/", get_class($model), $matches)) {
+            return $matches[1][0];
+        } else {
+            return str_replace('\\', '_', get_class($model));
+        }
     }
 
     public function getFragment($name): ?FragmentDefinitionNode
     {
         /** @var FragmentDefinitionNode $fragment */
-        foreach($this->fragments as $fragment) {
+        foreach ($this->fragments as $fragment) {
             if ($fragment->name->value == $name) {
                 return $fragment;
             }
