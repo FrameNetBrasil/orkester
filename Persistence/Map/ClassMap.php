@@ -21,7 +21,7 @@ class ClassMap
     private array $fieldMaps = [];
     private array $attributeMaps = [];
     private AttributeMap $keyAttributeMap;
-    private HookMap $hookMap;
+//    private HookMap $hookMap;
     private array $hashedAttributeMaps = [];
     private array $updateAttributeMaps = [];
     private array $insertAttributeMaps = [];
@@ -127,15 +127,15 @@ class ClassMap
         return $this->superAssociationMap;
     }
 
-    public function setHookMap(HookMap $hookMap)
-    {
-        $this->hookMap = $hookMap;
-    }
-
-    public function getHookMap(): HookMap
-    {
-        return $this->hookMap;
-    }
+//    public function setHookMap(HookMap $hookMap)
+//    {
+//        $this->hookMap = $hookMap;
+//    }
+//
+//    public function getHookMap(): HookMap
+//    {
+//        return $this->hookMap;
+//    }
 
     public function hasAttribute(string $attributeName): bool
     {
