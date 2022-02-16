@@ -149,37 +149,35 @@ class Executor
         }
     }
 
-    #[ArrayShape(['data' => "array", 'errors' => "array"])]
+    #[ArrayShape(['data' => "array", 'errors' => "array", 'serverErrors' => "array"])]
     public function executeCommands(): ?array
     {
         $errors = [];
+        $serverErrors = [];
+        $response = [];
         foreach ($this->operations as $alias => ['model' => $model, 'operation' => $op]) {
             try {
                 $op->prepare($model);
                 $result = $op->execute($model?->getCriteria());
-                if (!empty($result)) {
-                    $this->context->results[$alias] = $result;
+                $this->context->results[$alias] = $result;
+                if (!$this->context->omitted->contains($alias)) {
+                    $response[$alias] = $result;
                 }
             } catch (EGraphQLNotFoundException $e) {
-                $errors[$alias]['not_found'] = $e->errors;
+                $serverErrors[$alias]['not_found'] = $e->errors;
             } catch (EGraphQLForbiddenException $e) {
-                $errors[$alias]['forbidden'] = $e->errors;
+                $serverErrors[$alias]['forbidden'] = $e->errors;
             } catch (EGraphQLValidationException $e) {
-                $errors[$alias]['validation'] = $e->errors;
+                $errors[$alias] = $e->errors;
             } catch (EGraphQLException $e) {
-                $errors[$alias]['meta'] = $e->errors;
-            } catch (\Exception) {
-                $errors[$alias]['server'] = 'internal_server_error';
+                $serverErrors[$alias]['bad_request'] = $e->errors;
+                merror($e->getMessage());
+            } catch (\Exception | \Error $e) {
+                mfatal($e->getMessage());
+                $serverErrors[$alias]['bad_request'] = 'internal_server_error';
             }
         }
-
-        $response = [];
-        foreach ($this->context->results as $alias => $result) {
-            if (!$this->context->omitted->contains($alias)) {
-                $response[$alias] = $result;
-            }
-        }
-        return ['data' => $response, 'errors' => $errors];
+        return ['data' => $response, 'errors' => $errors, 'serverErrors' => $serverErrors];
     }
 
 //    public function executeIntrospection(): array
@@ -190,23 +188,25 @@ class Executor
 //        return [];
 //    }
 
-    #[ArrayShape(['data' => "array", 'errors' => "array"])]
+    #[ArrayShape(['data' => "array", 'errors' => "array", 'serverErrors' => "array"])]
     public function execute(): ?array
     {
+        $serverErrors = [];
         try {
             if (!$this->isPrepared) {
                 $this->prepare();
             }
             return $this->executeCommands();
         } catch (SyntaxError $e) {
-            return ['data' => null, 'errors' => ['$meta' => ['syntax_error' => $e->getMessage()]]];
+            $serverErrors['syntax_error'] = $e->getMessage();
         } catch (EGraphQLNotFoundException $e) {
-            return ['data' => null, 'errors' => ['$meta' => ['not_found' => $e->errors]]];
+            $serverErrors['not_found'] = $e->errors;
         } catch (EGraphQLException $e) {
-            return ['data' => null, 'errors' => ['$meta' => ['execution_error' => $e->errors]]];
+            $serverErrors['execution_error'] = $e->errors;
         } catch (DependencyException | NotFoundException $e) {
-            return ['data' => null, 'errors' => ['$meta' => ['server_error' => 'failed instantiating model']]];
+            $serverErrors['internal'] = 'failed instantiating model';
         }
+        return ['data' => null, 'errors' => null, 'serverErrors' => ['$meta' => $serverErrors]];
     }
 
 }

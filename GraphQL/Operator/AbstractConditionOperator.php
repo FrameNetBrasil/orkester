@@ -2,7 +2,6 @@
 
 namespace Orkester\GraphQL\Operator;
 
-use GraphQL\Language\AST\ListTypeNode;
 use GraphQL\Language\AST\ListValueNode;
 use GraphQL\Language\AST\NodeList;
 use GraphQL\Language\AST\ObjectFieldNode;
@@ -57,7 +56,8 @@ abstract class AbstractConditionOperator extends AbstractOperation
         $conditionsNode = $node->values->offsetGet(1);
         $conditions = [];
         /** @var ObjectFieldNode $fieldNode */
-        foreach ($this->context->getNodeValue($conditionsNode) as $cond => $value) {
+        foreach ($this->context->getNodeValue($conditionsNode) ?? [] as $cond => $value) {
+            if ($value == null && $cond != 'is_null') continue;
             $operator = $this->getCriteriaOperator($cond, $value);
             $conditions[] = ['op' => $operator, 'value' => $value];
         }
@@ -81,13 +81,16 @@ abstract class AbstractConditionOperator extends AbstractOperation
             $var = $this->context->getNodeValue($node->value);
             $op = array_key_first($var);
             $value = $var[$op];
-            $operator = $this->getCriteriaOperator($op, $value);
         } else {
             $entry = $node->value->fields->offsetGet(0);
             $value = $this->context->getNodeValue($entry->value);;
-            $operator = $this->getCriteriaOperator($entry->name->value, $value);
+            $op = $entry->name->value;
         }
-        return [[$field, $operator, $value]];
+        if (!($value == null && $op != 'is_null')) {
+            $operator = $this->getCriteriaOperator($op, $value);
+            return [[$field, $operator, $value]];
+        }
+        return [];
     }
 
     protected function prepareConditionGroup(RetrieveCriteria $criteria, NodeList $root, string $conjunction)

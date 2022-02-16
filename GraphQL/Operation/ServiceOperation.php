@@ -6,6 +6,8 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\SelectionSetNode;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLValidationException;
+use Orkester\Exception\EValidationException;
 use Orkester\GraphQL\ExecutionContext;
 use Orkester\Manager;
 
@@ -31,27 +33,31 @@ class ServiceOperation extends AbstractMutationOperation
     {
         $reflectionMethod = new \ReflectionMethod($service);
         $reflectionParameters = $reflectionMethod->getParameters();
-        $result = [];
-        foreach ($arguments as $name => $value) {
-            /** @var \ReflectionParameter $param */
-            if ($param = array_find($reflectionParameters, fn($rp) => $rp->getName() == $name)) {
-                $result[$name] = $value;
+        $missingArguments = [];
+        $typeMismatch = [];
+        foreach ($reflectionParameters as $reflectionParameter) {
+            $name = $reflectionParameter->getName();
+            if (!array_key_exists($name, $arguments) && !$reflectionParameter->isOptional()) {
+                $missingArguments[] = $reflectionParameter->getName();
+            } else if ((is_null($arguments[$name] ?? null) && !$reflectionParameter->getType()->allowsNull()) ||
+                !($reflectionParameter->getType()->getName() == gettype($arguments[$name]))) {
+                $typeMismatch[$name] = [
+                    'received' => gettype($arguments[$name]),
+                    'expected' => $reflectionParameter->getType()->getName()
+                ];
             }
         }
         $errors = [];
-        $missingArguments = [];
-        foreach ($reflectionParameters as $reflectionParameter) {
-            if (!$reflectionParameter->isOptional() && !array_key_exists($reflectionParameter->getName(), $result)) {
-                $missingArguments[] = $reflectionParameter->getName();
-            }
-        }
         if (!empty($missingArguments)) {
             $errors['missing_argument'] = $missingArguments;
+        }
+        if (!empty($typeMismatch)) {
+            $errors['type_mismatch'] = $typeMismatch;
         }
         if (!empty($errors)) {
             throw new EGraphQLException($errors);
         }
-        return $result;
+        return $arguments;
     }
 
     public function execute(): ?array
@@ -83,8 +89,8 @@ class ServiceOperation extends AbstractMutationOperation
                 }
             }
             return $response;
-        } catch (\Exception $e) {
-            throw $e;
+        } catch (EValidationException $e) {
+            throw new EGraphQLValidationException($e->errors);
         }
     }
 }
