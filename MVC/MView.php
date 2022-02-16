@@ -151,13 +151,23 @@ class MView
 
     protected function processVue()
     {
-        $this->baseName = basename($this->viewFile, '.vue');
-        $template = new MTemplate(dirname($this->viewFile));
-        $template->context('view', $this);
-        $template->context('data', Manager::getData());
-        $template->context('template', $template);
-        $content = $template->fetch($this->baseName);
-
+        $data = Manager::getData();
+            mdump((array)$data);
+//        if ($data->module == 1) {
+            $this->baseName = basename($this->viewFile, '.vue');
+            $template = new MTemplate(dirname($this->viewFile));
+            $template->context('view', $this);
+            $template->context('data', Manager::getData());
+            $template->context('template', $template);
+            $content = $template->fetch($this->baseName);
+            $this->resultFormat = 'javascript';
+            return $content;
+//        } else {
+//            $page = Manager::getObject(MPage::class);
+//            $page->setContent('');
+//            return $page->render();
+//        }
+/*
         $key = md5($content);
         if ($this->vueCache->has($key)) {
             $newContent = $this->vueCache->get($key);
@@ -177,9 +187,7 @@ class MView
             }
             $this->vueCache->set($key, $newContent);
         }
-        $this->resultFormat = 'javascript';
-        //mdump($newContent);
-        return $newContent;
+*/
     }
 
     public function processPrompt(MPromptData $prompt)//$type, $message = '', $action1 = '', $action2 = '')

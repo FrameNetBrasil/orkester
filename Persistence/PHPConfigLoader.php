@@ -52,16 +52,16 @@ class PHPConfigLoader extends PersistentConfigLoader
                 (method_exists($className, $name) ?
                     "$className::$name" : null);
         };
-        $this->classMap->setHookMap(
-            new HookMap(
-                $tryGetFunction('onBeforeSave'),
-                $tryGetFunction('onBeforeUpdate'),
-                $tryGetFunction('onBeforeInsert'),
-                $tryGetFunction('onAfterSave'),
-                $tryGetFunction('onAfterUpdate'),
-                $tryGetFunction('onAfterInsert')
-            )
-        );
+//        $this->classMap->setHookMap(
+//            new HookMap(
+//                $tryGetFunction('onBeforeSave'),
+//                $tryGetFunction('onBeforeUpdate'),
+//                $tryGetFunction('onBeforeInsert'),
+//                $tryGetFunction('onAfterSave'),
+//                $tryGetFunction('onAfterUpdate'),
+//                $tryGetFunction('onAfterInsert')
+//            )
+//        );
         if (isset($map['extends'])) {
             $this->classMap->setSuperClassName($map['extends']);
         }
