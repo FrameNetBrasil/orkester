@@ -230,16 +230,18 @@ class QueryOperation extends AbstractOperation
         return $this->node->alias ? $this->node->alias->value : $this->node->name->value;
     }
 
-    public function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap): AssociationMap
+    public function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap, int|string $fromKey, int|string $toKey): AssociationMap
     {
         $name = '_gql';
         $associationMap = new AssociationMap($name, $fromClassMap);
         $associationMap->setToClassName($toClassMap->getName());
         $associationMap->setToClassMap($toClassMap);
+        
+        //$associationMap->s;
         $key = $fromClassMap->getKeyAttributeName();
         $associationMap->setCardinality('oneToOne');
 
-        $associationMap->addKeys($key, $key);
+        $associationMap->addKeys($fromKey, $toKey);
         $associationMap->setKeysAttributes();
         $fromClassMap->putAssociationMap($associationMap);
         return $associationMap;
@@ -280,19 +282,20 @@ class QueryOperation extends AbstractOperation
 
         foreach ($this->subOperations as $associationName => $operation) {
             $associationMap = $classMap->getAssociationMap($associationName);
-            $fk = $associationMap->getFromKey();
+            $fromKey = $associationMap->getFromKey();
+            $fk = $associationMap->getToKey();
             $keySet = new Set();
             foreach($rows as $row) {
-                if (!empty($row[$fk])) $keySet->add($row[$fk]);
+                if (!empty($row[$fromKey])) $keySet->add($row[$fromKey]);
             }
             $keys = $keySet->toArray();
             $toClassMap = $associationMap->getToClassMap();
             $subCriteria = $toClassMap->getCriteria();
             $cardinality = $associationMap->getCardinality();
 
-            $shouldIncludeEmpty = strcasecmp($criteria->getAssociationType($associationName), 'LEFT') == 0;
+//            $shouldIncludeEmpty = strcasecmp($criteria->getAssociationType($associationName), 'LEFT') == 0;
             if ($cardinality == 'oneToOne') {
-                $newAssociation = $this->createTemporaryAssociation($toClassMap, $classMap);
+                $newAssociation = $this->createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey);
                 $joinField = $newAssociation->getName() . "." . $associationMap->getFromKey();
                 $subCriteria->where($joinField, 'IN', $keys);
                 $subCriteria->select($joinField);
@@ -306,7 +309,7 @@ class QueryOperation extends AbstractOperation
             $subResult = group_by($subResult, $fk, false);
             $updatedRows = [];
             foreach ($rows as $row) {
-                $value = $subResult[$row[$fk]] ?? [];
+                $value = $subResult[$row[$fromKey]] ?? [];
                 if ($cardinality == 'oneToOne') {
                     $value = $value[0] ?? null;
                 }
@@ -314,13 +317,14 @@ class QueryOperation extends AbstractOperation
                     unset($row[$column]);
                 }
                 $row[$associationName] = $value;
-                if (empty($value)) {
-                    if ($shouldIncludeEmpty) {
-                        $updatedRows[] = $row;
-                    }
-                } else {
-                    $updatedRows[] = $row;
-                }
+                $updatedRows[] = $row;
+//                if (empty($value)) {
+//                    if ($shouldIncludeEmpty) {
+//                        $updatedRows[] = $row;
+//                    }
+//                } else {
+//                    $updatedRows[] = $row;
+//                }
             }
             $rows = $updatedRows;
 

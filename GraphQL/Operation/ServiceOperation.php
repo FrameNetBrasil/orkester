@@ -51,9 +51,9 @@ class ServiceOperation extends AbstractMutationOperation
         if (!empty($missingArguments)) {
             $errors['missing_argument'] = $missingArguments;
         }
-        if (!empty($typeMismatch)) {
-            $errors['type_mismatch'] = $typeMismatch;
-        }
+//        if (!empty($typeMismatch)) {
+//            $errors['type_mismatch'] = $typeMismatch;
+//        }
         if (!empty($errors)) {
             throw new EGraphQLException($errors);
         }
