@@ -184,6 +184,9 @@ class Manager
         if (file_exists(self::$confPath . '/api.php')) {
             self::loadConf(self::$confPath . '/api.php');
         }
+        if (file_exists(self::$confPath . '/secrets.php')) {
+            self::loadConf(self::$confPath . '/secrets.php');
+        }
 
         Manager::$data = (object)[];
 
@@ -198,6 +201,12 @@ class Manager
     {
         $conf = require($configFile);
         self::$conf = MUtil::arrayMergeOverwrite(self::$conf, $conf);
+    }
+
+    public static function loadSecrets(string $secretsFile)
+    {
+        $secrets = require($secretsFile);
+        self::$conf = MUtil::arrayMergeOverwrite(self::$conf, $secrets);
     }
 
     /**
