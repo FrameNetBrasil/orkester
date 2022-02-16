@@ -23,22 +23,20 @@ class MGraphQLController
         $this->variables = $data->variables ?? [];
     }
 
-    /**
-     * @throws EGraphQLException
-     * @throws \GraphQL\Error\SyntaxError
-     */
     public function render(): Response
     {
         $executor = new Executor($this->query, $this->variables);
-        ['data' => $data, 'errors' => $errors] = $executor->execute();
-        if (empty($errors)) {
-            return $this->send(empty($data) ? '' : json_encode(['data' => $data]));
+        ['data' => $data, 'errors' => $errors, 'serverErrors' => $serverErrors] = $executor->execute();
+        if (!empty($serverErrors)) {
+            return $this->send(json_encode(['errors' => $serverErrors]), 400);
+        } else if (!empty($errors)) {
+            return $this->send(json_encode(['errors' => $errors]), 200);
         } else {
-            return $this->send(json_encode(['errors' => $errors]), 400);
+            return $this->send(empty($data) ? '' : json_encode(['data' => $data]), 200);
         }
     }
 
-    protected function send(string $content, int $httpCode = 200): Response
+    protected function send(string $content, int $httpCode): Response
     {
         $body = $this->response->getBody();
         $body->write($content);
