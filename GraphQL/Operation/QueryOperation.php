@@ -281,7 +281,11 @@ class QueryOperation extends AbstractOperation
         foreach ($this->subOperations as $associationName => $operation) {
             $associationMap = $classMap->getAssociationMap($associationName);
             $fk = $associationMap->getFromKey();
-            $keys = array_map(fn($row) => $row[$fk], $rows);
+            $keySet = new Set();
+            foreach($rows as $row) {
+                if (!empty($row[$fk])) $keySet->add($row[$fk]);
+            }
+            $keys = $keySet->toArray();
             $toClassMap = $associationMap->getToClassMap();
             $subCriteria = $toClassMap->getCriteria();
             $cardinality = $associationMap->getCardinality();
