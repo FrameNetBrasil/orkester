@@ -23,7 +23,7 @@ class ExecutionContext
 {
 
     protected static array $conf;
-    protected array $classMapToModelMap = [];
+    protected array $modelCache = [];
     public array $results = [];
     public Set $omitted;
 
@@ -114,17 +114,17 @@ class ExecutionContext
      * @throws \DI\DependencyException
      * @throws \DI\NotFoundException
      */
-    public function getModel(string|ClassMap $nameOrClassMap): null|MModelMaestro|MModel
+    public function getModel(string $name): ?MModel
     {
-        if ($nameOrClassMap instanceof ClassMap) {
-            return $this->classMapToModelMap[get_class($nameOrClassMap)] ?? null;
-        }
-        $modelName = $this->getModelName($nameOrClassMap);
+        $modelName = $this->getModelName($name);
         if (empty($modelName)) {
-            throw new EGraphQLNotFoundException($nameOrClassMap, 'model');
+            throw new EGraphQLNotFoundException($name, 'model');
+        }
+        if (array_key_exists($modelName, $this->modelCache)) {
+            return $this->modelCache[$modelName];
         }
         $model = Manager::getContainer()->get($modelName);
-        $this->classMapToModelMap[get_class($model)] = $model;
+        $this->modelCache[$modelName] = $model;
         return $model;
     }
 
