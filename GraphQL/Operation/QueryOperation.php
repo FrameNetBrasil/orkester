@@ -49,27 +49,27 @@ class QueryOperation extends AbstractOperation
         $this->requiredSelections = new Set();
     }
 
-    public static function isAssociationReadable(MModelMaestro|MModel $model, string $name)
+    public function isAssociationReadable(MModelMaestro|MModel $model, string $name)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['association'] ?? [])) {
-            static::$authorizationCache[get_class($model)]['association'][$name] = $model->authorization->readAssociation($name);
+            static::$authorizationCache[get_class($model)]['association'][$name] = $this->context->getAuthorization($model)->readAssociation($name);
         }
         return static::$authorizationCache[get_class($model)]['association'][$name];
     }
 
-    public static function isAttributeReadable(MModelMaestro|MModel $model, string $name)
+    public function isAttributeReadable(MModelMaestro|MModel $model, string $name)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['attribute'] ?? [])) {
-            static::$authorizationCache[get_class($model)]['attribute'][$name] = $model->authorization->readAttribute($name);
+            static::$authorizationCache[get_class($model)]['attribute'][$name] = $this->context->getAuthorization($model)->readAttribute($name);
         }
         return static::$authorizationCache[get_class($model)]['attribute'][$name];
     }
 
-    public static function isModelReadable(MModelMaestro|MModel $model)
+    public function isModelReadable(MModelMaestro|MModel $model)
     {
         $name = get_class($model);
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['model'] ?? [])) {
-            static::$authorizationCache[get_class($model)]['model'][$name] = $model->authorization->read();
+            static::$authorizationCache[get_class($model)]['model'][$name] = $this->context->getAuthorization($model)->read();
         }
         return static::$authorizationCache[get_class($model)]['model'][$name];
     }
@@ -236,7 +236,7 @@ class QueryOperation extends AbstractOperation
         $associationMap = new AssociationMap($name, $fromClassMap);
         $associationMap->setToClassName($toClassMap->getName());
         $associationMap->setToClassMap($toClassMap);
-        
+
         //$associationMap->s;
         $key = $fromClassMap->getKeyAttributeName();
         $associationMap->setCardinality('oneToOne');

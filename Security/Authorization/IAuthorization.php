@@ -7,6 +7,8 @@ use Orkester\Persistence\Criteria\RetrieveCriteria;
 
 interface IAuthorization
 {
+    function before(): ?bool;
+
     function read(): bool;
 
     function insert(): bool;

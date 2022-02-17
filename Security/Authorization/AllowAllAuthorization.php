@@ -52,4 +52,9 @@ class AllowAllAuthorization implements IAuthorization
     {
         return $model->getCriteria();
     }
+
+    function before(): ?bool
+    {
+        return true;
+    }
 }

@@ -16,14 +16,13 @@ use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\Manager;
 use Orkester\MVC\MModel;
-use Orkester\MVC\MModelMaestro;
-use Orkester\Persistence\Map\ClassMap;
 
 class ExecutionContext
 {
 
     protected static array $conf;
     protected array $modelCache = [];
+    protected array $authorizationCache = [];
     public array $results = [];
     public Set $omitted;
 
@@ -176,6 +175,13 @@ class ExecutionContext
             }
         }
         return null;
+    }
+
+    public function getAuthorization(MModel $model): ExecutionAuthorization
+    {
+        $className = get_class($model);
+        $this->authorizationCache[$className] ??= new ExecutionAuthorization($model);
+        return $this->authorizationCache[$className];
     }
 
 }
