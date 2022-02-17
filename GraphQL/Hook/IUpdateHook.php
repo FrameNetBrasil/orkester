@@ -4,7 +4,7 @@ namespace Orkester\GraphQL\Hook;
 
 interface IUpdateHook
 {
-    public function onBeforeUpdate(object $new, object $old);
+    public function beforeUpdate(object $new, object $old);
 
-    public function onAfterUpdate(object $new, object $old);
+    public function afterUpdate(object $new, object $old);
 }

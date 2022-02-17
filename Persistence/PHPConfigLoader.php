@@ -52,16 +52,16 @@ class PHPConfigLoader extends PersistentConfigLoader
                 (method_exists($className, $name) ?
                     "$className::$name" : null);
         };
-//        $this->classMap->setHookMap(
-//            new HookMap(
-//                $tryGetFunction('onBeforeSave'),
-//                $tryGetFunction('onBeforeUpdate'),
-//                $tryGetFunction('onBeforeInsert'),
-//                $tryGetFunction('onAfterSave'),
-//                $tryGetFunction('onAfterUpdate'),
-//                $tryGetFunction('onAfterInsert')
-//            )
-//        );
+        $this->classMap->setHookMap(
+            new HookMap(
+                $tryGetFunction('onBeforeSave'),
+                $tryGetFunction('onBeforeUpdate'),
+                $tryGetFunction('onBeforeInsert'),
+                $tryGetFunction('onAfterSave'),
+                $tryGetFunction('onAfterUpdate'),
+                $tryGetFunction('onAfterInsert')
+            )
+        );
         if (isset($map['extends'])) {
             $this->classMap->setSuperClassName($map['extends']);
         }
@@ -151,7 +151,7 @@ class PHPConfigLoader extends PersistentConfigLoader
         }
         $attributeMap = $this->classMap->getAttributeMap($key);
         if (empty($attributeMap)) {
-            $this->addAttribute($key, ['type' => 'integer', 'key' => 'foreign']);
+            $this->addAttribute($key, ['type' => 'integer', 'key' => 'foreign', 'nullable' => false]);
         }
         else {
             if ($key != $this->classMap->getKeyAttributeName()) {
@@ -212,7 +212,7 @@ class PHPConfigLoader extends PersistentConfigLoader
         }
         $attributeMap = $this->classMap->getAttributeMap($key);
         if (empty($attributeMap)) {
-            $this->addAttribute($key, ['type' => 'integer', 'key' => 'foreign']);
+            $this->addAttribute($key, ['type' => 'integer', 'key' => 'foreign', 'nullable' => false]);
         }
         else {
             if ($key != $this->classMap->getKeyAttributeName()) {

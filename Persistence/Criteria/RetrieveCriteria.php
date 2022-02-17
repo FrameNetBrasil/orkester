@@ -6,7 +6,7 @@ use Orkester\Database\MQuery;
 use Orkester\Database\MSql;
 use Orkester\Manager;
 use Orkester\MVC\MEntityMaestro;
-use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\PersistentObject;
 use Orkester\Types\MRange;
@@ -279,7 +279,7 @@ class RetrieveCriteria extends PersistentCriteria
             foreach (func_get_args() as $arg) {
                 if (is_string($arg)) {
                     list($class, $alias) = explode(' ', $arg);
-                    /** @var MModelMaestro $class */
+                    /** @var MModel $class */
                     $classMap = $class::getClassMap();
                     $this->addClass($classMap, $alias);
                 } else {

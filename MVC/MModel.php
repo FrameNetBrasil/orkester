@@ -104,6 +104,7 @@ class MModel
     {
         $classMap = $classMap ?? static::getClassMap();
         $errors = [];
+        static::beforeSave($object);
         /** @var AttributeMap $attributeMap */
         foreach($classMap->getAttributesMap() as $attributeMap) {
             try {
@@ -133,7 +134,6 @@ class MModel
         if (!empty($errors)) {
             throw new EValidationException($errors);
         }
-        static::beforeSave($object);
         $pk = Manager::getPersistentManager()->saveObject($classMap, $object);
         static::afterSave($object, $pk);
         return $pk;
@@ -424,6 +424,7 @@ class MModel
         }
         $transaction = static::beginTransaction();
         try {
+
             $cardinality = $associationMap->getCardinality();
             $fromModel = $associationMap->getFromClassMap()->getModel();
 

@@ -21,8 +21,6 @@ use Orkester\GraphQL\Operation\InsertOperation;
 use Orkester\GraphQL\Operation\QueryOperation;
 use Orkester\GraphQL\Operation\ServiceOperation;
 use Orkester\GraphQL\Operation\UpdateOperation;
-use Orkester\MVC\MModelMaestro;
-use Orkester\MVC\MModel;
 
 class Executor
 {
