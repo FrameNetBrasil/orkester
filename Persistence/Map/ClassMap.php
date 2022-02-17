@@ -3,8 +3,7 @@
 namespace Orkester\Persistence\Map;
 
 use Orkester\Manager;
-use Orkester\MVC\MModelMaestro;
-use Orkester\Persistence\Association;
+use Orkester\MVC\MModel;
 use Orkester\Persistence\Criteria\DeleteCriteria;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\PersistentObject;
@@ -21,7 +20,7 @@ class ClassMap
     private array $fieldMaps = [];
     private array $attributeMaps = [];
     private AttributeMap $keyAttributeMap;
-//    private HookMap $hookMap;
+    private HookMap $hookMap;
     private array $hashedAttributeMaps = [];
     private array $updateAttributeMaps = [];
     private array $insertAttributeMaps = [];
@@ -100,7 +99,7 @@ class ClassMap
         return $this->hasTypedAttribute;
     }
 
-    public function getObject(): MModelMaestro|null
+    public function getObject(): ?MModel
     {
         $className = $this->getName();
         return null;//Manager::getModel($className);
@@ -127,15 +126,15 @@ class ClassMap
         return $this->superAssociationMap;
     }
 
-//    public function setHookMap(HookMap $hookMap)
-//    {
-//        $this->hookMap = $hookMap;
-//    }
-//
-//    public function getHookMap(): HookMap
-//    {
-//        return $this->hookMap;
-//    }
+    public function setHookMap(HookMap $hookMap)
+    {
+        $this->hookMap = $hookMap;
+    }
+
+    public function getHookMap(): HookMap
+    {
+        return $this->hookMap;
+    }
 
     public function hasAttribute(string $attributeName): bool
     {
@@ -638,7 +637,7 @@ class ClassMap
         return null;
     }
 
-    public function getModel(): MModelMaestro
+    public function getModel(): MModel
     {
         return new $this->model();
     }

@@ -13,7 +13,6 @@ use Orkester\Exception\EValidationException;
 use Orkester\Manager;
 use Orkester\MVC\MController;
 use Orkester\MVC\MModel;
-use Orkester\MVC\MModel;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
 
@@ -29,10 +28,10 @@ class JsonApi extends MController
         return new ($conf[$key][$name])();
     }
 
-    public static function modelFromResource($resource): MModel|MModel
+    public static function modelFromResource($resource): MModel
     {
         $instance = static::getEndpointInstance($resource, false);
-        if (($instance instanceof MModel) || ($instance instanceof MModel)) {
+        if ($instance instanceof MModel) {
             return $instance;
         }
         throw new \InvalidArgumentException('Resource model not found', 404);
@@ -53,7 +52,7 @@ class JsonApi extends MController
         return $errors ?? [];
     }
 
-    public function get(array $args, MModel|MModel $model, Request $request): array
+    public function get(array $args, MModel $model, Request $request): array
     {
         $params = $request->getQueryParams();
         return Retrieve::process(
@@ -101,6 +100,7 @@ class JsonApi extends MController
 
     public function patch(array $args, MModel $model): array
     {
+
         if (array_key_exists('relationship', $args)) {
             $model->updateAssociation($args['id'], $args['relationship'], $this->data->data, true);
             return [(object) [], 200];

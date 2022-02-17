@@ -113,12 +113,12 @@ class UpdateOperation extends AbstractMutationOperation
         try {
             foreach ($modified as [$new, $old]) {
                 if ($model instanceof IUpdateHook) {
-                    $model->onBeforeUpdate($new, $old);
+                    $model->beforeUpdate($new, $old);
                 }
                 $modifiedKeys[] = $new->$pk;
                     $model->save($new);
                 if ($model instanceof IUpdateHook) {
-                    $model->onAfterUpdate($new, $old);
+                    $model->afterUpdate($new, $old);
                 }
             }
         } catch(EValidationException $e) {

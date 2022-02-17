@@ -23,7 +23,6 @@ use Orkester\GraphQL\Operator\OffsetOperator;
 use Orkester\GraphQL\Operator\OrderByOperator;
 use Orkester\GraphQL\Operator\WhereOperator;
 use Orkester\Manager;
-use Orkester\MVC\MModelMaestro;
 use Orkester\MVC\MModel;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\AssociationMap;
@@ -40,7 +39,7 @@ class QueryOperation extends AbstractOperation
     public bool $includeTypename = false;
     public Set $requiredSelections;
     public string $typename = '';
-    public MModelMaestro|MModel $model;
+    public MModel $model;
 
     public function __construct(ExecutionContext $context, protected FieldNode $node, protected bool $isMutationResult = false)
     {
@@ -49,7 +48,7 @@ class QueryOperation extends AbstractOperation
         $this->requiredSelections = new Set();
     }
 
-    public function isAssociationReadable(MModelMaestro|MModel $model, string $name)
+    public function isAssociationReadable(MModel $model, string $name)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['association'] ?? [])) {
             static::$authorizationCache[get_class($model)]['association'][$name] = $this->context->getAuthorization($model)->readAssociation($name);
@@ -57,7 +56,7 @@ class QueryOperation extends AbstractOperation
         return static::$authorizationCache[get_class($model)]['association'][$name];
     }
 
-    public function isAttributeReadable(MModelMaestro|MModel $model, string $name)
+    public function isAttributeReadable(MModel $model, string $name)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['attribute'] ?? [])) {
             static::$authorizationCache[get_class($model)]['attribute'][$name] = $this->context->getAuthorization($model)->readAttribute($name);
@@ -65,7 +64,7 @@ class QueryOperation extends AbstractOperation
         return static::$authorizationCache[get_class($model)]['attribute'][$name];
     }
 
-    public function isModelReadable(MModelMaestro|MModel $model)
+    public function isModelReadable(MModel $model)
     {
         $name = get_class($model);
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['model'] ?? [])) {
@@ -114,7 +113,7 @@ class QueryOperation extends AbstractOperation
         }
     }
 
-    public function handleAttribute(FieldNode $node, MModelMaestro|MModel $model)
+    public function handleAttribute(FieldNode $node, MModel $model)
     {
         if (!static::isAttributeReadable($model, $node->name->value)) {
             throw new EGraphQLForbiddenException($node->name->value, 'field');
@@ -151,7 +150,7 @@ class QueryOperation extends AbstractOperation
      * @throws \DI\NotFoundException
      * @throws \DI\DependencyException|EGraphQLException
      */
-    public function handleAssociation(FieldNode $node, MModelMaestro|MModel $model)
+    public function handleAssociation(FieldNode $node, MModel $model)
     {
         if (!$model->getClassMap()->associationExists($node->name->value)) {
             throw new EGraphQLNotFoundException($node->name->value, 'association');
@@ -175,7 +174,7 @@ class QueryOperation extends AbstractOperation
      * @throws \DI\NotFoundException
      * @throws \DI\DependencyException
      */
-    public function handleSelection(?SelectionSetNode $node, MModelMaestro|MModel $model)
+    public function handleSelection(?SelectionSetNode $node, MModel $model)
     {
         if (is_null($node)) {
             return;
@@ -255,7 +254,7 @@ class QueryOperation extends AbstractOperation
      * @throws \DI\DependencyException
      * @throws \DI\NotFoundException
      */
-    public function execute(RetrieveCriteria $criteria, null|MModelMaestro|MModel $model = null): ?array
+    public function execute(RetrieveCriteria $criteria, ?MModel $model = null): ?array
     {
         if (!$this->isPrepared) {
             $this->prepare($model);
