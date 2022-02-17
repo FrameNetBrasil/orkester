@@ -237,8 +237,6 @@ class QueryOperation extends AbstractOperation
         $associationMap->setToClassName($toClassMap->getName());
         $associationMap->setToClassMap($toClassMap);
 
-        //$associationMap->s;
-        $key = $fromClassMap->getKeyAttributeName();
         $associationMap->setCardinality('oneToOne');
 
         $associationMap->addKeys($fromKey, $toKey);
@@ -273,7 +271,6 @@ class QueryOperation extends AbstractOperation
         $criteria->select(join(",", $this->selection->toArray()));
         $this->applyArguments($criteria);
         $rows = $criteria->asResult();
-
         if ($this->includeTypename) {
             foreach ($rows as &$row) {
                 $row['__typename'] = $this->typename;
