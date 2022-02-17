@@ -158,7 +158,7 @@ class Executor
         foreach ($this->operations as $alias => ['model' => $model, 'operation' => $op]) {
             try {
                 $op->prepare($model);
-                $result = $op->execute($model?->getCriteria());
+                $result = $op->execute($model?->authorization->criteria($model));
                 $this->context->results[$alias] = $result;
                 if (!$this->context->omitted->contains($alias)) {
                     $response[$alias] = $result;

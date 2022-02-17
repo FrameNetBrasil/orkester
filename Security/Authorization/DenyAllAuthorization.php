@@ -2,46 +2,54 @@
 
 namespace Orkester\Security\Authorization;
 
+use Orkester\MVC\MModel;
+use Orkester\Persistence\Criteria\RetrieveCriteria;
+
 class DenyAllAuthorization implements IAuthorization
 {
 
-    function isModelReadable(): bool
+    function read(): bool
     {
         return false;
     }
 
-    function isModelWritable(): bool
+    function insert(): bool
     {
         return false;
     }
 
-    function isAttributeReadable(string $name): bool
+    function readAttribute(string $name): bool
     {
         return false;
     }
 
-    function isAttributeWritable(string $name, ?object $entity): bool
+    function writeAttribute(string $name, ?object $entity): bool
     {
         return false;
     }
 
-    function isAssociationReadable(string $name): bool
+    function readAssociation(string $name): bool
     {
         return false;
     }
 
-    function isAssociationWritable(string $name, ?object $entity): bool
+    function writeAssociation(string $name, ?object $entity): bool
     {
         return false;
     }
 
-    public function isEntityDeletable(int $pk): bool
+    public function delete(int $pk): bool
     {
         return false;
     }
 
-    public function isModelDeletable(): bool
+    function update(object $entity): bool
     {
         return false;
+    }
+
+    function criteria(MModel $model): RetrieveCriteria
+    {
+        return $model->getCriteria();
     }
 }

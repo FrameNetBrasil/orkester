@@ -50,7 +50,7 @@ class DeleteOperation extends AbstractOperation
         $operator->isPrepared = true;
 
         $pk = $model->getClassMap()->getKeyAttributeName();
-        return $operator->execute($model->getCriteria()->select($pk));
+        return $operator->execute($model->authorization->criteria($model)->select($pk));
     }
 
     /**
@@ -61,13 +61,10 @@ class DeleteOperation extends AbstractOperation
         $this->prepareArguments($this->root->arguments);
         $model = $this->context->getModel($this->root->name->value);
         $modelName = $this->root->name->value;
-        if (!$model->authorization->isModelDeletable()) {
-            throw new EGraphQLForbiddenException($modelName, 'delete');
-        }
         $rows = $this->collectExistingRows($model);
         $pk = $model->getClassMap()->getKeyAttributeName();
         foreach ($rows as $row) {
-            if ($model->authorization->isEntityDeletable($row[$pk])) {
+            if ($model->authorization->delete($row[$pk])) {
                 try {
                     $model->delete($row[$pk]);
                 } catch(EDBException $e) {
@@ -75,7 +72,7 @@ class DeleteOperation extends AbstractOperation
                     throw new EGraphQLException(["delete_row_{$modelName}" => 'constraint failed']);
                 }
             } else {
-                throw new EGraphQLForbiddenException($modelName, 'delete_entity');
+                throw new EGraphQLForbiddenException($modelName, 'delete');
             }
         }
         return null;

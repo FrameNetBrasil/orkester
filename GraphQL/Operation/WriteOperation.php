@@ -18,7 +18,7 @@ class WriteOperation
     public static function isAssociationWritable(MModel $model, string $name, ?object $object)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)]??['association']??[])) {
-            static::$authorizationCache[get_class($model)]['association'][$name] = $model->authorization->isAssociationWritable($name, $object);
+            static::$authorizationCache[get_class($model)]['association'][$name] = $model->authorization->writeAssociation($name, $object);
         }
         return static::$authorizationCache[get_class($model)]['association'][$name];
     }
@@ -26,7 +26,7 @@ class WriteOperation
     public static function isAttributeWritable(MModel $model, string $name, ?object $object)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)]??['attribute']??[])) {
-            static::$authorizationCache[get_class($model)]['attribute'][$name] = $model->authorization->isAttributeWritable($name, $object);
+            static::$authorizationCache[get_class($model)]['attribute'][$name] = $model->authorization->writeAttribute($name, $object);
         }
         return static::$authorizationCache[get_class($model)]['attribute'][$name];
     }
