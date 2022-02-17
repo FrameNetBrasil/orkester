@@ -105,9 +105,9 @@ class Retrieve
             };
         } else {
             return match ($matchMode) {
-                'startsWith' => [$field, 'AILIKE', "$value%"],
-                'contains' => [$field, 'AILIKE', "%$value%"],
-                'endsWith' => [$field, 'AILIKE', "%$value"],
+                'startsWith' => [$field, 'LIKE', "$value%"],
+                'contains' => [$field, 'LIKE', "%$value%"],
+                'endsWith' => [$field, 'LIKE', "%$value"],
                 'notContains' => [$field, 'NOT LIKE', "%$value%"],
                 'lessEquals' => [$field, '<=', $value],
                 'greater' => [$field, '>', $value],
@@ -166,7 +166,7 @@ class Retrieve
             $criteria->associationType($name, $type);
         }
         if (!empty($group)) {
-            $criteria->groupBy($group);
+            $criteria->groupBy(...explode(',', $group));
         }
         if (!empty($sort)) {
             $sortFields = explode(',', $sort);
