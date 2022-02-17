@@ -25,7 +25,7 @@ abstract class AbstractMutationOperation extends AbstractOperation
             return $single ? null : [];
         }
         $pk = $model->getClassMap()->getKeyAttributeName();
-        $criteria = $model->getCriteria()->where($pk, 'IN', $ids);
+        $criteria = $model->authorization->criteria($model)->where($pk, 'IN', $ids);
         return $operation->execute($criteria);
     }
 

@@ -7,7 +7,6 @@ use Orkester\Exception\EOrkesterException;
 use Orkester\Exception\ESecurityException;
 use Orkester\Exception\EValidationException;
 use Orkester\Manager;
-use Orkester\Persistence\IAttributeValidator;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Criteria\DeleteCriteria;
@@ -22,13 +21,14 @@ use Orkester\Security\Authorization\IAuthorization;
 class MModel
 {
 
+    public IAuthorization $authorization;
     public static RetrieveCriteria $criteria;
     public static array $map = [];
     public static string $entityClass = '';
 
-    public function __construct(public ?IAuthorization $authorization = null)
+    public function __construct(?IAuthorization $authorization = null)
     {
-        $this->authorization ??= new AllowAllAuthorization();
+        $this->authorization = $authorization ?? new AllowAllAuthorization();
     }
 
     public static function init(): void
@@ -64,7 +64,7 @@ class MModel
         return static::getAPICriteria();
     }
 
-    public static function getAPICriteria(ClassMap $classMap = null): RetrieveCriteria
+    public function getAPICriteria(ClassMap $classMap = null): RetrieveCriteria
     {
         return static::getCriteria($classMap);
     }

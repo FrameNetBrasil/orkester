@@ -52,7 +52,7 @@ class QueryOperation extends AbstractOperation
     public static function isAssociationReadable(MModelMaestro|MModel $model, string $name)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['association'] ?? [])) {
-            static::$authorizationCache[get_class($model)]['association'][$name] = $model->authorization->isAssociationReadable($name);
+            static::$authorizationCache[get_class($model)]['association'][$name] = $model->authorization->readAssociation($name);
         }
         return static::$authorizationCache[get_class($model)]['association'][$name];
     }
@@ -60,7 +60,7 @@ class QueryOperation extends AbstractOperation
     public static function isAttributeReadable(MModelMaestro|MModel $model, string $name)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['attribute'] ?? [])) {
-            static::$authorizationCache[get_class($model)]['attribute'][$name] = $model->authorization->isAttributeReadable($name);
+            static::$authorizationCache[get_class($model)]['attribute'][$name] = $model->authorization->readAttribute($name);
         }
         return static::$authorizationCache[get_class($model)]['attribute'][$name];
     }
@@ -69,7 +69,7 @@ class QueryOperation extends AbstractOperation
     {
         $name = get_class($model);
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['model'] ?? [])) {
-            static::$authorizationCache[get_class($model)]['model'][$name] = $model->authorization->isModelReadable();
+            static::$authorizationCache[get_class($model)]['model'][$name] = $model->authorization->read();
         }
         return static::$authorizationCache[get_class($model)]['model'][$name];
     }
@@ -329,6 +329,6 @@ class QueryOperation extends AbstractOperation
             $rows = $updatedRows;
 
         }
-        return ($this->isSingleResult || $this->context->isSingular($this->node->name->value)) ? $rows[0] : $rows;
+        return ($this->isSingleResult || $this->context->isSingular($this->node->name->value)) ? ($rows[0] ?? null) : $rows;
     }
 }

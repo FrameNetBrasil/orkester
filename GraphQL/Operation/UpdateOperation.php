@@ -65,7 +65,7 @@ class UpdateOperation extends AbstractMutationOperation
         $operator->operators = $this->operators;
         $operator->isPrepared = true;
 
-        return $operator->execute($model->getCriteria()->select('*'));
+        return $operator->execute($model->authorization->criteria($model)->select('*'));
     }
 
     public function prepare(?MModel $model)
@@ -89,9 +89,7 @@ class UpdateOperation extends AbstractMutationOperation
         if (empty($this->set)) {
             $this->prepare($model);
         }
-        if (!$model->authorization->isModelWritable()) {
-            throw new EGraphQLForbiddenException($modelName, 'write');
-        }
+        //TODO batch
         $rows = $this->collectExistingRows($model);
 
         $writer = new WriteOperation();
@@ -99,6 +97,9 @@ class UpdateOperation extends AbstractMutationOperation
 
         foreach ($rows as $row) {
             $currentRowObject = (object)$row;
+            if (!$model->authorization->update($currentRowObject)) {
+                throw new EGraphQLForbiddenException($modelName, 'update');
+            }
             $writer->currentObject = $currentRowObject;
             $values = $writer->createEntityArray($this->set, $model);
             if (!empty($values)) {

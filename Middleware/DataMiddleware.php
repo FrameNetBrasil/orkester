@@ -16,7 +16,7 @@ class DataMiddleware implements Middleware
      */
     public function process(Request $request, RequestHandler $handler): Response
     {
-        mtrace('in data middleware');
+//        mtrace('in data middleware');
         $data =  (object)$request->getQueryParams();
         $body = $request->getParsedBody() ?? [];
         foreach($body as $name => $value){

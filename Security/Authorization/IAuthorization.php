@@ -2,21 +2,27 @@
 
 namespace Orkester\Security\Authorization;
 
+use Orkester\MVC\MModel;
+use Orkester\Persistence\Criteria\RetrieveCriteria;
+
 interface IAuthorization
 {
-    function isModelReadable(): bool;
+    function read(): bool;
 
-    function isModelWritable(): bool;
+    function insert(): bool;
 
-    function isModelDeletable(): bool;
+    function delete(int $pk): bool;
 
-    function isAttributeReadable(string $name): bool;
+    function update(object $entity): bool;
 
-    function isAttributeWritable(string $name, ?object $entity): bool;
+    function readAttribute(string $name): bool;
 
-    function isAssociationReadable(string $name): bool;
+    function writeAttribute(string $name, ?object $entity): bool;
 
-    function isAssociationWritable(string $name, ?object $entity): bool;
+    function readAssociation(string $name): bool;
 
-    function isEntityDeletable(int $pk): bool;
+    function writeAssociation(string $name, ?object $entity): bool;
+
+    function criteria(MModel $model): RetrieveCriteria;
+
 }

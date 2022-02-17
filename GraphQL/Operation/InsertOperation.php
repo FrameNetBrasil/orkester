@@ -56,7 +56,7 @@ class InsertOperation extends AbstractMutationOperation
         $objectNode = $this->context->getArgumentValueNode($this->root, 'object');
         $modelName = $this->root->name->value;
         $model = $this->context->getModel($modelName);
-        if (!$model->authorization->isModelWritable()) {
+        if (!$model->authorization->insert()) {
             throw new EGraphQLForbiddenException($modelName, 'write');
         }
         $pk = $model->getClassMap()->getKeyAttributeName();
