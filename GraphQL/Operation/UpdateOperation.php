@@ -46,7 +46,9 @@ class UpdateOperation extends AbstractMutationOperation
                     'set' => SetOperator::class,
                     default => null
                 };
-                if (is_null($class)) continue;
+                if (is_null($class)) {
+                    throw new EGraphQLException(['unknown_argument' => $argument->name->value]);
+                }
                 $this->operators[] = new $class($this->context, $argument->value);
             }
         }
@@ -91,13 +93,12 @@ class UpdateOperation extends AbstractMutationOperation
         }
         //TODO batch
         $rows = $this->collectExistingRows($model);
-
         $writer = new WriteOperation($this->context);
         $modified = [];
 
         foreach ($rows as $row) {
             $currentRowObject = (object)$row;
-            if (!$$this->context->getAuthorization($model)->update($currentRowObject)) {
+            if (!$this->context->getAuthorization($model)->update($currentRowObject)) {
                 throw new EGraphQLForbiddenException($modelName, 'update');
             }
             $writer->currentObject = $currentRowObject;

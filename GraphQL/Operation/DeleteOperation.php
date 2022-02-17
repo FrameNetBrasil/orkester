@@ -35,7 +35,9 @@ class DeleteOperation extends AbstractOperation
                 'id' => IdOperator::class,
                 default => null
             };
-            if (is_null($class)) continue;
+            if (is_null($class)) {
+                throw new EGraphQLException(['unknown_argument' => $argument->name->value]);
+            }
             $this->operators[] = new $class($this->context, $argument->value);
         }
     }
@@ -50,7 +52,10 @@ class DeleteOperation extends AbstractOperation
         $operator->isPrepared = true;
 
         $pk = $model->getClassMap()->getKeyAttributeName();
-        return $operator->execute($this->context->getAuthorization($model)->criteria()->select($pk));
+        $rows = $operator->execute($this->context->getAuthorization($model)->criteria()->select($pk));
+        if (is_null($rows)) return [];
+        if (!array_key_exists(0, $rows)) return [$rows];
+        return $rows;
     }
 
     /**
