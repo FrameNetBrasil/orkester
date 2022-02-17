@@ -22,7 +22,7 @@ class InsertOperation extends AbstractMutationOperation
     public function __construct(protected ExecutionContext $context, protected FieldNode $root)
     {
         parent::__construct($this->context);
-        $this->writer = new WriteOperation();
+        $this->writer = new WriteOperation($this->context);
     }
 
     /**
@@ -56,7 +56,7 @@ class InsertOperation extends AbstractMutationOperation
         $objectNode = $this->context->getArgumentValueNode($this->root, 'object');
         $modelName = $this->root->name->value;
         $model = $this->context->getModel($modelName);
-        if (!$model->authorization->insert()) {
+        if (!$this->context->getAuthorization($model)->insert()) {
             throw new EGraphQLForbiddenException($modelName, 'write');
         }
         $pk = $model->getClassMap()->getKeyAttributeName();

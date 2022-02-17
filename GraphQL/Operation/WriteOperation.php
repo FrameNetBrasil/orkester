@@ -5,6 +5,7 @@ namespace Orkester\GraphQL\Operation;
 use GraphQL\Language\AST\ObjectFieldNode;
 use Orkester\Exception\EGraphQLForbiddenException;
 use Orkester\Exception\EGraphQLNotFoundException;
+use Orkester\GraphQL\ExecutionContext;
 use Orkester\MVC\MModel;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
@@ -15,18 +16,22 @@ class WriteOperation
 
     public static array $authorizationCache = [];
 
-    public static function isAssociationWritable(MModel $model, string $name, ?object $object)
+    public function __construct(protected ExecutionContext $context)
+    {
+    }
+
+    public function isAssociationWritable(MModel $model, string $name, ?object $object)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)]??['association']??[])) {
-            static::$authorizationCache[get_class($model)]['association'][$name] = $model->authorization->writeAssociation($name, $object);
+            static::$authorizationCache[get_class($model)]['association'][$name] = $this->context->getAuthorization($model)->writeAssociation($name, $object);
         }
         return static::$authorizationCache[get_class($model)]['association'][$name];
     }
 
-    public static function isAttributeWritable(MModel $model, string $name, ?object $object)
+    public function isAttributeWritable(MModel $model, string $name, ?object $object)
     {
         if (!array_key_exists($name, static::$authorizationCache[get_class($model)]??['attribute']??[])) {
-            static::$authorizationCache[get_class($model)]['attribute'][$name] = $model->authorization->writeAttribute($name, $object);
+            static::$authorizationCache[get_class($model)]['attribute'][$name] = $this->context->getAuthorization($model)->writeAttribute($name, $object);
         }
         return static::$authorizationCache[get_class($model)]['attribute'][$name];
     }

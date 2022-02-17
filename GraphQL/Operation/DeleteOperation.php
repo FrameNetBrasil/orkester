@@ -50,7 +50,7 @@ class DeleteOperation extends AbstractOperation
         $operator->isPrepared = true;
 
         $pk = $model->getClassMap()->getKeyAttributeName();
-        return $operator->execute($model->authorization->criteria($model)->select($pk));
+        return $operator->execute($this->context->getAuthorization($model)->criteria()->select($pk));
     }
 
     /**
@@ -64,7 +64,7 @@ class DeleteOperation extends AbstractOperation
         $rows = $this->collectExistingRows($model);
         $pk = $model->getClassMap()->getKeyAttributeName();
         foreach ($rows as $row) {
-            if ($model->authorization->delete($row[$pk])) {
+            if ($this->context->getAuthorization($model)->delete($row[$pk])) {
                 try {
                     $model->delete($row[$pk]);
                 } catch(EDBException $e) {

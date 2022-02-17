@@ -52,4 +52,9 @@ class DenyAllAuthorization implements IAuthorization
     {
         return $model->getCriteria();
     }
+
+    function before(): ?bool
+    {
+        return false;
+    }
 }
