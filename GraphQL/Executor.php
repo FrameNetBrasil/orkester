@@ -173,7 +173,7 @@ class Executor
                 $serverErrors[$alias]['bad_request'] = $e->errors;
                 merror($e->getMessage());
             } catch (\Exception | \Error $e) {
-                mfatal($e->getTraceAsString());
+//                mfatal($e->getTraceAsString());
                 mfatal($e->getMessage());
                 $serverErrors[$alias]['bad_request'] = 'internal_server_error';
             }

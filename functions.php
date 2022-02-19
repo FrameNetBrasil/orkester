@@ -11,31 +11,37 @@ function _M($msg, $params = NULL)
 function mdump(...$var)
 {
     MTrace::traceDebug("DEBUG", ...$var);
+    return $var[0];
 }
 
 function mfatal(...$var)
 {
     MTrace::traceDebug("FATAL", ...$var);
+    return $var[0];
 }
 
 function merror(...$var)
 {
     MTrace::traceDebug("ERROR", ...$var);
+    return $var[0];
 }
 
 function mwarn(...$var)
 {
     MTrace::traceDebug("WARN", ...$var);
+    return $var[0];
 }
 
 function minfo(...$var)
 {
     MTrace::traceDebug("INFO", ...$var);
+    return $var[0];
 }
 
 function mtrace($var)
 {
     MTrace::trace(print_r($var, true));
+    return $var[0];
 }
 
 function mconsole($var)
@@ -69,6 +75,11 @@ function group_by(array $data, mixed $key, bool $unset_key = true): array
         $accumulator[$groupKey][] = $element;
         return $accumulator;
     }, []);
+}
+
+function method(string $class, string $method): string
+{
+    return "$class::$method";
 }
 
 function mrequest($vars, $from = 'ALL', $order = '')

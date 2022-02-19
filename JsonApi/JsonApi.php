@@ -155,7 +155,7 @@ class JsonApi extends MController
     {
         $this->request = $request;
         $this->response = $response;
-        $middleware = Manager::getConf('api')['middleware'];
+        $middleware = Manager::getConf('api')['middleware'] ?? null;
         try {
             if (!empty($middleware)) {
                 ($middleware . '::beforeRequest')($request, $args);
@@ -204,7 +204,7 @@ class JsonApi extends MController
     public function handleModel(Request $request, Response $response, array $args): array
     {
         $transaction = null;
-        $middleware = Manager::getConf('api')['middleware'];
+        $middleware = Manager::getConf('api')['middleware'] ?? null;
         $method = match ($request->getMethod()) {
             'GET' => 'get',
             'DELETE' => 'delete',
@@ -227,7 +227,9 @@ class JsonApi extends MController
             $transaction->commit();
             return $result;
         } finally {
-            ($middleware . '::afterModelRequest')($result, $resource, $method, $args);
+            if (!empty($middleware)) {
+                ($middleware . '::afterModelRequest')($result, $resource, $method, $args);
+            }
             if ($transaction != null && $transaction->inTransaction()) {
                 $transaction->rollback();
             }
