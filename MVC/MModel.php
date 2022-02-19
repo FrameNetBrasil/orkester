@@ -61,11 +61,6 @@ class MModel
 
     public static function getResourceCriteria(ClassMap $classMap = null): RetrieveCriteria
     {
-        return static::getAPICriteria();
-    }
-
-    public function getAPICriteria(ClassMap $classMap = null): RetrieveCriteria
-    {
         return static::getCriteria($classMap);
     }
 
@@ -345,7 +340,11 @@ class MModel
             if ($errors) {
                 throw new EValidationException($errors);
             }
-            static::save($entity);
+            try {
+                static::save($entity);
+            } catch(EValidationException $e) {
+                throw new EValidationException(array_merge(...$e->errors));
+            }
 
             foreach ($delayedAssociations as $associationName) {
                 static::saveAssociation($entity, $associationName, $associations[$associationName], $validate);

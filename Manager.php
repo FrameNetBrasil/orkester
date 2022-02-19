@@ -184,8 +184,8 @@ class Manager
         if (file_exists(self::$confPath . '/api.php')) {
             self::loadConf(self::$confPath . '/api.php');
         }
-        if (file_exists(self::$confPath . '/secrets.php')) {
-            self::loadConf(self::$confPath . '/secrets.php');
+        if (file_exists(self::$confPath . '/environment.php')) {
+            self::loadConf(self::$confPath . '/environment.php');
         }
 
         Manager::$data = (object)[];
@@ -201,12 +201,6 @@ class Manager
     {
         $conf = require($configFile);
         self::$conf = MUtil::arrayMergeOverwrite(self::$conf, $conf);
-    }
-
-    public static function loadSecrets(string $secretsFile)
-    {
-        $secrets = require($secretsFile);
-        self::$conf = MUtil::arrayMergeOverwrite(self::$conf, $secrets);
     }
 
     /**
@@ -274,6 +268,11 @@ class Manager
     public static function getVarPath(): string
     {
         return self::$varPath;
+    }
+
+    public static function getPublicPath(): string
+    {
+        return self::$publicPath;
     }
 
     public static function getConf(string $key)
