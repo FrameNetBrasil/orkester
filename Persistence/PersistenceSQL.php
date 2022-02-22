@@ -56,12 +56,16 @@ class PersistenceSQL implements PersistenceBackend
 
     public function beginTransaction(ClassMap $classMap = null): PersistenceTransaction
     {
-        $dbName = $this->getDbName($classMap);
+        if (!is_null($classMap)) {
+            $this->setDb($classMap);
+        }
+        $dbName = $this->db->getName();
         if (array_key_exists($dbName, $this->transactions)) {
             $transaction = $this->transactions[$dbName];
         }
         else {
-            $connection = $this->getDb($classMap)->getConnection();
+            //$connection = $this->getDb($classMap)->getConnection();
+            $connection = $this->db->getConnection();
             $transaction = new PersistenceTransaction($connection);
             $this->transactions[$dbName] = $transaction;
         }
@@ -450,7 +454,6 @@ class PersistenceSQL implements PersistenceBackend
         $columns = array_keys($rows[0]);
         $sqlColumns = [];
         foreach ($columns as $column) {
-//            mdump($column);
             $attributeMap = $criteria->getClassMap()->getAttributeMap($column);
             $sqlColumns[] = $attributeMap->getColumnName();
         }
