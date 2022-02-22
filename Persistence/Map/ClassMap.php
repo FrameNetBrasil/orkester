@@ -20,7 +20,7 @@ class ClassMap
     private array $fieldMaps = [];
     private array $attributeMaps = [];
     private AttributeMap $keyAttributeMap;
-    private HookMap $hookMap;
+    private ?HookMap $hookMap = NULL;
     private array $hashedAttributeMaps = [];
     private array $updateAttributeMaps = [];
     private array $insertAttributeMaps = [];
