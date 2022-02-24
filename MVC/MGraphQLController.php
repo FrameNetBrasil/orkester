@@ -28,7 +28,7 @@ class MGraphQLController
         $executor = new Executor($this->query, $this->variables);
         ['data' => $data, 'errors' => $errors, 'serverErrors' => $serverErrors] = $executor->execute();
         if (!empty($serverErrors)) {
-            return $this->send(json_encode(['errors' => $serverErrors]), 400);
+            return $this->send(json_encode(['serverErrors' => $serverErrors]), 400);
         } else if (!empty($errors)) {
             return $this->send(json_encode(['errors' => $errors]), 200);
         } else {

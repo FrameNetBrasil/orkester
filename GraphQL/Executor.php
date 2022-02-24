@@ -160,7 +160,7 @@ class Executor
                     $op->execute($this->context->getAuthorization($model)->criteria()) :
                     $op->execute();
                 $this->context->results[$alias] = $result;
-                if (!$this->context->omitted->contains($alias)) {
+                if (!$this->context->omitted->contains($alias) && !empty($result)) {
                     $response[$alias] = $result;
                 }
             } catch (EGraphQLNotFoundException $e) {
