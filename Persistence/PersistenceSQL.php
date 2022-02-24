@@ -28,14 +28,18 @@ class PersistenceSQL implements PersistenceBackend
         $this->db = Manager::getDatabase(Manager::getOptions('db'));
     }
 
-    public function setDb(ClassMap $classMap = null) {
+    public function setDb(ClassMap $classMap = null)
+    {
         $databaseName = $this->getDbName($classMap);
         $this->db = Manager::getDatabase($databaseName);
     }
 
-    public function getDb(ClassMap $classMap = null) {
-        $databaseName = $this->getDbName($classMap);
-        $this->db = Manager::getDatabase($databaseName);
+    public function getDb(ClassMap $classMap = null)
+    {
+        if (!is_null($classMap)) {
+            $databaseName = $this->getDbName($classMap);
+            $this->db = Manager::getDatabase($databaseName);
+        }
         return $this->db;
     }
 
@@ -62,8 +66,7 @@ class PersistenceSQL implements PersistenceBackend
         $dbName = $this->db->getName();
         if (array_key_exists($dbName, $this->transactions)) {
             $transaction = $this->transactions[$dbName];
-        }
-        else {
+        } else {
             //$connection = $this->getDb($classMap)->getConnection();
             $connection = $this->db->getConnection();
             $transaction = new PersistenceTransaction($connection);
@@ -81,7 +84,7 @@ class PersistenceSQL implements PersistenceBackend
         $columns = [];
         $attributeMaps = array_filter(
             $classMap->getInsertAttributeMaps(),
-            fn ($attributeMap) => empty($attributeMap->getReference())
+            fn($attributeMap) => empty($attributeMap->getReference())
         );
 
         foreach ($attributeMaps as $attributeMap) {
@@ -108,7 +111,7 @@ class PersistenceSQL implements PersistenceBackend
         $columns = [];
         $attributeMaps = array_filter(
             $classMap->getInsertAttributeMaps(),
-            fn ($attributeMap) => empty($attributeMap->getReference())
+            fn($attributeMap) => empty($attributeMap->getReference())
         );
 
         foreach ($attributeMaps as $attributeMap) {
@@ -140,6 +143,7 @@ class PersistenceSQL implements PersistenceBackend
         $statement->setWhere("(" . $column . " = {$id})");
         return $statement;
     }
+
     /**
      * Convert a PHP value to database syntax expected value
      * @param mixed $value
@@ -191,8 +195,7 @@ class PersistenceSQL implements PersistenceBackend
         if (array_key_exists($dbName, $this->transactions)) {
             $transaction = $this->transactions[$dbName];
             $transaction->begin();
-        }
-        else {
+        } else {
             $transaction = $this->beginTransaction();
         }
         try {
@@ -462,7 +465,7 @@ class PersistenceSQL implements PersistenceBackend
         $statement->setTables($criteria->getClassMap()->getTableName());
         $statement->setDb($this->db);
 
-        foreach($rows as $row) {
+        foreach ($rows as $row) {
             $command = $statement->insert($row);
             $this->execute([$command]);
         }
