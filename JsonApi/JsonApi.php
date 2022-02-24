@@ -135,8 +135,8 @@ class JsonApi extends MController
         }
     }
 
-    #[ArrayShape(['status' => "int", 'title' => "string", 'detail' => "string"])]
-    public static function createError(int $code, string $title, string $detail): array
+    #[ArrayShape(['status' => "int", 'title' => "string", 'detail' => "string|array"])]
+    public static function createError(int $code, string $title, string|array $detail): array
     {
         return [
             'status' => $code,
