@@ -30,7 +30,6 @@ class OperandString extends PersistentOperand
             $value = preg_replace('/(.*) as (.*)/', '$1', $value);
         }
         $token = $value;
-
         if (str_contains($token, '(')) {
             $o = new OperandFunction($token, $this->criteria);
             $sql = $o->getSql();
@@ -48,6 +47,11 @@ class OperandString extends PersistentOperand
         } elseif ($token == '*') {
             $sql = $token;
         } else {
+            $isDistinct = false;
+            if (str_starts_with($token, 'distinct')) {
+                $isDistinct = true;
+                $token = explode(' ', $token)[1];
+            }
             $attributeCriteria = $this->criteria->getAttributeCriteria($token);
             $attributeMap = $attributeCriteria->getAttributeMap();
             $attribute = $attributeCriteria->getAttribute();
@@ -56,7 +60,7 @@ class OperandString extends PersistentOperand
             } else if ($attributeMap instanceof AttributeMap) {
                 $token = $attribute;
                 $o = new OperandAttributeMap($token, $attributeMap, $this->criteria);
-                $sql = $o->getSql();
+                $sql = ($isDistinct ? 'distinct ' : '') . $o->getSql();
             } else {
                 $tk = str_replace('.*', '', $token);
                 $associationMap = $this->criteria->getAssociationMap($tk);
