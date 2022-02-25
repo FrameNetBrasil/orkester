@@ -4,6 +4,7 @@ namespace Orkester\GraphQL\Operation;
 
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\ObjectValueNode;
+use GraphQL\Language\AST\VariableNode;
 use Orkester\Exception\EDomainException;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLForbiddenException;
@@ -33,7 +34,7 @@ class InsertOperation extends AbstractMutationOperation
      * @throws EValidationException
      * @throws EGraphQLNotFoundException
      */
-    public function insertSingle(MModel $model, ObjectValueNode $node): ?object
+    public function insertSingle(MModel $model, ObjectValueNode|VariableNode $node): ?object
     {
         $value = $this->context->getNodeValue($node);
         $data = $this->writer->createEntityArray($value, $model);
