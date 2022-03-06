@@ -50,9 +50,10 @@ class MActionDispatcher extends MController
                 throw new \Exception($msg);
             }
         } else {
-            $this->module = $arguments['module'] ?? 'Main';
-            $this->controller =  $arguments['controller'] ?? 'Main';
-            $this->action =  $arguments['action'] ?? 'main';
+            $default = Manager::getOptions('mainController');
+            $this->module = $arguments['module'] ?? $default['module'] ?? 'Main';
+            $this->controller =  $arguments['controller'] ??  $default['controller'] ?? 'Main';
+            $this->action =  $arguments['action'] ?? $default['action'] ?? 'main';
             $this->controllerClass = "App\\Modules\\{$this->module}\\Controllers\\{$this->controller}Controller";
         }
         $this->httpMethod = $route->getMethods()[0];
