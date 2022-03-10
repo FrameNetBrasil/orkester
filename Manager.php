@@ -157,7 +157,6 @@ class Manager
         date_default_timezone_set(self::getOptions("timezone"));
         setlocale(LC_ALL, self::getOptions("locale"));
         self::$actions = [];
-        self::$log = self::$container->get(MLog::class);
         $tmpPath = self::getOptions('tmpPath');
         if (!file_exists($tmpPath)) {
             mkdir($tmpPath);
@@ -187,7 +186,7 @@ class Manager
         if (file_exists(self::$confPath . '/environment.php')) {
             self::loadConf(self::$confPath . '/environment.php');
         }
-
+        self::$log = self::$container->get(MLog::class);
         Manager::$data = (object)[];
 
         register_shutdown_function("shutdown");
