@@ -30,16 +30,16 @@ class OperandString extends PersistentOperand
             $value = preg_replace('/(.*) as (.*)/', '$1', $value);
         }
         $token = $value;
-        if (str_contains($token, '(')) {
+        if (preg_match('/([^(^ ]*)\((.*)\)/', $value)) {
             $o = new OperandFunction($token, $this->criteria);
             $sql = $o->getSql();
-        } elseif (str_contains($token, ',')) {
+        } else if (str_contains($token, ',')) {
             $o = new OperandList($token, $this->criteria);
             $sql = $o->getSql();
         } elseif (str_starts_with($token, ':')) {
             $sql = $token;
         } elseif (str_starts_with($token, '#')) {
-            $sql = substr($token,1);
+            $sql = substr($token, 1);
         } elseif (is_numeric($token)) {
             $sql = $token;
         } elseif (str_contains($token, '\'')) {
@@ -68,16 +68,10 @@ class OperandString extends PersistentOperand
                     $classMap = $associationMap->getToClassMap();
                     $sql = $classMap->getTableName() . '.*';
                 } else {
-                    $classMap = $this->criteria->getClassMap($token); // direct table
-                    if ($classMap instanceof ClassMap) {
-                        $sql = $classMap->getTableName();
-                    } else {
-                        $sql = $token;
-                    }
+                    $sql = $token;
                 }
             }
         }
-
         if ($alias != '') {
             $this->criteria->setAttributeAlias($output[2], $sql);
         }
@@ -108,13 +102,13 @@ class OperandString extends PersistentOperand
         */
         $value = trim($this->operand);
         $token = $value;
-        if (str_contains($token, '(') && OperandFunction::isValid($token)) {
+        if (preg_match('/([^(^ ]*)\((.*)\)/', $value)) {
             $o = new OperandFunction($token, $this->criteria);
             $sql = $o->getSql();
         } elseif (str_starts_with($token, ':')) {
             $sql = $token;
         } elseif (str_starts_with($token, '#')) {
-            $sql = substr($token,1);
+            $sql = substr($token, 1);
         } elseif (is_numeric($token)) {
             $sql = $token;
         } elseif (str_contains($token, '\'')) {
@@ -168,7 +162,7 @@ class OperandString extends PersistentOperand
             $o = new OperandList($token, $this->criteria);
             $sql = $o->getSql();
         } elseif (str_starts_with($token, ':')) {
-            $sql = substr($token,1);
+            $sql = substr($token, 1);
         } elseif (is_numeric($token)) {
             $sql = $token;
         } else {
