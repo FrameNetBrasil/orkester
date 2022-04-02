@@ -33,7 +33,7 @@ class MSql
         ?string $orderBy = '',
         ?string $groupBy = '',
         ?string $having = '',
-        ?bool $forUpdate = false
+        ?bool   $forUpdate = false
     )
     {
         $this->clear();
@@ -249,7 +249,6 @@ class MSql
         $this->_prepareParameters();
         if (!is_null($this->parameters)) {
             if (count($this->parameters) > 0) {
-
                 foreach ($this->parameters as $i => $paramValue) {
                     if (is_numeric($i)) {
                         $this->bindValue($i + 1, $paramValue ?? null, $this->paramType[$i]);
@@ -285,7 +284,7 @@ class MSql
         $tables = implode(',', $this->tables);
         $columns = implode(',', $this->columns);
         $values = implode(',', $this->paramKey);
-        $sqlText = "INSERT INTO {$tables} ({$columns}) VALUES ({$values})" ;
+        $sqlText = "INSERT INTO {$tables} ({$columns}) VALUES ({$values})";
         $this->command = $sqlText;
         $this->prepareAndBind();
         return $this;

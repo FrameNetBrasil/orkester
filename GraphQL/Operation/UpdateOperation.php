@@ -112,14 +112,8 @@ class UpdateOperation extends AbstractMutationOperation
         $modifiedKeys = [];
         try {
             foreach ($modified as [$new, $old]) {
-                if ($model instanceof IUpdateHook) {
-                    $model->beforeUpdate($new, $old);
-                }
+                $model->update($new, $old);
                 $modifiedKeys[] = $new->$pk;
-                    $model->save($new);
-                if ($model instanceof IUpdateHook) {
-                    $model->afterUpdate($new, $old);
-                }
             }
         } catch(EValidationException $e) {
             throw new EGraphQLValidationException($this->handleValidationErrors($e->errors));

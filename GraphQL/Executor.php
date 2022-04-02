@@ -160,8 +160,8 @@ class Executor
                     $op->execute($this->context->getAuthorization($model)->criteria()) :
                     $op->execute();
                 $this->context->results[$alias] = $result;
-                if (!$this->context->omitted->contains($alias) && !empty($result)) {
-                    $response[$alias] = $result;
+                if (!$this->context->omitted->contains($alias)) {
+                    $response[$alias] = $result['result'];
                 }
             } catch (EGraphQLNotFoundException $e) {
                 $serverErrors[$alias]['not_found'] = $e->errors;
@@ -173,7 +173,7 @@ class Executor
                 $serverErrors[$alias]['bad_request'] = $e->errors;
                 merror($e->getMessage());
             } catch (\Exception | \Error $e) {
-//                mfatal($e->getTraceAsString());
+                mfatal($e->getTraceAsString());
                 mfatal($e->getMessage());
                 $serverErrors[$alias]['bad_request'] = 'internal_server_error';
             }

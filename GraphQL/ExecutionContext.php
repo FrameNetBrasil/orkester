@@ -16,6 +16,7 @@ use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\Manager;
 use Orkester\MVC\MModel;
+use Orkester\Persistence\Criteria\RetrieveCriteria;
 
 class ExecutionContext
 {
@@ -24,6 +25,7 @@ class ExecutionContext
     protected array $modelCache = [];
     protected array $authorizationCache = [];
     public array $results = [];
+    public array $criterias = [];
     public Set $omitted;
 
 
@@ -52,17 +54,21 @@ class ExecutionContext
         $result = $value;
         if (preg_match('/^\$q:(.+)/', $value, $matches)) {
             $parts = explode('.', $matches[1]);
-            $key = last($parts);
             if (!array_key_exists($parts[0], $this->results)) {
                 throw new EGraphQLException(['subquery_not_found' => $parts[0]]);
             }
-            $subResult = $this->results[$parts[0]];
-            if (array_key_exists(0, $subResult)) {
-                $result = array_map(fn($row) => $row[$key], $subResult);
-            } else {
-                $result = $subResult[$key];
+            if(count($parts) >= 2) {
+                $key = last($parts);
+                $subResult = $this->results[$parts[0]]['result'];
+                if (array_key_exists(0, $subResult)) {
+                    $result = array_map(fn($row) => $row[$key], $subResult);
+                } else {
+                    $result = $subResult[$key] ?? null;
+                }
             }
-
+            else {
+                $result = $this->results[$parts[0]]['criteria'];
+            }
         }
         return $result;
     }
@@ -183,5 +189,4 @@ class ExecutionContext
         $this->authorizationCache[$className] ??= new ExecutionAuthorization($model);
         return $this->authorizationCache[$className];
     }
-
 }

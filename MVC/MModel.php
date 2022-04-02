@@ -119,7 +119,7 @@ class MModel
                     }
                 }
                 if (is_null($value) && !$attributeMap->isNullable()) {
-                    throw new EValidationException([$attributeMap->getName() => 'attribute_not_nullable']);
+                    throw new EValidationException([$classMap->getName() . '::' . $attributeMap->getName() => 'attribute_not_nullable']);
                 }
                 $object->{$attributeMap->getName()} = $value;
             } catch(EValidationException $e) {
@@ -139,6 +139,42 @@ class MModel
     }
 
     public static function afterSave(object $object, int $pk)
+    {
+    }
+
+    /**
+     * @throws EValidationException
+     */
+    public function insert(object $object)
+    {
+        static::beforeInsert($object);
+        $pk = static::save($object);
+        static::afterInsert($object, $pk);
+    }
+
+    public static function beforeInsert(object $object)
+    {
+    }
+
+    public static function afterInsert(object $object, int $pk)
+    {
+    }
+
+    /**
+     * @throws EValidationException
+     */
+    public function update(object $object, object $old)
+    {
+        static::beforeUpdate($object, $old);
+        $pk = static::save($object);
+        static::afterUpdate($object, $old, $pk);
+    }
+
+    public static function beforeUpdate(object $object, object $old)
+    {
+    }
+
+    public static function afterUpdate(object $object, object $old, int $pk)
     {
     }
 
