@@ -42,7 +42,7 @@ class InsertOperation extends AbstractMutationOperation
             return null;
         }
         $object = (object)$data;
-        $model->save($object);
+        $model->insert($object);
         return $object;
     }
 
@@ -61,10 +61,6 @@ class InsertOperation extends AbstractMutationOperation
             throw new EGraphQLForbiddenException($modelName, 'write');
         }
         $pk = $model->getClassMap()->getKeyAttributeName();
-        if (!is_null($this->root->selectionSet)) {
-            $queryOperation = new QueryOperation($this->context, $this->root);
-            $queryOperation->prepare($model);
-        }
         $isSingle = $this->context->isSingular($modelName);
         try {
             if ($objectNode) {

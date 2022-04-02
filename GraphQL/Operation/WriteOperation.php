@@ -68,7 +68,7 @@ class WriteOperation
         /** @var ObjectFieldNode $fieldNode */
         foreach ($values as $name => $value) {
             if ($attributeMap = $classMap->getAttributeMap($name)) {
-                if ($attributeMap->getKeyType() == 'primary') {
+                if (false && $attributeMap->getKeyType() == 'primary') {
                     throw new EGraphQLForbiddenException($attributeMap->getName(), 'pk_write');
                 } else if ($attributeMap->getKeyType() == 'foreign') {
                     $associationMap = array_find($classMap->getAssociationMaps(), fn($map) => $map->getFromKey() == $attributeMap->getName());

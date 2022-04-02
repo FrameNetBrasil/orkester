@@ -35,7 +35,7 @@ abstract class AbstractConditionOperator extends AbstractOperation
             'in' => 'IN',
             'nin' => 'NOT IN',
             'is_null' => $value ? 'IS NULL' : 'IS NOT NULL',
-            'like' => 'LIKE',
+            'like', 'contains' => 'LIKE',
             'nlike' => 'NOT LIKE',
             'regex' => 'RLIKE',
             default => null
@@ -43,9 +43,11 @@ abstract class AbstractConditionOperator extends AbstractOperation
         if (is_null($result)) {
             throw new EGraphQLException(["unknown_condition_operator" => $operator]);
         }
-        if ($operator == 'is_null') {
-            $value = null;
-        }
+        $value = match($operator) {
+            'is_null' => null,
+            'contains' => "%$value%",
+            default => $value
+        };
         return $result;
     }
 
@@ -123,7 +125,7 @@ abstract class AbstractConditionOperator extends AbstractOperation
         } else if ($this->node instanceof VariableNode) {
             $conditions = $this->context->getNodeValue($this->node);
             foreach ($conditions as $field => $condition) {
-                foreach ($condition as $op => $value) {
+                foreach ($condition ?? [] as $op => $value) {
                     $topLevelConditions[] = [$field, $this->getCriteriaOperator($op, $value), $value];
                 }
             }

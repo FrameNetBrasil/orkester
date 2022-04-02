@@ -21,6 +21,7 @@ use Orkester\GraphQL\Operator\JoinOperator;
 use Orkester\GraphQL\Operator\LimitOperator;
 use Orkester\GraphQL\Operator\OffsetOperator;
 use Orkester\GraphQL\Operator\OrderByOperator;
+use Orkester\GraphQL\Operator\UnionOperator;
 use Orkester\GraphQL\Operator\WhereOperator;
 use Orkester\Manager;
 use Orkester\MVC\MModel;
@@ -34,9 +35,10 @@ class QueryOperation extends AbstractOperation
     public Set $selection;
     public array $subOperations = [];
     public array $operators = [];
-    public bool $isPrepared = false;
     public bool $isSingleResult = false;
+    public bool $isCriteriaOnly = false;
     public bool $includeTypename = false;
+    public ?array $parameters = null;
     public Set $requiredSelections;
     public string $typename = '';
     public MModel $model;
@@ -85,6 +87,11 @@ class QueryOperation extends AbstractOperation
                 if ($this->context->getNodeValue($argument->value)) {
                     $this->isSingleResult = true;
                 };
+            } else if ($argument->name->value == 'criteria') {
+                $this->context->addOmitted($this->getName());
+                $this->isCriteriaOnly = true;
+            } else if ($argument->name->value == 'bind') {
+                $this->parameters = $this->context->getNodeValue($argument->value);
             }
             if ($this->isMutationResult) continue;
             $class = match ($argument->name->value) {
@@ -96,6 +103,7 @@ class QueryOperation extends AbstractOperation
                 'limit' => LimitOperator::class,
                 'offset' => OffsetOperator::class,
                 'having' => HavingOperator::class,
+                'union' => UnionOperator::class,
                 default => null
             };
             if (is_null($class)) {
@@ -205,25 +213,6 @@ class QueryOperation extends AbstractOperation
         }
     }
 
-    /**
-     * @param MModel|null $model
-     * @throws EGraphQLException
-     * @throws EGraphQLForbiddenException
-     * @throws EGraphQLNotFoundException
-     * @throws \DI\DependencyException
-     * @throws \DI\NotFoundException
-     */
-    public function prepare(?MModel $model)
-    {
-        if (!static::isModelReadable($model)) {
-            throw new EGraphQLForbiddenException($this->node->name->value, 'read');
-        }
-        $this->prepareArguments($this->node->arguments);
-        $this->handleSelection($this->node->selectionSet, $model);
-        $this->isPrepared = true;
-        $this->typename = $this->context->getModelTypename($model);
-    }
-
     public function getName(): string
     {
         return $this->node->alias ? $this->node->alias->value : $this->node->name->value;
@@ -245,20 +234,34 @@ class QueryOperation extends AbstractOperation
     }
 
     /**
-     * @param RetrieveCriteria $criteria
-     * @param MModelMaestro|MModel|null $model
-     * @return array
+     * @param MModel|null $model
      * @throws EGraphQLException
      * @throws EGraphQLForbiddenException
      * @throws EGraphQLNotFoundException
      * @throws \DI\DependencyException
      * @throws \DI\NotFoundException
      */
-    public function execute(RetrieveCriteria $criteria, ?MModel $model = null): ?array
+    public function prepare(?MModel $model)
     {
-        if (!$this->isPrepared) {
-            $this->prepare($model);
+        if (!static::isModelReadable($model)) {
+            throw new EGraphQLForbiddenException($this->node->name->value, 'read');
         }
+        $this->prepareArguments($this->node->arguments);
+        $this->handleSelection($this->node->selectionSet, $model);
+        $this->typename = $this->context->getModelTypename($model);
+    }
+
+    /**
+     * @param RetrieveCriteria $criteria
+     * @return ?array
+     * @throws EGraphQLException
+     * @throws EGraphQLForbiddenException
+     * @throws EGraphQLNotFoundException
+     * @throws \DI\DependencyException
+     * @throws \DI\NotFoundException
+     */
+    public function execute(RetrieveCriteria $criteria): ?array
+    {
         $columnsToExclude = [];
         foreach ($this->requiredSelections->toArray() as $item) {
             if (!$this->selection->contains($item)) {
@@ -269,7 +272,11 @@ class QueryOperation extends AbstractOperation
         $classMap = $criteria->getClassMap();
         $criteria->select(join(",", $this->selection->toArray()));
         $this->applyArguments($criteria);
-        $rows = $criteria->asResult();
+//        $rows = $criteria->asResult($this->context->variables);
+        if ($this->isCriteriaOnly) {
+            return ['criteria' => $criteria];
+        }
+        $rows = $criteria->asResult($this->parameters ?? null);
         if ($this->includeTypename) {
             foreach ($rows as &$row) {
                 $row['__typename'] = $this->typename;
@@ -281,7 +288,7 @@ class QueryOperation extends AbstractOperation
             $fromKey = $associationMap->getFromKey();
             $fk = $associationMap->getToKey();
             $keySet = new Set();
-            foreach($rows as $row) {
+            foreach ($rows as $row) {
                 if (!empty($row[$fromKey])) $keySet->add($row[$fromKey]);
             }
             $keys = $keySet->toArray();
@@ -325,6 +332,10 @@ class QueryOperation extends AbstractOperation
             $rows = $updatedRows;
 
         }
-        return ($this->isSingleResult || $this->context->isSingular($this->node->name->value)) ? ($rows[0] ?? null) : $rows;
+        $result = ($this->isSingleResult || $this->context->isSingular($this->node->name->value)) ? ($rows[0] ?? null) : $rows;
+        return [
+            'criteria' => $criteria,
+            'result' => $result
+        ];
     }
 }
