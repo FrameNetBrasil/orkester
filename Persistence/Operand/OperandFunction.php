@@ -22,13 +22,13 @@ class OperandFunction extends PersistentOperand
     public function getSql()
     {
         $value = trim($this->operand);
-        $output = [];
-        preg_match('/([^\(]*)\((.*)\)/', $value, $output);
-        $fn = $output[1];
-        $arg = $output[2];
-        $o = new OperandString($arg, $this->criteria);
-        $sql = $fn . '(' . $o->getSql() . ')';
-        return $sql;
+        $output = preg_replace_callback('/([\.\w]+)/',
+            function ($matches) {
+                $op = new OperandString($matches[1], $this->criteria);
+                return $op->getSql();
+            },
+            $value);
+        return $output;
     }
 
     public function getSqlWhere()
@@ -44,14 +44,6 @@ class OperandFunction extends PersistentOperand
     public function getSqlOrder()
     {
         return '';
-    }
-
-    public static function isValid(string $string): bool
-    {
-        $value = trim($string);
-        $output = [];
-        preg_match('/([^(^ ]*)\((.*)\)/', $value, $output);
-        return !empty($output[1]);
     }
 
 }
