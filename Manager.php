@@ -86,7 +86,7 @@ class Manager
     /**
      * Configuration values
      */
-    static private array $conf = [];
+    static public array $conf = [];
     static private App $app;
     /**
      * @var HttpErrorHandler
@@ -128,12 +128,16 @@ class Manager
         $reflection = new \ReflectionClass(\Composer\Autoload\ClassLoader::class);
         $basePath = dirname($reflection->getFileName(), 3);
         self::$basePath = $basePath;
-        self::$appPath = $basePath . '/app';
         self::$confPath = $basePath . '/conf';
+        self::loadConf(self::$confPath . '/conf.php');
+
+        $appDir = self::getOptions('appDir') ?? 'app';
+        self::$appPath = $basePath . "/$appDir";
+
         self::$publicPath = $basePath . '/public';
         self::$classPath = $basePath . '/vendor/elymatos/orkester';
         self::$varPath = $basePath . '/var';
-        self::loadConf(self::$confPath . '/conf.php');
+
         self::$mode = self::getOptions("mode");
         // Instantiate PHP-DI ContainerBuilder
         $containerBuilder = new ContainerBuilder();
@@ -141,15 +145,25 @@ class Manager
         if (self::$mode == 'PROD') {
             $containerBuilder->enableCompilation(__DIR__ . '/../var/cache');
         }
-// Set up settings
-        $settings = require self::$confPath . '/settings.php';
-        $settings($containerBuilder);
+        // Set up settings
+        $baseSettings = require self::$classPath . '/Conf/settings.php';
+        $baseSettings($containerBuilder);
 
-// Set up dependencies
-        $dependencies = require self::$confPath . '/dependencies.php';
-        $dependencies($containerBuilder);
+        if (file_exists(file_exists(self::$confPath . '/settings.php'))) {
+            $settings = require self::$confPath . '/settings.php';
+            $settings($containerBuilder);
+        }
 
-// Build PHP-DI Container instance
+        // Set up dependencies
+        $baseDependencies = require self::$classPath . '/Conf/dependencies.php';
+        $baseDependencies($containerBuilder);
+
+        if (file_exists(file_exists(self::$confPath . '/dependencies.php'))) {
+            $dependencies = require self::$confPath . '/dependencies.php';
+            $dependencies($containerBuilder);
+        }
+
+        // Build PHP-DI Container instance
         self::$container = $containerBuilder->build();
 
         self::$baseURL = '';
@@ -262,6 +276,11 @@ class Manager
     public static function getConfPath(): string
     {
         return self::$confPath;
+    }
+
+    public static function getOrkesterPath(): string
+    {
+        return self::$classPath;
     }
 
     public static function getVarPath(): string
