@@ -398,7 +398,7 @@ class PersistenceSQL implements PersistenceBackend
     {
         $statement = $this->getSqlStatementForCriteria($criteria);
         $statement->setDb($this->getDb($criteria->getClassMap()));
-        if (count($parameters) > 0) {
+        if (!empty($parameters)) {
             $statement->setParameters($parameters);
         }
         return $this->db->getQuery($statement);
