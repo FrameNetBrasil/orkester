@@ -131,7 +131,8 @@ class Manager
         self::$confPath = $basePath . '/conf';
         self::loadConf(self::$confPath . '/conf.php');
 
-        $appDir = self::getOptions('appDir') ?? 'app';
+        $optAddDir = self::getOptions('appDir');
+        $appDir = empty($optAddDir) ? 'app' : $optAddDir;
         self::$appPath = $basePath . "/$appDir";
 
         self::$publicPath = $basePath . '/public';
