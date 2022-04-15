@@ -21,7 +21,7 @@ use Orkester\Persistence\Criteria\RetrieveCriteria;
 class ExecutionContext
 {
 
-    protected static array $conf;
+    protected static array $conf = [];
     protected array $modelCache = [];
     protected array $authorizationCache = [];
     public array $results = [];
@@ -57,7 +57,7 @@ class ExecutionContext
             if (!array_key_exists($parts[0], $this->results)) {
                 throw new EGraphQLException(['subquery_not_found' => $parts[0]]);
             }
-            if(count($parts) >= 2) {
+            if (count($parts) >= 2) {
                 $key = last($parts);
                 $subResult = $this->results[$parts[0]]['result'];
                 if (array_key_exists(0, $subResult)) {
@@ -65,8 +65,7 @@ class ExecutionContext
                 } else {
                     $result = $subResult[$key] ?? null;
                 }
-            }
-            else {
+            } else {
                 $result = $this->results[$parts[0]]['criteria'];
             }
         }
@@ -135,10 +134,10 @@ class ExecutionContext
 
     public function getCallableService(string $name): ?string
     {
-        if ($callable = static::$conf['services'][$name] ?? false) {
+        if ($callable = (static::$conf)['services'][$name] ?? false) {
             return $callable;
-        } else if ($callable = static::$conf['serviceResolver']($name)) {
-            return $callable;
+        } else if (array_key_exists('serviceResolver', static::$conf)) {
+            return (static::$conf)['serviceResolver']($name);
         }
         return null;
     }
