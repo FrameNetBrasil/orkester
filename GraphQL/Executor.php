@@ -161,7 +161,7 @@ class Executor
                     $op->execute();
                 $this->context->results[$alias] = $result;
                 if (!$this->context->omitted->contains($alias)) {
-                    $response[$alias] = $result['result'];
+                    $response[$alias] = $result['result'] ?? null;
                 }
             } catch (EGraphQLNotFoundException $e) {
                 $serverErrors[$alias]['not_found'] = $e->errors;
