@@ -54,7 +54,7 @@ class MLog
         $handlerSQL->setFormatter($formatter);
         $this->loggerSQL->pushHandler($handlerSQL);
 
-        if ($this->port != 0) {
+        if (!empty($this->port) && $this->port != '0') {
             $strict = $this->getOption('strict');
             $allow = $strict ? ($strict == $this->host) : true;
             $host = $this->peer;
