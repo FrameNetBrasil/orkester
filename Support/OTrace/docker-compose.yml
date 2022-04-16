@@ -1,7 +1,8 @@
 version: '3.4'
 services:
   trace:
-    image: orkester_trace
+    build:
+        context: .
     restart: unless-stopped
     # resolve dns
     #hostname: orkester.trace.internal

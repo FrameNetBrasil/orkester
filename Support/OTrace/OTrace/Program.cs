@@ -17,14 +17,18 @@ void StartWebSocketServer(IPAddress ip, int port)
 
 void ProcessTraceMessage(string tag, string message)
 {
-    TraceSocketBehavior.Broadcast(JsonSerializer.Serialize(new
+    if (!string.IsNullOrWhiteSpace(tag) && !string.IsNullOrWhiteSpace(message))
     {
-        tag,
-        message
-    }, new JsonSerializerOptions
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-    }));
+        TraceSocketBehavior.Broadcast(JsonSerializer.Serialize(new
+        {
+            tag,
+            message
+        }, new JsonSerializerOptions
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        }));        
+    }
+    
     // Console.WriteLine(message);
     // Console.WriteLine($"##########  {tag} END OF MESSAGE ##############");
 }
@@ -59,8 +63,14 @@ void ReadTraceSocket(Socket socket)
                 {
                     CompleteMessage(tag);
                     tag = match.Groups[1].Value;
+                    builder.Append(line.Substring(tag.Length + 2));
                 }
-                builder.Append(line);
+                else
+                {
+                    builder.Append(line);
+                }
+
+                builder.Append(Environment.NewLine);
             }
         }
         catch (SocketException)
