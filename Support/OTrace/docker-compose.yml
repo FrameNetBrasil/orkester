@@ -1,0 +1,15 @@
+version: '3.4'
+services:
+  trace:
+    image: orkester_trace
+    restart: unless-stopped
+    hostname: orkester.trace.internal
+    # as an alternative to resolve dns, can also map WebSocket port
+    #ports:
+    #  - "9999:9999"
+    #  - "9998:9998"
+    command:
+      - "0.0.0.0" # Listen IP. Orkester will send trace data to this host (conf: logs.host)
+      - "9999" # Listen Port (conf: logs.port)
+      - "0.0.0.0" # WebSocket Host (use dns resolver for orkester.trace.internal or find container IP)
+      - "9998" # WebSocket Port (anything except the same port as above)
