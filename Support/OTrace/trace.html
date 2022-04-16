@@ -5,7 +5,7 @@
         <div>
             <div>
                 <label for="host">Host</label>
-                <input id="host" name="host" value="orkester.trace.internal">
+                <input id="host" name="host" value="0.0.0.0">
             </div>
             <div>
                 <label for="port">Port</label>
@@ -28,6 +28,7 @@
     body {
         margin-top: 0;
         margin-left: 0;
+        height: fit-content;
     }
 
     #host {
@@ -86,8 +87,6 @@
     function clear() {
         content.innerHTML = "";
         messageCounter = 0;
-        document.body.style.height = '1px'
-        document.body.style.removeProperty('height');
     }
 
     clearButton.onclick = clear;
@@ -101,6 +100,7 @@
         element.classList.add("log-message", data.tag);
         element.innerHTML = `${++messageCounter}:  ${data.message}`;
         content.append(element);
+        window.scrollTo(0, document.body.scrollHeight);
     }
 
     connectButton.onclick = function () {

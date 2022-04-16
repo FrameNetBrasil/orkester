@@ -76,17 +76,13 @@ void StartTraceListener(IPAddress ip, int port)
 {
     var listener = new TcpListener(ip, port);
     listener.Start();
-
-    async Task AcceptSocket()
-    {
-        //This only accepts ONE connection from orkester at a time
-        var socket = await listener.AcceptSocketAsync();
-        ReadTraceSocket(socket);
-        AcceptSocket();
-    }
-
-    AcceptSocket();
     Console.WriteLine($"Trace listener started at {ip}:{port}");
+    while (listener.Server.IsBound)
+    {
+        var socket = listener.AcceptSocket();
+        var task = new Task(() => ReadTraceSocket(socket));
+        task.Start();
+    }
 }
 
 try
@@ -116,9 +112,8 @@ try
         throw new ArgumentException($"Invalid WebSocket port: {args[3]}");
     }
 
-    StartTraceListener(listenIp, listenPort);
+    new Task(() => StartTraceListener(listenIp, listenPort)).Start();
     StartWebSocketServer(wsIp, wsPort);
-
     var stop = new ManualResetEvent(false);
     stop.WaitOne();
 }
