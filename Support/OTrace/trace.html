@@ -96,9 +96,12 @@
         if (resetCheckbox.checked && data.tag === "RESET_LOG_MESSAGES") {
             clear();
         }
+        if (data.tag === "JSON") {
+            console.log(JSON.parse(data.message))
+        }
         const element = document.createElement("div");
         element.classList.add("log-message", data.tag);
-        element.innerHTML = `${++messageCounter}:  ${data.message}`;
+        element.innerHTML = `${++messageCounter}: [${data.tag}] ${data.message}`;
         content.append(element);
         window.scrollTo(0, document.body.scrollHeight);
     }
