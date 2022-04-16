@@ -46,7 +46,7 @@ function mtrace($var)
 
 function mconsole($var)
 {
-    MTrace::console(print_r($var, true));
+    MTrace::traceDebug("JSON", json_encode($var));
 }
 
 function mtracestack()
@@ -79,6 +79,12 @@ function group_by(array $data, mixed $key, bool $unset_key = true): array
 
 function method(string $class, string $method): string
 {
+    return "$class::$method";
+}
+
+function get_method(string $method, string $class = null): string
+{
+    $class ??= get_called_class();
     return "$class::$method";
 }
 
