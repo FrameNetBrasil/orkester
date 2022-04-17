@@ -2,6 +2,7 @@
 
 namespace Orkester\Services;
 
+use Monolog\Handler\ErrorLogHandler;
 use Orkester\Manager;
 use Monolog\Handler\StreamHandler;
 use Monolog\Formatter\LineFormatter;
@@ -45,6 +46,12 @@ class MLog
 
         $this->logger = new Logger($this->channel);
         // Create the handlers
+        global $argv;
+        if (in_array('--trace', $argv ?? [])) {
+            $stdout = new StreamHandler('php://stdout');
+            $stdout->setFormatter(new LineFormatter("%level_name%: %message% %context.user%" . PHP_EOL));
+            $this->logger->pushHandler($stdout);
+        }
         $handlerFile = new StreamHandler($this->errorLog, Logger::DEBUG, filePermission: 0777);
         $handlerFile->setFormatter($formatter);
         $this->logger->pushHandler($handlerFile);

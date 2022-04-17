@@ -11,7 +11,7 @@ function _M($msg, $params = NULL)
 function mdump(...$var)
 {
     MTrace::traceDebug("DEBUG", ...$var);
-    return $var[0];
+    return $var[0] ?? null;
 }
 
 function mfatal(...$var)
@@ -46,7 +46,7 @@ function mtrace($var)
 
 function mconsole($var)
 {
-    MTrace::traceDebug("JSON", json_encode($var));
+    MTrace::traceDebug("CONSOLE", json_encode($var));
 }
 
 function mtracestack()
