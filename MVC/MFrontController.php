@@ -67,8 +67,6 @@ class MFrontController
             $middleware($this->app);
         }
 
-        $baseMiddleware = require Manager::getOrkesterPath() . '/Conf/middleware.php';
-        $baseMiddleware($this->app);
 // Register routes
         $routes = require $confPath . '/routes.php';
         $routes($this->app);
