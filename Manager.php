@@ -348,7 +348,7 @@ class Manager
     public static function getCache(): Psr16Adapter
     {
         if (is_null(self::$cache)) {
-            mdump('=== creating cache');
+            mtrace('=== creating cache');
             $driver = self::$conf['cache']['type'] ?: 'apcu';
             $cacheObj = new MCacheFast($driver);
             self::$cache = $cacheObj->getCache();
