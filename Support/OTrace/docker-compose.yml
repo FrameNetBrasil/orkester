@@ -4,14 +4,14 @@ services:
     build:
         context: .
     restart: unless-stopped
-    # resolve dns
+    # resolve dns eg.
     #hostname: orkester.trace.internal
     # or map ports
     ports:
       - "9999:9999"
       - "9998:9998"
     command:
-      - "0.0.0.0" # Listen IP. Orkester will send trace data to this host (conf: logs.host)
-      - "9999" # Listen Port (conf: logs.port)
-      - "0.0.0.0" # WebSocket Host (use dns resolver for orkester.trace.internal or find container IP)
+      - "0.0.0.0" # Listen IP. Orkester will send trace data to this host (conf.php: logs.peer)
+      - "9999" # Listen Port (conf.php: logs.port)
+      - "0.0.0.0" # WebSocket Host (connect to this to receive JSON trace data eg. ws::0.0.0.0:9998)
       - "9998" # WebSocket Port (anything except the same port as above)
