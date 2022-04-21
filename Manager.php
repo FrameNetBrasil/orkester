@@ -149,8 +149,7 @@ class Manager
         // Set up settings
         $baseSettings = require self::$classPath . '/Conf/settings.php';
         $baseSettings($containerBuilder);
-
-        if (file_exists(file_exists(self::$confPath . '/settings.php'))) {
+        if (file_exists(self::$confPath . '/settings.php')) {
             $settings = require self::$confPath . '/settings.php';
             $settings($containerBuilder);
         }
@@ -159,7 +158,7 @@ class Manager
         $baseDependencies = require self::$classPath . '/Conf/dependencies.php';
         $baseDependencies($containerBuilder);
 
-        if (file_exists(file_exists(self::$confPath . '/dependencies.php'))) {
+        if (file_exists(self::$confPath . '/dependencies.php')) {
             $dependencies = require self::$confPath . '/dependencies.php';
             $dependencies($containerBuilder);
         }
