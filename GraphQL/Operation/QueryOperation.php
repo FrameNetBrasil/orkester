@@ -114,7 +114,7 @@ class QueryOperation extends AbstractOperation
     public function formatValue(string $key, mixed $value)
     {
         /** @var AttributeMap $map */
-        if ($map = $this->attributeMaps[$key] ?? false) {
+        if (!is_null($value) && $map = $this->attributeMaps[$key] ?? false) {
             $phpValue = $map->getValueFromDb($value);
             if ($format = $this->formatters[$key] ?? false) {
                 $type = $map->getType();
