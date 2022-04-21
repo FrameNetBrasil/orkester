@@ -15,9 +15,10 @@ use Orkester\GraphQL\Hook\IUpdateHook;
 use Orkester\GraphQL\Operator\IdOperator;
 use Orkester\GraphQL\Operator\SetOperator;
 use Orkester\GraphQL\Operator\WhereOperator;
+use Orkester\MVC\MAuthorizedModel;
 use Orkester\MVC\MModel;
 
-class UpdateOperation extends AbstractMutationOperation
+class UpdateOperation extends AbstractWriteOperation
 {
     protected array $operators = [];
     protected array $set;
@@ -26,7 +27,6 @@ class UpdateOperation extends AbstractMutationOperation
     public function __construct(ExecutionContext $context, protected FieldNode $root)
     {
         parent::__construct($context);
-
     }
 
     public function prepareArguments(NodeList $arguments)
@@ -61,16 +61,15 @@ class UpdateOperation extends AbstractMutationOperation
      * @throws EGraphQLForbiddenException
      * @throws \DI\DependencyException
      */
-    public function collectExistingRows(MModel $model): array
+    public function collectExistingRows(MAuthorizedModel $model): array
     {
         $operator = new QueryOperation($this->context, $this->root);
         $operator->operators = $this->operators;
         $operator->isPrepared = true;
-
-        return $operator->execute($this->context->getAuthorization($model)->criteria()->select('*'));
+        return $operator->execute($model->getCriteria()->select('*'))['result'];
     }
 
-    public function prepare(?MModel $model)
+    public function prepare(?MAuthorizedModel $model)
     {
         $this->prepareArguments($this->root->arguments);
     }
@@ -93,16 +92,11 @@ class UpdateOperation extends AbstractMutationOperation
         }
         //TODO batch
         $rows = $this->collectExistingRows($model);
-        $writer = new WriteOperation($this->context);
         $modified = [];
 
         foreach ($rows as $row) {
             $currentRowObject = (object)$row;
-            if (!$this->context->getAuthorization($model)->update($currentRowObject)) {
-                throw new EGraphQLForbiddenException($modelName, 'update');
-            }
-            $writer->currentObject = $currentRowObject;
-            $values = $writer->createEntityArray($this->set, $model);
+            $values = $this->createEntityArray($this->set, $model, true);
             if (!empty($values)) {
                 $modified[] = [(object)array_merge($row, $values), $currentRowObject];
             }

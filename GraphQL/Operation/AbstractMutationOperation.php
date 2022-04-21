@@ -4,7 +4,7 @@ namespace Orkester\GraphQL\Operation;
 
 use GraphQL\Language\AST\FieldNode;
 use Orkester\GraphQL\ExecutionContext;
-use Orkester\MVC\MModel;
+use Orkester\MVC\MAuthorizedModel;
 
 abstract class AbstractMutationOperation extends AbstractOperation
 {
@@ -13,7 +13,7 @@ abstract class AbstractMutationOperation extends AbstractOperation
         parent::__construct($context);
     }
 
-    public function createSelectionResult(MModel $model, FieldNode $root, ?array $ids, bool $single)
+    public function createSelectionResult(MAuthorizedModel $model, FieldNode $root, ?array $ids, bool $single)
     {
         if (is_null($ids)) {
             return $single ? null : [];
@@ -25,7 +25,7 @@ abstract class AbstractMutationOperation extends AbstractOperation
             return $single ? null : [];
         }
         $pk = $model->getClassMap()->getKeyAttributeName();
-        $criteria = $this->context->getAuthorization($model)->criteria()->where($pk, 'IN', $ids);
+        $criteria = $model->getCriteria()->where($pk, 'IN', $ids);
         return $operation->execute($criteria);
     }
 

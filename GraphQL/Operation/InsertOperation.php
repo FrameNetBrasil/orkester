@@ -13,36 +13,52 @@ use Orkester\Exception\EGraphQLValidationException;
 use Orkester\Exception\ESecurityException;
 use Orkester\Exception\EValidationException;
 use Orkester\GraphQL\ExecutionContext;
+use Orkester\MVC\MAuthorizedModel;
 use Orkester\MVC\MModel;
 
-class InsertOperation extends AbstractMutationOperation
+class InsertOperation extends AbstractWriteOperation
 {
 
-    protected WriteOperation $writer;
+    protected AbstractWriteOperation $writer;
 
     public function __construct(protected ExecutionContext $context, protected FieldNode $root)
     {
         parent::__construct($this->context);
-        $this->writer = new WriteOperation($this->context);
+    }
+
+    public function getName(): string
+    {
+        return $this->root->alias ? $this->root->alias->value : $this->root->name->value;
     }
 
     /**
-     * @param MModel $model
-     * @param ObjectValueNode $node
+     * @param MAuthorizedModel $model
+     * @param ObjectValueNode|VariableNode $node
      * @return object|null
      * @throws EGraphQLForbiddenException
      * @throws EValidationException
      * @throws EGraphQLNotFoundException
      */
-    public function insertSingle(MModel $model, ObjectValueNode|VariableNode $node): ?object
+    public function insertSingle(MAuthorizedModel $model, ObjectValueNode|VariableNode $node): ?object
     {
         $value = $this->context->getNodeValue($node);
-        $data = $this->writer->createEntityArray($value, $model);
-        if (is_null($data)) {
-            return null;
-        }
+        $isUpdate = $this->isUpdateOperation($value, $model);
+        $data = $this->createEntityArray($value, $model, $isUpdate);
         $object = (object)$data;
-        $model->insert($object);
+        if ($isUpdate) {
+            $key = $model->getClassMap()->getKeyAttributeName();
+            $old = $model->one($key);
+            if (empty($old)) {
+                throw new EGraphQLNotFoundException($this->getName(), 'upsert');
+            }
+            try {
+                $model->update($object, $old);
+            } catch (\DomainException) {
+                throw new EGraphQLForbiddenException($this->getName(), 'update');
+            }
+        } else {
+            $model->insert($object);
+        }
         return $object;
     }
 
@@ -57,9 +73,6 @@ class InsertOperation extends AbstractMutationOperation
         $objectNode = $this->context->getArgumentValueNode($this->root, 'object');
         $modelName = $this->root->name->value;
         $model = $this->context->getModel($modelName);
-        if (!$this->context->getAuthorization($model)->insert()) {
-            throw new EGraphQLForbiddenException($modelName, 'write');
-        }
         $pk = $model->getClassMap()->getKeyAttributeName();
         $isSingle = $this->context->isSingular($modelName);
         try {

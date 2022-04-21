@@ -2,6 +2,7 @@
 
 namespace Orkester\GraphQL;
 
+use Carbon\Carbon;
 use Ds\Set;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
@@ -15,15 +16,15 @@ use GraphQL\Language\AST\VariableNode;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\Manager;
+use Orkester\MVC\MAuthorizedModel;
 use Orkester\MVC\MModel;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
+use Orkester\Persistence\Map\AttributeMap;
 
 class ExecutionContext
 {
 
     protected static array $conf = [];
-    protected array $modelCache = [];
-    protected array $authorizationCache = [];
     public array $results = [];
     public array $criterias = [];
     public Set $omitted;
@@ -118,18 +119,16 @@ class ExecutionContext
      * @throws \DI\DependencyException
      * @throws \DI\NotFoundException
      */
-    public function getModel(string $name): ?MModel
+    public function getModel(string $name): ?MAuthorizedModel
     {
         $modelName = $this->getModelName($name);
         if (empty($modelName)) {
             throw new EGraphQLNotFoundException($name, 'model');
         }
-        if (array_key_exists($modelName, $this->modelCache)) {
-            return $this->modelCache[$modelName];
-        }
-        $model = Manager::getContainer()->get($modelName);
-        $this->modelCache[$modelName] = $model;
-        return $model;
+        $container = Manager::getContainer();
+        $model = $container->get($modelName);
+        $authorization = $container->get($model::$authorizationClass);
+        return new MAuthorizedModel($model, $authorization);
     }
 
     public function getCallableService(string $name): ?string
@@ -162,12 +161,12 @@ class ExecutionContext
         $this->omitted->add($alias);
     }
 
-    public function getModelTypename(MModel $model): string
+    public function getModelTypename(MAuthorizedModel $model): string
     {
-        if (preg_match_all("/([\w\d_]+)Model$/", get_class($model), $matches)) {
+        if (preg_match_all("/([\w\d_]+)Model$/", get_class($model->getModel()), $matches)) {
             return $matches[1][0];
         } else {
-            return str_replace('\\', '_', get_class($model));
+            return str_replace('\\', '_', get_class($model->getModel()));
         }
     }
 
@@ -180,12 +179,5 @@ class ExecutionContext
             }
         }
         return null;
-    }
-
-    public function getAuthorization(MModel $model): ExecutionAuthorization
-    {
-        $className = get_class($model);
-        $this->authorizationCache[$className] ??= new ExecutionAuthorization($model);
-        return $this->authorizationCache[$className];
     }
 }

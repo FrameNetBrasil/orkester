@@ -157,7 +157,7 @@ class Executor
             try {
                 $op->prepare($model);
                 $result = $model ?
-                    $op->execute($this->context->getAuthorization($model)->criteria()) :
+                    $op->execute($model->getCriteria()) :
                     $op->execute();
                 $this->context->results[$alias] = $result;
                 if (!$this->context->omitted->contains($alias)) {
