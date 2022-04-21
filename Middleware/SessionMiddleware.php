@@ -17,8 +17,6 @@ class SessionMiddleware implements Middleware
      */
     public function process(Request $request, RequestHandler $handler): Response
     {
-        $checkLogin = Manager::getConf('login.check');
-        mtrace('in session middleware - login check = ' . ($checkLogin ? 'true' : 'false'));
         $idSession = $_COOKIE['PHPSESSID'] ?? session_id();
         $jwtHeader = $request->getHeaderLine('Authorization');
         if ($jwtHeader) {
