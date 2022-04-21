@@ -7,6 +7,7 @@ use GraphQL\Language\AST\ObjectFieldNode;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLForbiddenException;
 use Orkester\Exception\EGraphQLNotFoundException;
+use Orkester\Exception\EGraphQLValidationException;
 use Orkester\MVC\MAuthorizedModel;
 use Orkester\Persistence\Map\AttributeMap;
 
@@ -20,6 +21,7 @@ abstract class AbstractWriteOperation extends AbstractMutationOperation
 
     public function formatValue(string $type, mixed $value, mixed $format)
     {
+        if (is_null($value)) return null;
         return match ($type) {
             'datetime', 'time', 'date', 'timestamp' => Carbon::createFromFormat($format, $value),
             default => $value
@@ -45,7 +47,11 @@ abstract class AbstractWriteOperation extends AbstractMutationOperation
                     }
                     ['value' => $provided, 'format' => $format] = $value;
                     if (!empty($format)) {
-                        $value = $this->formatValue($attributeMap->getType(), $provided, $format);
+                        try {
+                            $value = $this->formatValue($attributeMap->getType(), $provided, $format);
+                        } catch(\Exception $e) {
+                            throw new EGraphQLValidationException([$name => ['invalid_value']]);
+                        }
                     } else {
                         $value = $provided;
                     }
