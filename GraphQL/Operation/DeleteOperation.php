@@ -8,11 +8,10 @@ use GraphQL\Language\AST\NodeList;
 use Orkester\Exception\EDBException;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLForbiddenException;
-use Orkester\Exception\EGraphQLValidationException;
 use Orkester\GraphQL\ExecutionContext;
 use Orkester\GraphQL\Operator\IdOperator;
 use Orkester\GraphQL\Operator\WhereOperator;
-use Orkester\MVC\MModel;
+use Orkester\MVC\MAuthorizedModel;
 
 class DeleteOperation extends AbstractOperation
 {
@@ -23,7 +22,6 @@ class DeleteOperation extends AbstractOperation
     public function __construct(ExecutionContext $context, protected FieldNode $root)
     {
         parent::__construct($context);
-
     }
 
     public function prepareArguments(NodeList $arguments)
@@ -45,14 +43,14 @@ class DeleteOperation extends AbstractOperation
     /**
      * @throws EGraphQLException
      */
-    public function collectExistingRows(MModel $model): array
+    public function collectExistingRows(MAuthorizedModel $model): array
     {
         $operator = new QueryOperation($this->context, $this->root);
         $operator->operators = $this->operators;
         $operator->isPrepared = true;
 
         $pk = $model->getClassMap()->getKeyAttributeName();
-        $rows = $operator->execute($this->context->getAuthorization($model)->criteria()->select($pk));
+        $rows = $operator->execute($model->getCriteria()->select($pk))['result'];
         if (is_null($rows)) return [];
         if (!array_key_exists(0, $rows)) return [$rows];
         return $rows;
@@ -67,16 +65,14 @@ class DeleteOperation extends AbstractOperation
         $model = $this->context->getModel($this->root->name->value);
         $modelName = $this->root->name->value;
         $rows = $this->collectExistingRows($model);
-        $pk = $model->getClassMap()->getKeyAttributeName();
+        $pk = $model->getKeyAttributeName();
         foreach ($rows as $row) {
-            if ($this->context->getAuthorization($model)->delete($row[$pk])) {
-                try {
-                    $model->delete($row[$pk]);
-                } catch(EDBException $e) {
-                    merror($e->getMessage());
-                    throw new EGraphQLException(["delete_row_{$modelName}" => 'constraint failed']);
-                }
-            } else {
+            try {
+                $model->delete($row[$pk]);
+            } catch (EDBException $e) {
+                merror($e->getMessage());
+                throw new EGraphQLException(["delete_row_{$modelName}" => 'constraint_failed']);
+            } catch (\DomainException) {
                 throw new EGraphQLForbiddenException($modelName, 'delete');
             }
         }

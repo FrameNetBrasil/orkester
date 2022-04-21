@@ -196,6 +196,11 @@ class ClassMap
 
     public function attributeExists(string $path): bool
     {
+       return $this->getAttributeMapChain($path) != null;
+    }
+
+    public function getAttributeMapChain(string $path): ?AttributeMap
+    {
         $parts = explode('.', $path);
         $classMap = $this;
         for($i = 0; $i < count($parts) - 1; $i++){
@@ -203,10 +208,10 @@ class ClassMap
                 $classMap = $associationMap->getToClassMap();
             }
             else {
-                return false;
+                return null;
             }
         }
-        return $classMap->getAttributeMap(last($parts)) != null;
+        return $classMap->getAttributeMap(last($parts));
     }
 
     public function associationExists(string $path): bool

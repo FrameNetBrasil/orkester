@@ -25,11 +25,7 @@ class MModel
     public static RetrieveCriteria $criteria;
     public static array $map = [];
     public static string $entityClass = '';
-
-    public function __construct(?IAuthorization $authorization = null)
-    {
-        $this->authorization = $authorization ?? new AllowAllAuthorization();
-    }
+    public static string $authorizationClass = AllowAllAuthorization::class;
 
     public static function init(): void
     {

@@ -3,7 +3,7 @@
 namespace Orkester\GraphQL\Operation;
 
 use Orkester\GraphQL\ExecutionContext;
-use Orkester\MVC\MModel;
+use Orkester\MVC\MAuthorizedModel;
 
 abstract class AbstractOperation
 {
@@ -11,7 +11,7 @@ abstract class AbstractOperation
     {
     }
 
-    public function prepare(?MModel $model)
+    public function prepare(?MAuthorizedModel $model)
     {
 
     }

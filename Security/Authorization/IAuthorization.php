@@ -9,21 +9,15 @@ interface IAuthorization
 {
     function before(): ?bool;
 
-    function read(): bool;
+    function readAttribute(string $attribute): bool;
 
-    function insert(): bool;
+    function insertAttribute(string $attribute): bool;
 
-    function delete(int $pk): bool;
+    function updateAttribute(string $attribute): bool;
 
-    function update(object $entity): bool;
+    function updateEntity(int $pk): bool;
 
-    function readAttribute(string $name): bool;
-
-    function writeAttribute(string $name, ?object $entity): bool;
-
-    function readAssociation(string $name): bool;
-
-    function writeAssociation(string $name, ?object $entity): bool;
+    function deleteEntity(int $pk): bool;
 
     function criteria(MModel $model): RetrieveCriteria;
 

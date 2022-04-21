@@ -2,11 +2,13 @@
 
 namespace Orkester\GraphQL\Operation;
 
+use Carbon\Carbon;
 use Ds\Set;
 use GraphQL\Exception\InvalidArgument;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentSpreadNode;
+use GraphQL\Language\AST\Node;
 use GraphQL\Language\AST\NodeList;
 use GraphQL\Language\AST\SelectionSetNode;
 use Orkester\Exception\EGraphQLException;
@@ -24,9 +26,11 @@ use Orkester\GraphQL\Operator\OrderByOperator;
 use Orkester\GraphQL\Operator\UnionOperator;
 use Orkester\GraphQL\Operator\WhereOperator;
 use Orkester\Manager;
+use Orkester\MVC\MAuthorizedModel;
 use Orkester\MVC\MModel;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\AssociationMap;
+use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 
 class QueryOperation extends AbstractOperation
@@ -35,6 +39,8 @@ class QueryOperation extends AbstractOperation
     public Set $selection;
     public array $subOperations = [];
     public array $operators = [];
+    public array $formatters = [];
+    public array $attributeMaps = [];
     public bool $isSingleResult = false;
     public bool $isCriteriaOnly = false;
     public bool $includeTypename = false;
@@ -48,31 +54,6 @@ class QueryOperation extends AbstractOperation
         parent::__construct($context);
         $this->selection = new Set();
         $this->requiredSelections = new Set();
-    }
-
-    public function isAssociationReadable(MModel $model, string $name)
-    {
-        if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['association'] ?? [])) {
-            static::$authorizationCache[get_class($model)]['association'][$name] = $this->context->getAuthorization($model)->readAssociation($name);
-        }
-        return static::$authorizationCache[get_class($model)]['association'][$name];
-    }
-
-    public function isAttributeReadable(MModel $model, string $name)
-    {
-        if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['attribute'] ?? [])) {
-            static::$authorizationCache[get_class($model)]['attribute'][$name] = $this->context->getAuthorization($model)->readAttribute($name);
-        }
-        return static::$authorizationCache[get_class($model)]['attribute'][$name];
-    }
-
-    public function isModelReadable(MModel $model)
-    {
-        $name = get_class($model);
-        if (!array_key_exists($name, static::$authorizationCache[get_class($model)] ?? ['model'] ?? [])) {
-            static::$authorizationCache[get_class($model)]['model'][$name] = $this->context->getAuthorization($model)->read();
-        }
-        return static::$authorizationCache[get_class($model)]['model'][$name];
     }
 
     public function prepareArguments(NodeList $arguments)
@@ -121,33 +102,68 @@ class QueryOperation extends AbstractOperation
         }
     }
 
-    public function handleAttribute(FieldNode $node, MModel $model)
+    public function nodeListToAssociative(NodeList $list): array
     {
-        if (!static::isAttributeReadable($model, $node->name->value)) {
+        $r = [];
+        foreach ($list->getIterator() as $n) {
+            $r[$n->name->value] = $n;
+        }
+        return $r;
+    }
+
+    public function formatValue(string $key, mixed $value)
+    {
+        /** @var AttributeMap $map */
+        if ($map = $this->attributeMaps[$key] ?? false) {
+            $phpValue = $map->getValueFromDb($value);
+            if ($format = $this->formatters[$key] ?? false) {
+                $type = $map->getType();
+                return match ($type) {
+                    'datetime', 'time', 'date', 'timestamp' => $phpValue->format($format),
+                    default => $phpValue
+                };
+            }
+            return $phpValue;
+        }
+        return $value;
+    }
+
+    public function handleAttribute(FieldNode $node, MAuthorizedModel $model)
+    {
+        if (!$model->canRead($node->name->value)) {
             throw new EGraphQLForbiddenException($node->name->value, 'field');
         }
-        $canValidate = true;
+        $isComputed = false;
         $alias = $node->alias?->value;
         $name = $alias ?? $node->name->value;
-        $field = $node->name->value;
-        if ($node->arguments->count() > 0) {
-            $argument = $node->arguments->offsetGet(0);
-            $field = $argument->value->value;
-            if ($argument->name->value == 'expr') {
-                $select = "{$argument->value->value} as {$name}";
-                $canValidate = false;
-            } else if ($argument->name->value == 'field') {
-                $select = "{$argument->value->value} as {$name}";
-            } else {
-                throw new InvalidArgument("Unknown argument: {$argument->value->name}");
-            }
-        } else if ($alias) {
-            $select = "{$node->name->value} as {$alias}";
-        } else {
-            $select = $name;
+        $mapField = $node->name->value;
+        $arguments = $this->nodeListToAssociative($node->arguments);
+        if ($expr = $arguments['expr'] ?? false) {
+            $mapField = $expr->value->value;
+            $isComputed = true;
+            $select = "{$expr->value->value} as $name";
+        } else if ($field = $arguments['field'] ?? false) {
+            $mapField = $field->value->value;
+            $select = "{$field->value->value} as $name";
         }
-        if ($canValidate && !$model->getClassMap()->attributeExists($field)) {
-            throw new EGraphQLNotFoundException($field, "attribute");
+        if (empty($select)) {
+            if ($alias) {
+                $select = "{$node->name->value} as $alias";
+            } else {
+                $select = $name;
+            }
+        }
+        if (!$isComputed && $attributeMap = $model->getClassMap()->getAttributeMapChain($mapField)) {
+            $this->attributeMaps[$name] = $attributeMap;
+        }
+        if ($argFormat = $arguments['format'] ?? false) {
+            if ($isComputed) {
+                throw new EGraphQLException(['invalid_argument' => 'computed_attribute_unsupported_format']);
+            }
+            $this->formatters[$name] = $argFormat->value->value;
+        }
+        if (!$isComputed && !$model->getClassMap()->attributeExists($mapField)) {
+            throw new EGraphQLNotFoundException($mapField, "attribute");
         }
         $this->selection->add($select);
     }
@@ -158,18 +174,24 @@ class QueryOperation extends AbstractOperation
      * @throws \DI\NotFoundException
      * @throws \DI\DependencyException|EGraphQLException
      */
-    public function handleAssociation(FieldNode $node, MModel $model)
+    public
+    function handleAssociation(FieldNode $node, MAuthorizedModel $model)
     {
         if (!$model->getClassMap()->associationExists($node->name->value)) {
             throw new EGraphQLNotFoundException($node->name->value, 'association');
         }
-        if (!static::isAssociationReadable($model, $node->name->value)) {
-            throw new EGraphQLForbiddenException($node->name->value, 'read');
-        }
         $associationName = explode('.', $node->name->value)[0];
         $associationMap = $model->getClassMap()->getAssociationMap($associationName);
+
+        if (!$model->canRead($associationMap->getFromKey())) {
+            throw new EGraphQLForbiddenException($node->name->value, 'read');
+        }
+
         $operation = new QueryOperation($this->context, $node);
-        $operation->prepare(Manager::getContainer()->get($associationMap->getToClassName()));
+        $container = Manager::getContainer();
+        $associatedModel = $container->get($associationMap->getToClassName());
+        $authorization = $container->get($associatedModel::$authorizationClass);
+        $operation->prepare(new MAuthorizedModel($associatedModel, $authorization));
         $name = $node->alias ? $node->alias->value : $node->name->value;
         $this->subOperations[$name] = $operation;
         $this->requiredSelections->add($associationMap->getFromKey());
@@ -182,7 +204,8 @@ class QueryOperation extends AbstractOperation
      * @throws \DI\NotFoundException
      * @throws \DI\DependencyException
      */
-    public function handleSelection(?SelectionSetNode $node, MModel $model)
+    public
+    function handleSelection(?SelectionSetNode $node, MAuthorizedModel $model)
     {
         if (is_null($node)) {
             return;
@@ -213,12 +236,14 @@ class QueryOperation extends AbstractOperation
         }
     }
 
-    public function getName(): string
+    public
+    function getName(): string
     {
         return $this->node->alias ? $this->node->alias->value : $this->node->name->value;
     }
 
-    public function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap, int|string $fromKey, int|string $toKey): AssociationMap
+    public
+    function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap, int|string $fromKey, int|string $toKey): AssociationMap
     {
         $name = '_gql';
         $associationMap = new AssociationMap($name, $fromClassMap);
@@ -234,18 +259,16 @@ class QueryOperation extends AbstractOperation
     }
 
     /**
-     * @param MModel|null $model
+     * @param MAuthorizedModel|null $model
      * @throws EGraphQLException
      * @throws EGraphQLForbiddenException
      * @throws EGraphQLNotFoundException
      * @throws \DI\DependencyException
      * @throws \DI\NotFoundException
      */
-    public function prepare(?MModel $model)
+    public
+    function prepare(?MAuthorizedModel $model)
     {
-        if (!static::isModelReadable($model)) {
-            throw new EGraphQLForbiddenException($this->node->name->value, 'read');
-        }
         $this->prepareArguments($this->node->arguments);
         $this->handleSelection($this->node->selectionSet, $model);
         $this->typename = $this->context->getModelTypename($model);
@@ -260,7 +283,8 @@ class QueryOperation extends AbstractOperation
      * @throws \DI\DependencyException
      * @throws \DI\NotFoundException
      */
-    public function execute(RetrieveCriteria $criteria): ?array
+    public
+    function execute(RetrieveCriteria $criteria): ?array
     {
         $columnsToExclude = [];
         foreach ($this->requiredSelections->toArray() as $item) {
@@ -277,9 +301,13 @@ class QueryOperation extends AbstractOperation
             return ['criteria' => $criteria];
         }
         $rows = $criteria->asResult($this->parameters ?? null);
-        if ($this->includeTypename) {
-            foreach ($rows as &$row) {
+        $keys = array_keys($rows ? $rows[0] : []);
+        foreach ($rows as &$row) {
+            if ($this->includeTypename) {
                 $row['__typename'] = $this->typename;
+            }
+            foreach ($keys as $key) {
+                $row[$key] = $this->formatValue($key, $row[$key]);
             }
         }
 
@@ -308,7 +336,7 @@ class QueryOperation extends AbstractOperation
             } else {
                 throw new EGraphQLException([$cardinality => 'Unhandled cardinality']);
             }
-            $subResult = $operation->execute($subCriteria);
+            $subResult = $operation->execute($subCriteria)['result'];
             $subResult = group_by($subResult, $fk, false);
             $updatedRows = [];
             foreach ($rows as $row) {
