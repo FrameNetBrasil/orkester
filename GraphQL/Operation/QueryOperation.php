@@ -44,6 +44,7 @@ class QueryOperation extends AbstractOperation
     public bool $isSingleResult = false;
     public bool $isCriteriaOnly = false;
     public bool $includeTypename = false;
+    public bool $includeTotal = false;
     public ?array $parameters = null;
     public Set $requiredSelections;
     public string $typename = '';
@@ -56,25 +57,30 @@ class QueryOperation extends AbstractOperation
         $this->requiredSelections = new Set();
     }
 
-    public function prepareArguments(NodeList $arguments)
+    public function prepareArguments(NodeList $nodeList)
     {
-        /** @var ArgumentNode $argument */
-        foreach ($arguments->getIterator() as $argument) {
-            if ($argument->name->value == 'omit') {
-                if ($this->context->getNodeValue($argument->value)) {
-                    $this->context->addOmitted($this->getName());
-                };
-            } else if ($argument->name->value == 'one') {
-                if ($this->context->getNodeValue($argument->value)) {
-                    $this->isSingleResult = true;
-                };
-            } else if ($argument->name->value == 'criteria') {
+        $arguments = $this->nodeListToAssociativeArray($nodeList);
+        if ($omit = array_pop_key('omit', $arguments)) {
+            if ($this->context->getNodeValue($omit->value)) {
                 $this->context->addOmitted($this->getName());
-                $this->isCriteriaOnly = true;
-            } else if ($argument->name->value == 'bind') {
-                $this->parameters = $this->context->getNodeValue($argument->value);
             }
-            if ($this->isMutationResult) continue;
+        }
+        if ($one = array_pop_key('one', $arguments)) {
+            if ($this->context->getNodeValue($one->value)) {
+                $this->isSingleResult = true;
+            };
+        }
+        if (array_pop_key('criteria', $arguments)) {
+            $this->context->addOmitted($this->getName());
+            $this->isCriteriaOnly = true;
+        }
+        if ($bind = array_pop_key('bind', $arguments)) {
+            $this->parameters = $this->context->getNodeValue($bind->value);
+        }
+        if ($this->isMutationResult) return;
+
+        /** @var ArgumentNode $argument */
+        foreach ($arguments as $argument) {
             $class = match ($argument->name->value) {
                 'id' => IdOperator::class,
                 'where' => WhereOperator::class,
@@ -90,19 +96,32 @@ class QueryOperation extends AbstractOperation
             if (is_null($class)) {
                 continue;
             }
+            $params = $this->parameters ?? [];
             /** @var AbstractOperator $operator */
-            $this->operators[] = new $class($this->context, $argument->value);
+            $this->operators[] = new $class($this->context, $argument->value, $params);
         }
     }
 
-    public function applyArguments(RetrieveCriteria $criteria)
+    public function applyOperators(RetrieveCriteria $criteria, array $operators)
     {
-        foreach ($this->operators as $operator) {
+        foreach ($operators as $operator) {
             $operator->apply($criteria);
         }
     }
 
-    public function nodeListToAssociative(NodeList $list): array
+    public function applyCriteriaOperators(RetrieveCriteria $criteria)
+    {
+        $this->applyOperators($criteria, $this->operators);
+    }
+
+    public function applySubCriteriaOperators(RetrieveCriteria $criteria)
+    {
+        $operators = array_filter($this->operators,
+            fn($op) => !($op instanceof OffsetOperator || $op instanceof LimitOperator));
+        $this->applyOperators($criteria, $operators);
+    }
+
+    public function nodeListToAssociativeArray(NodeList $list): array
     {
         $r = [];
         foreach ($list->getIterator() as $n) {
@@ -117,6 +136,9 @@ class QueryOperation extends AbstractOperation
         if (!is_null($value) && $map = $this->attributeMaps[$key] ?? false) {
             $phpValue = $map->getValueFromDb($value);
             if ($format = $this->formatters[$key] ?? false) {
+                if ($format == "boolean") {
+                    return $phpValue == true;
+                }
                 $type = $map->getType();
                 return match ($type) {
                     'datetime', 'time', 'date', 'timestamp' => $phpValue->format($format),
@@ -137,7 +159,7 @@ class QueryOperation extends AbstractOperation
         $alias = $node->alias?->value;
         $name = $alias ?? $node->name->value;
         $mapField = $node->name->value;
-        $arguments = $this->nodeListToAssociative($node->arguments);
+        $arguments = $this->nodeListToAssociativeArray($node->arguments);
         if ($expr = $arguments['expr'] ?? false) {
             $mapField = $expr->value->value;
             $isComputed = true;
@@ -220,6 +242,8 @@ class QueryOperation extends AbstractOperation
                     $this->includeTypename = true;
                 } else if ($selection->name->value == 'id') {
                     $this->selection->add("{$model->getClassMap()->getKeyAttributeName()} as id");
+                } else if ($selection->name->value == '__total') {
+                    $this->includeTotal = true;
                 } else {
                     if (is_null($selection->selectionSet)) {
                         $this->handleAttribute($selection, $model);
@@ -236,14 +260,17 @@ class QueryOperation extends AbstractOperation
         }
     }
 
-    public
-    function getName(): string
+    public function getName(): string
     {
         return $this->node->alias ? $this->node->alias->value : $this->node->name->value;
     }
 
-    public
-    function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap, int|string $fromKey, int|string $toKey): AssociationMap
+    public function getEndpointName(): string
+    {
+        return $this->node->name->value;
+    }
+
+    public function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap, int|string $fromKey, int|string $toKey): AssociationMap
     {
         $name = '_gql';
         $associationMap = new AssociationMap($name, $fromClassMap);
@@ -256,6 +283,31 @@ class QueryOperation extends AbstractOperation
         $associationMap->setKeysAttributes();
         $fromClassMap->putAssociationMap($associationMap);
         return $associationMap;
+    }
+
+    public function prepareForSubCriteria(RetrieveCriteria $criteria): array
+    {
+        $result = [];
+        if ($range = $criteria->getRange()) {
+            $criteria->setRange(null);
+            $result['range'] = $range;
+            return ['range' => $range];
+        }
+        if (!empty($columns = $criteria->getColumns())) {
+            $criteria->clearSelect();
+            $result['columns'] = $columns;
+        }
+        return $result;
+    }
+
+    public function restoreAfterSubCriteria(RetrieveCriteria $criteria, array $parameters)
+    {
+        if ($range = $parameters['range'] ?? false) {
+            $criteria->setRange($range);
+        }
+        if ($columns = $parameters['columns'] ?? false) {
+            $criteria->setColumns($columns);
+        }
     }
 
     /**
@@ -286,6 +338,16 @@ class QueryOperation extends AbstractOperation
     public
     function execute(RetrieveCriteria $criteria): ?array
     {
+        if ($this->node->alias && $this->node->alias->value == '__total') {
+            /** @var RetrieveCriteria $subCriteria */
+            $subCriteria = $this->context->results[$this->getEndpointName()]['criteria'];
+            $subCriteria->setAlias('q');
+            $this->prepareForSubCriteria($subCriteria);
+            return [
+                'criteria' => $criteria,
+                'result' => $subCriteria->count()
+            ];
+        }
         $columnsToExclude = [];
         foreach ($this->requiredSelections->toArray() as $item) {
             if (!$this->selection->contains($item)) {
@@ -295,7 +357,7 @@ class QueryOperation extends AbstractOperation
         }
         $classMap = $criteria->getClassMap();
         $criteria->select(join(",", $this->selection->toArray()));
-        $this->applyArguments($criteria);
+        $this->applyCriteriaOperators($criteria);
 //        $rows = $criteria->asResult($this->context->variables);
         if ($this->isCriteriaOnly) {
             return ['criteria' => $criteria];
@@ -310,37 +372,37 @@ class QueryOperation extends AbstractOperation
                 $row[$key] = $this->formatValue($key, $row[$key]);
             }
         }
+        $removedParameters = $this->prepareForSubCriteria($criteria);
 
         foreach ($this->subOperations as $associationName => $operation) {
             $associationMap = $classMap->getAssociationMap($associationName);
             $fromKey = $associationMap->getFromKey();
             $fk = $associationMap->getToKey();
-            $keySet = new Set();
-            foreach ($rows as $row) {
-                if (!empty($row[$fromKey])) $keySet->add($row[$fromKey]);
-            }
-            $keys = $keySet->toArray();
+            $criteria->clearSelect();
+            $criteria->select($fromKey);
+            $this->applySubCriteriaOperators($criteria);
+
             $toClassMap = $associationMap->getToClassMap();
-            $subCriteria = $toClassMap->getCriteria();
+            $associationCriteria = $toClassMap->getCriteria();
             $cardinality = $associationMap->getCardinality();
 
 //            $shouldIncludeEmpty = strcasecmp($criteria->getAssociationType($associationName), 'LEFT') == 0;
             if ($cardinality == 'oneToOne') {
                 $newAssociation = $this->createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey);
                 $joinField = $newAssociation->getName() . "." . $associationMap->getFromKey();
-                $subCriteria->where($joinField, 'IN', $keys);
-                $subCriteria->select($joinField);
+                $associationCriteria->where($joinField, 'IN', $criteria);
+                $associationCriteria->select($joinField);
             } else if ($cardinality == 'manyToOne' || $cardinality == 'oneToMany') {
-                $subCriteria->where($fk, 'IN', $keys);
-                $subCriteria->select($fk);
+                $associationCriteria->where($fk, 'IN', $criteria);
+                $associationCriteria->select($fk);
             } else {
                 throw new EGraphQLException([$cardinality => 'Unhandled cardinality']);
             }
-            $subResult = $operation->execute($subCriteria)['result'];
+            $subResult = $operation->execute($associationCriteria)['result'];
             $subResult = group_by($subResult, $fk, false);
             $updatedRows = [];
             foreach ($rows as $row) {
-                $value = $subResult[$row[$fromKey]] ?? [];
+                $value = $subResult[$row[$fromKey] ?? ''] ?? [];
                 if ($cardinality == 'oneToOne') {
                     $value = $value[0] ?? null;
                 }
@@ -360,6 +422,7 @@ class QueryOperation extends AbstractOperation
             $rows = $updatedRows;
 
         }
+        $this->restoreAfterSubCriteria($criteria, $removedParameters);
         $result = ($this->isSingleResult || $this->context->isSingular($this->node->name->value)) ? ($rows[0] ?? null) : $rows;
         return [
             'criteria' => $criteria,

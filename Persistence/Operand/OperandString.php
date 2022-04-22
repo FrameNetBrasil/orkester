@@ -50,7 +50,8 @@ class OperandString extends PersistentOperand
             $isDistinct = false;
             if (str_starts_with($token, 'distinct')) {
                 $isDistinct = true;
-                $token = explode(' ', $token)[1];
+                $parts = explode(' ', $token);
+                $token = $parts[1] ?? $parts[0];
             }
             $attributeCriteria = $this->criteria->getAttributeCriteria($token);
             $attributeMap = $attributeCriteria->getAttributeMap();

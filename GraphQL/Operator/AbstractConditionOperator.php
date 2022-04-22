@@ -14,7 +14,7 @@ use Orkester\Persistence\Criteria\RetrieveCriteria;
 
 abstract class AbstractConditionOperator extends AbstractOperation
 {
-    public function __construct(ExecutionContext $context, protected ObjectValueNode|VariableNode $node)
+    public function __construct(ExecutionContext $context, protected ObjectValueNode|VariableNode $node, protected array &$boundValues)
     {
         parent::__construct($context);
     }
@@ -43,11 +43,19 @@ abstract class AbstractConditionOperator extends AbstractOperation
         if (is_null($result)) {
             throw new EGraphQLException(["unknown_condition_operator" => $operator]);
         }
-        $value = match($operator) {
+        $key = substr($value, 1);
+        $realValue = $this->boundValues[$key] ?? $value;
+        $modifiedValue = match($operator) {
             'is_null' => null,
-            'contains' => "%$value%",
-            default => $value
+            'contains' => "%$realValue%",
+            default => $realValue
         };
+        if (array_key_exists($key, $this->boundValues)) {
+            $this->boundValues[$key] = $modifiedValue;
+        }
+        else {
+            $value = $modifiedValue;
+        }
         return $result;
     }
 
@@ -124,7 +132,7 @@ abstract class AbstractConditionOperator extends AbstractOperation
             }
         } else if ($this->node instanceof VariableNode) {
             $conditions = $this->context->getNodeValue($this->node);
-            foreach ($conditions as $field => $condition) {
+            foreach ($conditions ?? [] as $field => $condition) {
                 foreach ($condition ?? [] as $op => $value) {
                     $topLevelConditions[] = [$field, $this->getCriteriaOperator($op, $value), $value];
                 }

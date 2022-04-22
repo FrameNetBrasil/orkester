@@ -553,6 +553,10 @@ class PersistentCriteria
         return $this->associations[$name];
     }
 
+    public function setColumns($columns)
+    {
+        $this->columns = $columns;
+    }
 
     /*
      * getters
