@@ -67,6 +67,13 @@ function array_find($xs, $f) {
     return null;
 }
 
+function array_pop_key(mixed $key, array &$array)
+{
+    $value = $array[$key] ?? null;
+    unset($array[$key]);
+    return $value;
+}
+
 function group_by(array $data, mixed $key, bool $unset_key = true): array
 {
     return array_reduce($data, function (array $accumulator, array $element) use ($key, $unset_key) {

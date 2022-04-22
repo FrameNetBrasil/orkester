@@ -35,6 +35,11 @@ class RetrieveCriteria extends PersistentCriteria
         return $this->range;
     }
 
+    public function setRange(?MRange $range)
+    {
+        $this->range = $range;
+    }
+
     public function getForUpdate()
     {
         return $this->forUpdate;
