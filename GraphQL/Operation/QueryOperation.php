@@ -383,6 +383,8 @@ class QueryOperation extends AbstractOperation
             $subResult = $operation->execute($associationCriteria)['result'];
             $subResult = group_by($subResult, $fk, false);
             $updatedRows = [];
+            // this line is necessary for reasons beyond understanding
+            unset($row);
             foreach ($rows as $row) {
                 $value = $subResult[$row[$fromKey] ?? ''] ?? [];
                 if ($cardinality == 'oneToOne') {

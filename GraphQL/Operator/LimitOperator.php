@@ -17,6 +17,9 @@ class LimitOperator extends AbstractOperator
 
     public function apply(RetrieveCriteria $criteria): RetrieveCriteria
     {
-        return $criteria->limit($this->context->getNodeValue($this->node));
+        if ($limit = $this->context->getNodeValue($this->node)) {
+            $criteria->limit($limit);
+        }
+        return $criteria;
     }
 }
