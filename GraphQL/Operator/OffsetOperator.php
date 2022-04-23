@@ -16,6 +16,9 @@ class OffsetOperator extends AbstractOperator
 
     public function apply(RetrieveCriteria $criteria): RetrieveCriteria
     {
-        return $criteria->offset($this->context->getNodeValue($this->node));
+        if ($offset = $this->context->getNodeValue($this->node)) {
+            $criteria->offset($offset);
+        }
+        return $criteria;
     }
 }
