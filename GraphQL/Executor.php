@@ -20,7 +20,9 @@ use Orkester\GraphQL\Operation\DeleteOperation;
 use Orkester\GraphQL\Operation\InsertOperation;
 use Orkester\GraphQL\Operation\QueryOperation;
 use Orkester\GraphQL\Operation\ServiceOperation;
+use Orkester\GraphQL\Operation\TotalOperation;
 use Orkester\GraphQL\Operation\UpdateOperation;
+use Orkester\MVC\MModel;
 
 class Executor
 {
@@ -29,6 +31,7 @@ class Executor
     protected DocumentNode $document;
     protected ExecutionContext $context;
     public bool $isPrepared = false;
+    public bool $requiresTransaction = false;
 
 //    protected bool $isIntrospection = false;
     protected Set $aliases;
@@ -77,15 +80,20 @@ class Executor
             return;
         }
         foreach ($definition->selectionSet->selections->getIterator() as $fieldNode) {
-            $alias = $fieldNode->alias?->value ?? $fieldNode->name->value;
-            if ($this->aliases->contains($alias)) {
-                throw new EGraphQLException(['duplicate_alias' => $alias]);
+            $operationName = $fieldNode->alias?->value ?? $fieldNode->name->value;
+            if ($this->aliases->contains($operationName)) {
+                throw new EGraphQLException(['duplicate_alias' => $operationName]);
             }
-            $this->aliases->add($alias);
-
-            $model = $this->context->getModel($fieldNode->name->value);
-            $operation = new QueryOperation($this->context, $fieldNode);
-            $this->operations[$alias] = ['name' => $fieldNode->name->value, 'model' => $model, 'operation' => $operation];
+            $this->aliases->add($operationName);
+            if ($operationName == '__total') {
+                $model = null;
+                $operation = new TotalOperation($this->context, $fieldNode);
+            }
+            else {
+                $model = $this->context->getModel($fieldNode->name->value);
+                $operation = new QueryOperation($this->context, $fieldNode);
+            }
+            $this->operations[$operationName] = ['name' => $fieldNode->name->value, 'model' => $model, 'operation' => $operation];
         }
     }
 
@@ -103,6 +111,7 @@ class Executor
         if (is_null($definition->name)) {
             throw new EGraphQLException(['missing_mutation_type' => '']);
         }
+        $this->requiresTransaction = true;
         $operationName = match ($definition->name->value) {
             'insert' => InsertOperation::class,
             'delete' => DeleteOperation::class,
@@ -147,11 +156,10 @@ class Executor
         }
     }
 
-    #[ArrayShape(['data' => "array", 'errors' => "array", 'serverErrors' => "array"])]
+    #[ArrayShape(['data' => "array", 'errors' => "array"])]
     public function executeCommands(): ?array
     {
         $errors = [];
-        $serverErrors = [];
         $response = [];
         foreach ($this->operations as $alias => ['model' => $model, 'operation' => $op]) {
             try {
@@ -164,21 +172,24 @@ class Executor
                     $response[$alias] = $result['result'] ?? null;
                 }
             } catch (EGraphQLNotFoundException $e) {
-                $serverErrors[$alias]['not_found'] = $e->errors;
+                $errors[$alias]['not_found'] = $e->errors;
             } catch (EGraphQLForbiddenException $e) {
-                $serverErrors[$alias]['forbidden'] = $e->errors;
+                $errors[$alias]['forbidden'] = $e->errors;
             } catch (EGraphQLValidationException $e) {
-                $errors[$alias] = $e->errors;
+                $errors[$alias]['invalid_value'] = $e->errors;
             } catch (EGraphQLException $e) {
-                $serverErrors[$alias]['bad_request'] = $e->errors;
+                $errors[$alias] = $e->errors;
                 merror($e->getMessage());
             } catch (\Exception | \Error $e) {
                 mfatal($e->getTraceAsString());
                 mfatal($e->getMessage());
-                $serverErrors[$alias]['bad_request'] = 'internal_server_error';
+                $errors[$alias]['bad_request'] = 'internal_server_error';
+            }
+            if (!empty($errors)) {
+                break;
             }
         }
-        return ['data' => $response, 'errors' => $errors, 'serverErrors' => $serverErrors];
+        return ['data' => $response, 'errors' => $errors];
     }
 
 //    public function executeIntrospection(): array
@@ -189,25 +200,31 @@ class Executor
 //        return [];
 //    }
 
-    #[ArrayShape(['data' => "array", 'errors' => "array", 'serverErrors' => "array"])]
+    #[ArrayShape(['data' => "array", 'errors' => "array"])]
     public function execute(): ?array
     {
-        $serverErrors = [];
+        $metaErrors = [];
         try {
             if (!$this->isPrepared) {
                 $this->prepare();
             }
-            return $this->executeCommands();
+            if ($this->requiresTransaction) {
+                $transaction = MModel::beginTransaction();
+            }
+            $result = $this->executeCommands();
+            if (isset($transaction)) $transaction->commit();
+            return $result;
         } catch (SyntaxError $e) {
-            $serverErrors['syntax_error'] = $e->getMessage();
+            $metaErrors['syntax_error'] = $e->getMessage();
         } catch (EGraphQLNotFoundException $e) {
-            $serverErrors['not_found'] = $e->errors;
+            $metaErrors['not_found'] = $e->errors;
         } catch (EGraphQLException $e) {
-            $serverErrors['execution_error'] = $e->errors;
+            $metaErrors['execution_error'] = $e->errors;
         } catch (DependencyException | NotFoundException $e) {
-            $serverErrors['internal'] = 'failed instantiating model';
+            $metaErrors['internal'] = 'failed instantiating model';
         }
-        return ['data' => null, 'errors' => null, 'serverErrors' => ['$meta' => $serverErrors]];
+        if (isset($transaction)) $transaction->rollback();
+        return ['data' => null, 'errors' => ['$meta' => $metaErrors]];
     }
 
 }
