@@ -265,11 +265,6 @@ class QueryOperation extends AbstractOperation
         return $this->node->alias ? $this->node->alias->value : $this->node->name->value;
     }
 
-    public function getEndpointName(): string
-    {
-        return $this->node->name->value;
-    }
-
     public function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap, int|string $fromKey, int|string $toKey): AssociationMap
     {
         $name = '_gql';
@@ -285,7 +280,7 @@ class QueryOperation extends AbstractOperation
         return $associationMap;
     }
 
-    public function prepareForSubCriteria(RetrieveCriteria $criteria): array
+    public static function prepareForSubCriteria(RetrieveCriteria $criteria): array
     {
         $result = [];
         if ($range = $criteria->getRange()) {
@@ -300,7 +295,7 @@ class QueryOperation extends AbstractOperation
         return $result;
     }
 
-    public function restoreAfterSubCriteria(RetrieveCriteria $criteria, array $parameters)
+    public static function restoreAfterSubCriteria(RetrieveCriteria $criteria, array $parameters)
     {
         if ($range = $parameters['range'] ?? false) {
             $criteria->setRange($range);
@@ -335,19 +330,8 @@ class QueryOperation extends AbstractOperation
      * @throws \DI\DependencyException
      * @throws \DI\NotFoundException
      */
-    public
-    function execute(RetrieveCriteria $criteria): ?array
+    public function execute(RetrieveCriteria $criteria): ?array
     {
-        if ($this->node->alias && $this->node->alias->value == '__total') {
-            /** @var RetrieveCriteria $subCriteria */
-            $subCriteria = $this->context->results[$this->getEndpointName()]['criteria'];
-            $subCriteria->setAlias('q');
-            $this->prepareForSubCriteria($subCriteria);
-            return [
-                'criteria' => $criteria,
-                'result' => $subCriteria->count()
-            ];
-        }
         $columnsToExclude = [];
         foreach ($this->requiredSelections->toArray() as $item) {
             if (!$this->selection->contains($item)) {
@@ -358,7 +342,6 @@ class QueryOperation extends AbstractOperation
         $classMap = $criteria->getClassMap();
         $criteria->select(join(",", $this->selection->toArray()));
         $this->applyCriteriaOperators($criteria);
-//        $rows = $criteria->asResult($this->context->variables);
         if ($this->isCriteriaOnly) {
             return ['criteria' => $criteria];
         }
@@ -386,7 +369,6 @@ class QueryOperation extends AbstractOperation
             $associationCriteria = $toClassMap->getCriteria();
             $cardinality = $associationMap->getCardinality();
 
-//            $shouldIncludeEmpty = strcasecmp($criteria->getAssociationType($associationName), 'LEFT') == 0;
             if ($cardinality == 'oneToOne') {
                 $newAssociation = $this->createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey);
                 $joinField = $newAssociation->getName() . "." . $associationMap->getFromKey();
@@ -411,13 +393,6 @@ class QueryOperation extends AbstractOperation
                 }
                 $row[$associationName] = $value;
                 $updatedRows[] = $row;
-//                if (empty($value)) {
-//                    if ($shouldIncludeEmpty) {
-//                        $updatedRows[] = $row;
-//                    }
-//                } else {
-//                    $updatedRows[] = $row;
-//                }
             }
             $rows = $updatedRows;
 
