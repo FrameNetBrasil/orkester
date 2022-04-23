@@ -9,13 +9,13 @@ class CallableAuthorization implements IAuthorization
 {
 
     public function __construct(
-        protected $before,
-        protected $readAttribute,
-        protected $insertAttribute,
-        protected $updateAttribute,
-        protected $updateEntity,
-        protected $deleteEntity,
-        protected $criteria
+        protected $before = null,
+        protected $readAttribute = null,
+        protected $insertAttribute = null,
+        protected $updateAttribute = null,
+        protected $updateEntity = null,
+        protected $deleteEntity = null,
+        protected $criteria = null
     ){}
 
     function before(): ?bool

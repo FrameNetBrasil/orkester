@@ -115,7 +115,7 @@ class MModel
                     }
                 }
                 if (is_null($value) && !$attributeMap->isNullable()) {
-                    throw new EValidationException([$classMap->getName() . '::' . $attributeMap->getName() => 'attribute_not_nullable']);
+                    throw new EValidationException([$attributeMap->getName() => 'attribute_not_nullable']);
                 }
                 $object->{$attributeMap->getName()} = $value;
             } catch(EValidationException $e) {
