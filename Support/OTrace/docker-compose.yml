@@ -5,10 +5,11 @@ services:
         context: .
     restart: unless-stopped
     ports:
-      - "${TRACE_PORT}:9999"
-      - "${WS_PORT}:9998"
+      - "${TRACE_PORT}:${TRACE_PORT}"
+      - "${WS_PORT}:${WS_PORT}"
     command:
       - "0.0.0.0"
-      - "9999"
+      - "${TRACE_PORT}"
       - "0.0.0.0"
-      - "9998"
+      - "${WS_PORT}"
+
