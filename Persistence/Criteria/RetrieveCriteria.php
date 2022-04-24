@@ -266,6 +266,7 @@ class RetrieveCriteria extends PersistentCriteria
         $criteria = Manager::getPersistentManager()->getCriteria($this->getClassMap());
         $criteria->select("count(*) as cnt");
         $criteria->from($this);
+        $criteria->parameters($this->getParameters());
         return $criteria->asResult()[0]['cnt'];
     }
 
