@@ -257,6 +257,9 @@ class AttributeMap
     public function getValueToDb($object)
     {
         $value = $this->convertValue($this->getValue($object));
+        if ($this->type == 'boolean') {
+            $value = $object->{$this->name} ? 1 : 0;
+        }
 //        if (is_string($value)) {
 //            $value = strip_tags($value);
 //        }
