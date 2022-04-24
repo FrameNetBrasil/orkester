@@ -88,8 +88,7 @@ class Executor
             if ($operationName == '__total') {
                 $model = null;
                 $operation = new TotalOperation($this->context, $fieldNode);
-            }
-            else {
+            } else {
                 $model = $this->context->getModel($fieldNode->name->value);
                 $operation = new QueryOperation($this->context, $fieldNode);
             }
@@ -212,7 +211,13 @@ class Executor
                 $transaction = MModel::beginTransaction();
             }
             $result = $this->executeCommands();
-            if (isset($transaction)) $transaction->commit();
+            if (isset($transaction)) {
+                if (empty($result['errors'])) {
+                    $transaction->commit();
+                } else {
+                    $transaction->rollback();
+                }
+            }
             return $result;
         } catch (SyntaxError $e) {
             $metaErrors['syntax_error'] = $e->getMessage();

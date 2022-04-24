@@ -2,13 +2,10 @@
 
 namespace Orkester\GraphQL\Operation;
 
-use Carbon\Carbon;
 use Ds\Set;
-use GraphQL\Exception\InvalidArgument;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentSpreadNode;
-use GraphQL\Language\AST\Node;
 use GraphQL\Language\AST\NodeList;
 use GraphQL\Language\AST\SelectionSetNode;
 use Orkester\Exception\EGraphQLException;
@@ -35,7 +32,6 @@ use Orkester\Persistence\Map\ClassMap;
 
 class QueryOperation extends AbstractOperation
 {
-    public static array $authorizationCache = [];
     public Set $selection;
     public array $subOperations = [];
     public array $operators = [];
@@ -44,8 +40,7 @@ class QueryOperation extends AbstractOperation
     public bool $isSingleResult = false;
     public bool $isCriteriaOnly = false;
     public bool $includeTypename = false;
-    public bool $includeTotal = false;
-    public ?array $parameters = null;
+    public ?array $parameters = [];
     public Set $requiredSelections;
     public string $typename = '';
     public MModel $model;
@@ -75,7 +70,7 @@ class QueryOperation extends AbstractOperation
             $this->isCriteriaOnly = true;
         }
         if ($bind = array_pop_key('bind', $arguments)) {
-            $this->parameters = $this->context->getNodeValue($bind->value);
+            $this->parameters = $this->context->getNodeValue($bind->value) ?? [];
         }
         if ($this->isMutationResult) return;
 
@@ -96,29 +91,17 @@ class QueryOperation extends AbstractOperation
             if (is_null($class)) {
                 continue;
             }
-            $params = $this->parameters ?? [];
             /** @var AbstractOperator $operator */
-            $this->operators[] = new $class($this->context, $argument->value, $params);
+            $this->operators[] = new $class($this->context, $argument->value);
         }
     }
 
     public function applyOperators(RetrieveCriteria $criteria, array $operators)
     {
         foreach ($operators as $operator) {
-            $operator->apply($criteria);
+            $operator->apply($criteria, $this->parameters);
         }
-    }
 
-    public function applyCriteriaOperators(RetrieveCriteria $criteria)
-    {
-        $this->applyOperators($criteria, $this->operators);
-    }
-
-    public function applySubCriteriaOperators(RetrieveCriteria $criteria)
-    {
-        $operators = array_filter($this->operators,
-            fn($op) => !($op instanceof OffsetOperator || $op instanceof LimitOperator));
-        $this->applyOperators($criteria, $operators);
     }
 
     public function nodeListToAssociativeArray(NodeList $list): array
@@ -226,8 +209,7 @@ class QueryOperation extends AbstractOperation
      * @throws \DI\NotFoundException
      * @throws \DI\DependencyException
      */
-    public
-    function handleSelection(?SelectionSetNode $node, MAuthorizedModel $model)
+    public function handleSelection(?SelectionSetNode $node, MAuthorizedModel $model)
     {
         if (is_null($node)) {
             return;
@@ -242,8 +224,6 @@ class QueryOperation extends AbstractOperation
                     $this->includeTypename = true;
                 } else if ($selection->name->value == 'id') {
                     $this->selection->add("{$model->getClassMap()->getKeyAttributeName()} as id");
-                } else if ($selection->name->value == '__total') {
-                    $this->includeTotal = true;
                 } else {
                     if (is_null($selection->selectionSet)) {
                         $this->handleAttribute($selection, $model);
@@ -313,8 +293,7 @@ class QueryOperation extends AbstractOperation
      * @throws \DI\DependencyException
      * @throws \DI\NotFoundException
      */
-    public
-    function prepare(?MAuthorizedModel $model)
+    public function prepare(?MAuthorizedModel $model)
     {
         $this->prepareArguments($this->node->arguments);
         $this->handleSelection($this->node->selectionSet, $model);
@@ -341,11 +320,12 @@ class QueryOperation extends AbstractOperation
         }
         $classMap = $criteria->getClassMap();
         $criteria->select(join(",", $this->selection->toArray()));
-        $this->applyCriteriaOperators($criteria);
+        $this->applyOperators($criteria, $this->operators);
+        $criteria->parameters($this->parameters);
         if ($this->isCriteriaOnly) {
             return ['criteria' => $criteria];
         }
-        $rows = $criteria->asResult($this->parameters ?? null);
+        $rows = $criteria->asResult();
         $keys = array_keys($rows ? $rows[0] : []);
         foreach ($rows as &$row) {
             if ($this->includeTypename) {
@@ -358,13 +338,12 @@ class QueryOperation extends AbstractOperation
         $removedParameters = $this->prepareForSubCriteria($criteria);
 
         foreach ($this->subOperations as $associationName => $operation) {
+            $operation->parameters = &$this->parameters;
             $associationMap = $classMap->getAssociationMap($associationName);
             $fromKey = $associationMap->getFromKey();
             $fk = $associationMap->getToKey();
             $criteria->clearSelect();
             $criteria->select($fromKey);
-            $this->applySubCriteriaOperators($criteria);
-
             $toClassMap = $associationMap->getToClassMap();
             $associationCriteria = $toClassMap->getCriteria();
             $cardinality = $associationMap->getCardinality();

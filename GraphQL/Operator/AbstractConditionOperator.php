@@ -14,7 +14,7 @@ use Orkester\Persistence\Criteria\RetrieveCriteria;
 
 abstract class AbstractConditionOperator extends AbstractOperation
 {
-    public function __construct(ExecutionContext $context, protected ObjectValueNode|VariableNode $node, protected array &$boundValues)
+    public function __construct(ExecutionContext $context, protected ObjectValueNode|VariableNode $node)
     {
         parent::__construct($context);
     }
@@ -23,7 +23,7 @@ abstract class AbstractConditionOperator extends AbstractOperation
 
     protected abstract function applyAnyConditions(RetrieveCriteria $criteria, array $conditions);
 
-    protected function getCriteriaOperator(string $operator, mixed &$value): string
+    protected function getCriteriaOperator(string $operator, mixed &$value, array &$parameters): string
     {
         $result = match ($operator) {
             'eq' => '=',
@@ -44,22 +44,21 @@ abstract class AbstractConditionOperator extends AbstractOperation
             throw new EGraphQLException(["unknown_condition_operator" => $operator]);
         }
         $key = substr($value, 1);
-        $realValue = $this->boundValues[$key] ?? $value;
-        $modifiedValue = match($operator) {
+        $realValue = $parameters[$key] ?? $value;
+        $modifiedValue = match ($operator) {
             'is_null' => null,
             'contains' => "%$realValue%",
             default => $realValue
         };
-        if (array_key_exists($key, $this->boundValues)) {
-            $this->boundValues[$key] = $modifiedValue;
-        }
-        else {
+        if (array_key_exists($key, $parameters)) {
+            $parameters[$key] = $modifiedValue;
+        } else {
             $value = $modifiedValue;
         }
         return $result;
     }
 
-    protected function prepareExpression(ListValueNode $node)
+    protected function prepareExpression(ListValueNode $node, array &$parameters)
     {
         $field = $node->values->offsetGet(0)->value;
         /** @var ObjectValueNode $conditionsNode */
@@ -68,7 +67,7 @@ abstract class AbstractConditionOperator extends AbstractOperation
         /** @var ObjectFieldNode $fieldNode */
         foreach ($this->context->getNodeValue($conditionsNode) ?? [] as $cond => $value) {
             if ($value == null && $cond != 'is_null') continue;
-            $operator = $this->getCriteriaOperator($cond, $value);
+            $operator = $this->getCriteriaOperator($cond, $value, $parameters);
             $conditions[] = ['op' => $operator, 'value' => $value];
         }
         if (is_null($field) || empty($conditions)) {
@@ -81,11 +80,11 @@ abstract class AbstractConditionOperator extends AbstractOperation
         return $result;
     }
 
-    protected function prepareCondition(mixed $node): array
+    protected function prepareCondition(mixed $node, array &$parameters): array
     {
         $field = $node->name->value;
         if ($field == '_condition') {
-            return $this->prepareExpression($node->value);
+            return $this->prepareExpression($node->value, $parameters);
         }
         if ($node->value instanceof VariableNode) {
             $var = $this->context->getNodeValue($node->value);
@@ -97,17 +96,17 @@ abstract class AbstractConditionOperator extends AbstractOperation
             $op = $entry->name->value;
         }
         if (!($value == null && $op != 'is_null')) {
-            $operator = $this->getCriteriaOperator($op, $value);
+            $operator = $this->getCriteriaOperator($op, $value, $parameters);
             return [[$field, $operator, $value]];
         }
         return [];
     }
 
-    protected function prepareConditionGroup(RetrieveCriteria $criteria, NodeList $root, string $conjunction)
+    protected function prepareConditionGroup(RetrieveCriteria $criteria, NodeList $root, string $conjunction, array &$parameters)
     {
         $conditions = [];
         foreach ($root->getIterator() as $node) {
-            array_push($conditions, ...$this->prepareCondition($node));
+            array_push($conditions, ...$this->prepareCondition($node, $parameters));
         }
         if ($conjunction == 'and') {
             foreach ($conditions as $condition) {
@@ -118,23 +117,23 @@ abstract class AbstractConditionOperator extends AbstractOperation
         }
     }
 
-    public function apply(RetrieveCriteria $criteria): \Orkester\Persistence\Criteria\RetrieveCriteria
+    public function apply(RetrieveCriteria $criteria, array &$parameters): \Orkester\Persistence\Criteria\RetrieveCriteria
     {
         $topLevelConditions = [];
         if ($this->node instanceof ObjectValueNode) {
             /** @var ObjectFieldNode $node */
             foreach ($this->node->fields->getIterator() as $node) {
                 if ($node->name->value == 'and' || $node->name->value == 'or') {
-                    $this->prepareConditionGroup($criteria, $node->value->fields, $node->name->value);
+                    $this->prepareConditionGroup($criteria, $node->value->fields, $node->name->value, $parameters);
                 } else {
-                    array_push($topLevelConditions, ...$this->prepareCondition($node));
+                    array_push($topLevelConditions, ...$this->prepareCondition($node, $parameters));
                 }
             }
         } else if ($this->node instanceof VariableNode) {
             $conditions = $this->context->getNodeValue($this->node);
             foreach ($conditions ?? [] as $field => $condition) {
                 foreach ($condition ?? [] as $op => $value) {
-                    $topLevelConditions[] = [$field, $this->getCriteriaOperator($op, $value), $value];
+                    $topLevelConditions[] = [$field, $this->getCriteriaOperator($op, $value, $parameters), $value];
                 }
             }
         }
