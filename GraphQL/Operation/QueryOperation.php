@@ -369,14 +369,13 @@ class QueryOperation extends AbstractOperation
                 if ($cardinality == 'oneToOne') {
                     $value = $value[0] ?? null;
                 }
-                foreach ($columnsToExclude as $column) {
-                    unset($row[$column]);
+                if (in_array($fromKey, $columnsToExclude)) {
+                    unset($row[$fromKey]);
                 }
                 $row[$associationName] = $value;
                 $updatedRows[] = $row;
             }
             $rows = $updatedRows;
-
         }
         $this->restoreAfterSubCriteria($criteria, $removedParameters);
         $result = ($this->isSingleResult || $this->context->isSingular($this->node->name->value)) ? ($rows[0] ?? null) : $rows;
