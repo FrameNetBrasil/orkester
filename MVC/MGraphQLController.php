@@ -25,20 +25,20 @@ class MGraphQLController
 
     public function render(): Response
     {
-        $executor = new Executor($this->query, $this->variables);
-        ['data' => $data, 'errors' => $errors] = $executor->execute();
-        $content = empty($errors) ? ['data' => $data] : ['errors' => $errors];
-        $body = $this->response->getBody();
-        $body->write(json_encode($content));
-        return $this->response
-            ->withHeader('Content-Type', 'application/json')
-            ->withStatus(200);
+        return $this->send($this->execute(), 200);
     }
 
-    protected function send(string $content, int $httpCode): Response
+    public function execute(): array
+    {
+        $executor = new Executor($this->query, $this->variables);
+        ['data' => $data, 'errors' => $errors] = $executor->execute();
+        return empty($errors) ? ['data' => $data] : ['errors' => $errors];
+    }
+
+    public function send(mixed $content, int $httpCode): Response
     {
         $body = $this->response->getBody();
-        $body->write($content);
+        $body->write(json_encode($content));
         return $this->response
             ->withHeader('Content-Type', 'application/json')
             ->withStatus($httpCode);
