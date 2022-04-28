@@ -156,7 +156,8 @@ class RetrieveCriteria extends PersistentCriteria
         return $this;
     }
 
-    public function alias(string $alias) {
+    public function alias(string $alias)
+    {
         $this->setAlias($alias);
         return $this;
     }
@@ -200,7 +201,7 @@ class RetrieveCriteria extends PersistentCriteria
             $arg = $args[0];
             $select = "select " . $arg;
             $parser = new Parser($select);
-            foreach($parser->statements[0]->expr as $exp) {
+            foreach ($parser->statements[0]->expr as $exp) {
                 $attribute = trim($exp->expr);
                 if ($attribute == '*') {
                     $classMap = $this->classMap;
@@ -276,7 +277,8 @@ class RetrieveCriteria extends PersistentCriteria
         return $criteria->asResult()[0]['cnt'];
     }
 
-    public function clearSelect() {
+    public function clearSelect()
+    {
         $this->columns = [];
     }
 
@@ -546,7 +548,8 @@ class RetrieveCriteria extends PersistentCriteria
         return Manager::getPersistentManager()->getPersistence()->processCriteriaAsEntity($this, $entityClass, $parameters);
     }
 
-    public function prepare() {
+    public function prepare()
+    {
         return Manager::getPersistentManager()->getPersistence()->prepare($this);
     }
 
