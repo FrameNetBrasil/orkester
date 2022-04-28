@@ -215,15 +215,21 @@ class RetrieveCriteria extends PersistentCriteria
                     }
                 } else {
                     if (empty($exp->alias)) {
-                        $attributeMap = $this->classMap->getAttributeMap($exp->expr);
-                        $alias = $attributeMap && $attributeMap->getReference() ?
-                            $attributeMap->getName() : '';
-                    }
-                    else {
+                        if ($attributeMap = $this->classMap->getAttributeMap($exp->expr)) {
+                            if ($attributeMap->getReference()) {
+                                $alias = $attributeMap->getName();
+                            } else if (($name = $attributeMap->getName()) != $attributeMap->getColumnName()) {
+                                $alias = $name;
+                            } else {
+                                $alias = '';
+                            }
+                        }
+                        else {
+                            $alias = '';
+                        }
+                    } else {
                         $alias = $exp->alias;
                     }
-                    //$this->columns[] = addslashes($attribute);
-//                    $alias = ($exp->alias != '') ? ' as ' . $exp->alias : '';
                     $this->columns[] = empty($alias) ? $attribute : "$attribute as $alias";
                 }
             }
