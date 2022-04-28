@@ -53,4 +53,3 @@ class OperandAttributeMap extends PersistentOperand
     }
 
 }
-
