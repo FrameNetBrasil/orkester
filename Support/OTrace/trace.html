@@ -76,66 +76,107 @@
         font-weight: bold;
     }
 </style>
+<script src="trace.js"></script>
 <script>
-    const content = document.getElementById("content");
-    const resetCheckbox = document.getElementById("reset");
-    const connectButton = document.getElementById("button-connect");
-    const clearButton = document.getElementById("button-clear");
     const hostInput = document.getElementById("host");
     const portInput = document.getElementById("port");
+    const connectButton = document.getElementById("button-connect");
+    let socket = undefined;
     let isConnected = false;
-    let messageCounter = 0;
-    let socket;
-
-    function clear() {
-        content.innerHTML = "";
-        messageCounter = 0;
-    }
-
-    clearButton.onclick = clear;
-
-    function onMessage(event) {
-        const data = JSON.parse(event.data);
-        if (resetCheckbox.checked && data.tag === "RESET_LOG_MESSAGES") {
-            clear();
-        }
-        if (data.tag === "JSON") {
-            console.log(JSON.parse(data.message))
-        }
-        const element = document.createElement("div");
-        element.classList.add("log-message", data.tag);
-        element.innerHTML = `${++messageCounter}: [${data.tag}] ${data.message}`;
-        content.append(element);
-        window.scrollTo(0, document.body.scrollHeight);
-    }
-
     connectButton.onclick = function () {
+        console.log('click')
         if (isConnected) {
             socket.close();
-        } else {
-            connectButton.innerHTML = "Connecting";
-            try {
-                socket = new WebSocket(`ws://${hostInput.value}:${portInput.value}`);
-                socket.addEventListener("open", event => {
-                    isConnected = true;
-                    connectButton.innerHTML = "Disconnect";
-                });
-                socket.addEventListener("error", event => {
-                    console.error(event)
-                    isConnected = false;
-                    connectButton.innerHTML = "Error!"
-                })
-                socket.addEventListener("close", event => {
-                    isConnected = false;
-                    connectButton.innerHTML = "Connect"
-                })
-                socket.addEventListener("message", onMessage);
-            } catch (e) {
-                console.error(e)
+            isConnected = false;
+        }
+        try {
+            socket = connect(
+                hostInput.value,
+                portInput.value,
+                {
+                    DEBUG: "color: blue"
+                },
+                [],
+                undefined
+            )
+            console.log(socket)
+            socket.addEventListener("open", event => {
+                isConnected = true;
+                connectButton.innerHTML = "Disconnect";
+            });
+            socket.addEventListener("error", event => {
+                console.error(event)
+                isConnected = false;
                 connectButton.innerHTML = "Error!"
-            }
+            })
+            socket.addEventListener("close", event => {
+                isConnected = false;
+                connectButton.innerHTML = "Connect"
+            })
+            isConnected = true
+        } catch (e) {
+            console.error(e)
         }
     };
+    // const content = document.getElementById("content");
+    // const resetCheckbox = document.getElementById("reset");
+    // const connectButton = document.getElementById("button-connect");
+    // const clearButton = document.getElementById("button-clear");
+    // const hostInput = document.getElementById("host");
+    // const portInput = document.getElementById("port");
+    // let isConnected = false;
+    // let messageCounter = 0;
+    // let socket;
+    //
+    // function clear() {
+    //     content.innerHTML = "";
+    //     messageCounter = 0;
+    // }
+    //
+    // clearButton.onclick = clear;
+    //
+    // function onMessage(event) {
+    //     const data = JSON.parse(event.data);
+    //     if (resetCheckbox.checked && data.tag === "RESET_LOG_MESSAGES") {
+    //         clear();
+    //     }
+    //     if (data.tag === "JSON") {
+    //         console.log(JSON.parse(data.message))
+    //     }
+    //     const element = document.createElement("div");
+    //     element.classList.add("log-message", data.tag);
+    //     element.innerHTML = `${++messageCounter}: [${data.tag}] ${data.message}`;
+    //     content.append(element);
+    //     window.scrollTo(0, document.body.scrollHeight);
+    // }
+    //
+    // connectButton.onclick = function () {
+    //     if (isConnected) {
+    //         socket.close();
+    //     } else {
+    //         connectButton.innerHTML = "Connecting";
+    //         try {
+    //             socket = new WebSocket(`ws://${hostInput.value}:${portInput.value}`);
+    //             socket.addEventListener("open", event => {
+    //                 isConnected = true;
+    //                 connectButton.innerHTML = "Disconnect";
+    //             });
+    //             socket.addEventListener("error", event => {
+    //                 console.error(event)
+    //                 isConnected = false;
+    //                 connectButton.innerHTML = "Error!"
+    //             })
+    //             socket.addEventListener("close", event => {
+    //                 isConnected = false;
+    //                 connectButton.innerHTML = "Connect"
+    //             })
+    //             socket.addEventListener("message", onMessage);
+    //         } catch (e) {
+    //             console.error(e)
+    //             connectButton.innerHTML = "Error!"
+    //         }
+    //     }
+    // };
 
 </script>
 </html>
