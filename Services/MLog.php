@@ -2,6 +2,7 @@
 
 namespace Orkester\Services;
 
+use Carbon\Carbon;
 use Monolog\Handler\ErrorLogHandler;
 use Orkester\Manager;
 use Monolog\Handler\StreamHandler;
@@ -52,6 +53,7 @@ class MLog
             $stdout->setFormatter(new LineFormatter("%level_name%: %message% %context.user%" . PHP_EOL));
             $this->logger->pushHandler($stdout);
         }
+
         $handlerFile = new StreamHandler($this->errorLog, Logger::DEBUG, filePermission: 0777);
         $handlerFile->setFormatter($formatter);
         $this->logger->pushHandler($handlerFile);
@@ -219,7 +221,8 @@ class MLog
     */
     public function getLogFileName(string $filename): string
     {
-        $dir = $this->path;
+        $now = Carbon::now();
+        $dir = $this->path . '/' . $now->format('Y_m_d');
         $filename = basename($filename) . '.' . date('Y') . '-' . date('m') . '-' . date('d') . '-' . date('H') . '.log';
         return $dir . '/' . $filename;
     }
