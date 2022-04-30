@@ -309,7 +309,7 @@ class Manager
         return $conf;
     }
 
-    public static function setConf(string $key, string $value)
+    public static function setConf(string $key, mixed $value)
     {
         $k = explode('.', $key);
         $n = count($k);
