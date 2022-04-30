@@ -38,7 +38,6 @@ class MAuthorizedModel
 
     public function canUpdateAttribute(string $attribute): bool
     {
-        mdump($attribute);
         return $this->before ??
             $this->authorization->updateAttribute($attribute);
     }
