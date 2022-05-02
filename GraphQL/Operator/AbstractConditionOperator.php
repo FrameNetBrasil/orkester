@@ -43,7 +43,7 @@ abstract class AbstractConditionOperator extends AbstractOperation
         if (is_null($result)) {
             throw new EGraphQLException(["unknown_condition_operator" => $operator]);
         }
-        $key = substr($value, 1);
+        $key = is_string($value) ? substr($value, 1) : '';
         $realValue = $parameters[$key] ?? $value;
         $modifiedValue = match ($operator) {
             'is_null' => null,
@@ -69,10 +69,11 @@ abstract class AbstractConditionOperator extends AbstractOperation
             if ($value == null && $cond != 'is_null') continue;
             $operator = $this->getCriteriaOperator($cond, $value, $parameters);
             $conditions[] = ['op' => $operator, 'value' => $value];
+
         }
-        if (is_null($field) || empty($conditions)) {
-            throw new EGraphQLException(['condition' => 'Invalid where expression']);
-        }
+//        if (is_null($field) || empty($conditions)) {
+//            throw new EGraphQLException(['condition' => 'Invalid where expression']);
+//        }
         $result = [];
         foreach ($conditions as ['op' => $operator, 'value' => $value]) {
             $result[] = [$field, $operator, $value];
