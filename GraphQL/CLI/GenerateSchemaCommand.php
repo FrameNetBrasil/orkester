@@ -8,11 +8,33 @@ use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class GenerateSchemaCommand extends \Symfony\Component\Console\Command\Command
 {
-    protected static $defaultName = 'generate:schema';
+    protected static $defaultName = 'graphql:generate_schema';
+
+    public function __construct(
+        protected string $outDir = '',
+        protected bool   $generateWhere = false,
+        protected bool   $generateQuery = false,
+        protected bool   $generateType = false
+    )
+    {
+        parent::__construct();
+    }
+
+    public function configure()
+    {
+        $this
+            ->addOption('schema', null, InputOption::VALUE_NONE)
+            ->addOption('query', null, InputOption::VALUE_NONE)
+            ->addOption('where', null, InputOption::VALUE_NONE)
+            ->addOption('all', null, InputOption::VALUE_NONE)
+            ->addOption('out', 'o', InputOption::VALUE_REQUIRED);
+    }
+
 
     public function getAllModels($namespace): array
     {
@@ -29,7 +51,6 @@ class GenerateSchemaCommand extends \Symfony\Component\Console\Command\Command
     public function createQuery(string $modelKey, string $typename): string
     {
         return <<<EOD
-Query {
   $modelKey(
     id: ID, 
     limit: Int,
@@ -39,19 +60,19 @@ Query {
     join: [Join!]
     where: Where$typename
   ): [$typename!]!
-}
 EOD;
     }
 
     public function createWhere(string $typename, array $gqlAttributes): string
     {
         $where = <<<EOD
-type Where$typename {
+input Where$typename {
   or: Where$typename
   and: Where$typename
 
 EOD;
         foreach ($gqlAttributes as $attribute => $type) {
+            $type = $type == 'ID' ? 'Int' : $type;
             $where .= "  $attribute: Where$type" . PHP_EOL;
         }
         $where .= '}' . PHP_EOL;
@@ -68,6 +89,12 @@ EOD;
         }
     }
 
+    public function isModelAvailable(string $className): bool
+    {
+        $conf = require Manager::getConfPath() . '/graphql.php';
+        return in_array($className, $conf['models']);
+    }
+
 
     public function createSchema($key, $model, OutputInterface $output): array
     {
@@ -75,8 +102,8 @@ EOD;
         $classMap = $model::getClassMap();
 
         $typename = $this->getTypename($model, $output);
-        $schema = "type $typename {" . PHP_EOL;
-        $schema .= "  id: ID!" . PHP_EOL;
+        $typedef = "type $typename {" . PHP_EOL;
+        $typedef .= "  id: ID!" . PHP_EOL;
         $gqlAttributes = [];
         /** @var AttributeMap $attributeMap */
         foreach ($classMap->getAttributesMap() as $attributeMap) {
@@ -100,49 +127,66 @@ EOD;
             if (!empty($arguments)) {
                 $args = "(" . implode(' ', $arguments) . ")";
             }
-            $schema .= "  {$attributeMap->getName()}$args: $type$null" . PHP_EOL;
+            $typedef .= "  {$attributeMap->getName()}$args: $type$null" . PHP_EOL;
         }
         /** @var AssociationMap $associationMap */
-        foreach($classMap->getAssociationMaps() as $associationMap) {
-            $toTypename = $this->getTypename($associationMap->getToClassName(), $output);
-            $cardinality = $associationMap->getCardinality() == 'oneToMany' ?
-                "[$toTypename!]!" : $toTypename;
-            $schema .= "  {$associationMap->getName()}: {$cardinality}" . PHP_EOL;
+        foreach ($classMap->getAssociationMaps() as $associationMap) {
+            if ($this->isModelAvailable($associationMap->getToClassName())) {
+                $toTypename = $this->getTypename($associationMap->getToClassName(), $output);
+                $cardinality = $associationMap->getCardinality() == 'oneToMany' ?
+                    "[$toTypename!]!" : $toTypename;
+                $typedef .= "  {$associationMap->getName()}: {$cardinality}" . PHP_EOL;
+            }
         }
-        $schema .= "}" . PHP_EOL;
+        $typedef .= "}" . PHP_EOL;
         return [
             'type' => $typename,
-            'schema' => $schema,
+            'typedef' => $typedef,
             'where' => $this->createWhere($typename, $gqlAttributes),
             'query' => $this->createQuery($key, $typename)
         ];
     }
 
-    public function configure()
+    public function execute(?InputInterface $input, ?OutputInterface $output)
     {
-    }
-
-    public function execute(InputInterface $input, OutputInterface $output)
-    {
-        $conf = require Manager::getConfPath() . '/graphql.php';
-        $path = Manager::getBasePath() . "/app/Schema/Generated";
-        if (!file_exists($path)) {
-            mkdir($path, recursive: true);
+        if (!is_null($input)) {
+            $all = $input->getOption('all');
+            $this->generateWhere = $all || $input->getOption('where');
+            $this->generateQuery = $all || $input->getOption('query');
+            $this->generateType = $all || $input->getOption('schema');
+            $this->outDir = $input->getOption('out');
         }
+        $conf = require Manager::getConfPath() . '/graphql.php';
+        if (!file_exists($this->outDir)) {
+            mkdir($this->outDir, recursive: true);
+        }
+        $queries = [];
         foreach ($conf['models'] as $key => $model) {
             [
                 'type' => $type,
-                'schema' => $schema,
+                'typedef' => $typedef,
                 'where' => $where,
-                'query' => $query
+                'query' => $queries[]
             ] = $this->createSchema($key, $model, $output);
-            $filename = "$path/$type.graphql";
-            file_put_contents($filename,
-                $schema . PHP_EOL .
-                $query . PHP_EOL . PHP_EOL .
-                $where . PHP_EOL
-            );
+
+            $filename = "$this->outDir/$type.graphql";
+            $content =
+                ($this->generateType ? $typedef . PHP_EOL : '') .
+                ($this->generateWhere ? $where . PHP_EOL : '');
+            if ($content) {
+                file_put_contents($filename, $content);
+            }
+        }
+        if ($this->generateQuery) {
+            $allQueries = implode(PHP_EOL, $queries);
+            $query = <<<EOD
+type Query {
+  $allQueries
+}
+EOD;
+            file_put_contents("$this->outDir/Query.graphql", $query);
         }
         return Command::SUCCESS;
     }
+
 }

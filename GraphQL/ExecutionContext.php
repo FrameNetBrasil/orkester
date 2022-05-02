@@ -114,6 +114,11 @@ class ExecutionContext
         return static::$conf['models'][static::$conf['singular'][$name] ?? null] ?? null;
     }
 
+    public function getConf(string $key): mixed
+    {
+        return static::$conf[$key];
+    }
+
     /**
      * @throws EGraphQLNotFoundException
      * @throws \DI\DependencyException

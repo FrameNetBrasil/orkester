@@ -57,8 +57,9 @@ class Executor
     public function prepare()
     {
         $this->document = Parser::parse($this->query);
-        if ($this->document->definitions->offsetGet(0))
-        $fragments = [];
+        if ($this->document->definitions->offsetGet(0)) {
+            $fragments = [];
+        }
         foreach ($this->document->definitions as $definition) {
             if ($definition instanceof FragmentDefinitionNode) {
                 $fragments[] = $definition;
@@ -200,6 +201,18 @@ class Executor
         return ['data' => $response, 'errors' => $errors];
     }
 
+    public function executeIntrospection(): array
+    {
+        $definitionsDir = $this->context->getConf('schema');
+        $graphqlFiles = array_filter(scandir($definitionsDir), fn($file) => str_ends_with($file, '.graphql'));
+        $definitions = [
+            file_get_contents(Manager::getOrkesterPath() . '/GraphQL/Schema/orkester.graphql'),
+            ... array_map(fn($file) => file_get_contents("$definitionsDir/$file"), $graphqlFiles)
+        ];
+        $schema = BuildSchema::build(implode(PHP_EOL, $definitions));
+        return GraphQL::executeQuery($schema, $this->query)->toArray();
+    }
+
     #[ArrayShape(['data' => "array", 'errors' => "array"])]
     public function execute(): ?array
     {
@@ -209,9 +222,7 @@ class Executor
                 $this->prepare();
             }
             if ($this->isIntrospection) {
-                $contents = file_get_contents('/server/app/Schema/total.graphql');
-                $schema = BuildSchema::build($contents);
-                return GraphQL::executeQuery($schema, $this->query)->toArray();
+                return $this->executeIntrospection();
             }
             $transaction = MModel::beginTransaction();
             $result = $this->executeCommands();
