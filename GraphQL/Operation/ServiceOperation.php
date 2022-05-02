@@ -73,25 +73,7 @@ class ServiceOperation extends AbstractMutationOperation
             $result = $service(...$args);
             $selection = $this->collectSelectionSet($this->root->selectionSet);
             $response = [];
-            mdump('================');
-            mdump($result);
             return ['result' => $result];
-//            if (empty($result)) {
-//                return null;
-//            } else {
-//                if (count($selection) == 1 && $selection[0] == 'result') {
-//                    $response['result'] = $result;
-//                } else if (is_array($result)) {
-//                    foreach ($selection as $select) {
-//                        if (array_key_exists($select, $result)) {
-//                            $response[$select] = $result[$select];
-//                        }
-//                    }
-//                } else {
-//                    $response['result'] = $result;
-//                }
-//            }
-//            return $response;
         } catch (EValidationException $e) {
             throw new EGraphQLValidationException($e->errors);
         }
