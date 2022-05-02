@@ -6,10 +6,12 @@ use DI\DependencyException;
 use DI\NotFoundException;
 use Ds\Set;
 use GraphQL\Error\SyntaxError;
+use GraphQL\GraphQL;
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\OperationDefinitionNode;
 use GraphQL\Language\Parser;
+use GraphQL\Type\Introspection;
 use GraphQL\Utils\BuildSchema;
 use JetBrains\PhpStorm\ArrayShape;
 use Orkester\Exception\EGraphQLException;
@@ -22,6 +24,7 @@ use Orkester\GraphQL\Operation\QueryOperation;
 use Orkester\GraphQL\Operation\ServiceOperation;
 use Orkester\GraphQL\Operation\TotalOperation;
 use Orkester\GraphQL\Operation\UpdateOperation;
+use Orkester\Manager;
 use Orkester\MVC\MModel;
 
 class Executor
@@ -31,9 +34,9 @@ class Executor
     protected DocumentNode $document;
     protected ExecutionContext $context;
     public bool $isPrepared = false;
+    public bool $isIntrospection = false;
     public bool $requiresTransaction = false;
 
-//    protected bool $isIntrospection = false;
     protected Set $aliases;
     protected array $operations = [];
 
@@ -54,6 +57,7 @@ class Executor
     public function prepare()
     {
         $this->document = Parser::parse($this->query);
+        if ($this->document->definitions->offsetGet(0))
         $fragments = [];
         foreach ($this->document->definitions as $definition) {
             if ($definition instanceof FragmentDefinitionNode) {
@@ -62,7 +66,7 @@ class Executor
                 $this->definitions[] = $definition;
             }
         }
-        $this->context = new ExecutionContext($this->variables, $fragments);
+        $this->context = new ExecutionContext($this->variables, $fragments ?? []);
         $this->prepareOperations();
         $this->isPrepared = true;
     }
@@ -81,6 +85,11 @@ class Executor
         }
         foreach ($definition->selectionSet->selections->getIterator() as $fieldNode) {
             $operationName = $fieldNode->alias?->value ?? $fieldNode->name->value;
+            if (in_array($operationName, ['__schema', '__type'])) {
+                $this->isIntrospection = true;
+                $this->isPrepared = true;
+                return;
+            }
             if ($this->aliases->contains($operationName)) {
                 throw new EGraphQLException(['duplicate_alias' => $operationName]);
             }
@@ -191,14 +200,6 @@ class Executor
         return ['data' => $response, 'errors' => $errors];
     }
 
-//    public function executeIntrospection(): array
-//    {
-//        $contents = file_get_contents(Manager::getBasePath() . '/vendor/elymatos/orkester/GraphQL/Schema/Core.graphql');
-//        $schema = BuildSchema::build($contents);
-//        $executor = \GraphQL\Executor\Executor::execute($schema, $this->document);
-//        return [];
-//    }
-
     #[ArrayShape(['data' => "array", 'errors' => "array"])]
     public function execute(): ?array
     {
@@ -207,16 +208,17 @@ class Executor
             if (!$this->isPrepared) {
                 $this->prepare();
             }
-            if ($this->requiresTransaction) {
-                $transaction = MModel::beginTransaction();
+            if ($this->isIntrospection) {
+                $contents = file_get_contents('/server/app/Schema/total.graphql');
+                $schema = BuildSchema::build($contents);
+                return GraphQL::executeQuery($schema, $this->query)->toArray();
             }
+            $transaction = MModel::beginTransaction();
             $result = $this->executeCommands();
-            if (isset($transaction)) {
-                if (empty($result['errors'])) {
-                    $transaction->commit();
-                } else {
-                    $transaction->rollback();
-                }
+            if (empty($result['errors'])) {
+                $transaction->commit();
+            } else {
+                $transaction->rollback();
             }
             return $result;
         } catch (SyntaxError $e) {
