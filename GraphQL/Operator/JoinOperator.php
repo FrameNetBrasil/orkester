@@ -11,7 +11,7 @@ use Orkester\Persistence\Criteria\RetrieveCriteria;
 class JoinOperator extends AbstractOperator
 {
 
-    public function __construct(ExecutionContext $context, protected ObjectValueNode $root)
+    public function __construct(ExecutionContext $context, protected ListValueNode $root)
     {
         parent::__construct($context);
         $this->context = $context;
@@ -19,10 +19,12 @@ class JoinOperator extends AbstractOperator
 
     public function apply(RetrieveCriteria $criteria): RetrieveCriteria
     {
-        /** @var ObjectFieldNode $item */
-        foreach($this->root->fields as $item) {
-            $type = $item->name->value;
-            $path = $this->context->getNodeValue($item->value);
+        /** @var ObjectValueNode $item */
+        foreach($this->root->values->getIterator() as $item) {
+            /** @var ObjectFieldNode $node */
+            $node = $item->fields->offsetGet(0);
+            $type = $node->name->value;
+            $path = $this->context->getNodeValue($node->value);
             $criteria->setAssociationType($path, $type);
         }
         return $criteria;
