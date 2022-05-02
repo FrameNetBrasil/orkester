@@ -335,7 +335,7 @@ class MQuery
             foreach ($result as $row) {
                 $aNode = [];
                 foreach ($node as $n) {
-                    $aNode[] = $row[$n];
+                    $aNode[$n] = $row[$n];
                 }
                 $s = '';
                 foreach ($group as $g) {
