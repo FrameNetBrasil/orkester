@@ -79,7 +79,7 @@ EOD;
         return $where;
     }
 
-    public function getTypename(string $model, OutputInterface $output)
+    public function getTypename(string $model, ?OutputInterface $output)
     {
         if (preg_match_all("/([\w\d_]+)Model$/", $model, $matches)) {
             return $matches[1][0];
@@ -96,7 +96,7 @@ EOD;
     }
 
 
-    public function createSchema($key, $model, OutputInterface $output): array
+    public function createSchema($key, $model, ?OutputInterface $output): array
     {
         /** @var ClassMap $classMap */
         $classMap = $model::getClassMap();
