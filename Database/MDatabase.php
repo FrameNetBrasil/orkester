@@ -180,7 +180,7 @@ class MDatabase
         $MSql = new MSql();
         $MSql->setDb($this);
         $MSql->setCommand($command);
-        $this->execute($MSql, $parameters);
+        return $this->execute($MSql, $parameters);
     }
 
     public function execute(MSql $sql, $parameters = null)
@@ -189,10 +189,11 @@ class MDatabase
             try {
                 $sql->setParameters($parameters);
                 $this->affectedRows = $sql->execute();
+                $this->lastInsertId = $this->connection->lastInsertId();
+                return $this->lastInsertId;
             } catch (Exception $e) {
                 $code = $sql->stmt->errorCode();
                 $info = $sql->stmt->errorInfo();
-                mdump($info);
                 throw EDBException::execute($info[2], $code);
             }
         } else {
