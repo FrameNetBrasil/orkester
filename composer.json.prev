@@ -23,10 +23,13 @@
         "ramsey/uuid": "^4.2",
         "php-ds/php-ds": "^1.4",
         "phpfastcache/phpfastcache": "8",
+        "jenssegers/blade": "^1.4",
         "composer/composer": "^2.2",
+        "doctrine/dbal": "2.13",
+        "doctrine/common": "2.13.1",
+        "phpmyadmin/sql-parser": "^5.5",
         "webonyx/graphql-php": "^14.11",
-        "illuminate/database": "9.*",
-        "illuminate/events": "^9.11"
+        "illuminate/database": "*"
     },
     "autoload": {
         "files": [
