@@ -19,16 +19,20 @@ use DI\Container;
 //use Orkester\Security\MSSL;
 //use Orkester\Services\Cache\MCacheFast;
 //use Orkester\Services\Http\MAjax;
+use Orkester\Handlers\HttpErrorHandler;
+use Orkester\Handlers\ShutdownHandler;
 use Orkester\Services\MLog;
 //use Orkester\Services\MSession;
 //use Orkester\UI\MBasePainter;
 //use Orkester\Utils\MUtil;
 use Phpfastcache\Helper\Psr16Adapter;
+use Psr\Http\Message\RequestInterface;
 use Slim\Factory\AppFactory;
 use Slim\App;
 use Slim\Factory\ServerRequestCreatorFactory;
 use Slim\Handlers\ErrorHandler;
 use Slim\Psr7\Request;
+use Slim\ResponseEmitter;
 
 
 //define('MAESTRO_NAME', 'Maestro 4.0');
@@ -69,6 +73,8 @@ class Manager
     static private object $data;
     static private Container $container;
     static private ?MLog $log = NULL;
+    static private App $app;
+//    private static ?RequestInterface $request;
 
 //    static private string $appPath;
 //    static private string $publicPath;
@@ -89,7 +95,6 @@ class Manager
      * Configuration values
      */
     static public array $conf = [];
-//    static private App $app;
     /**
      * @var HttpErrorHandler
      */
@@ -100,7 +105,6 @@ class Manager
 //    private static ?MSession $session = null;
 //    private static $returnType;
 //    private static $persistence;
-//    private static ?Request $request;
 
     /**
      * Cria (se não existe) e retorna a instância singleton da class Manager.
@@ -223,31 +227,51 @@ class Manager
     }
 
     /**
-     * Processa a requisição feita via browser após a inicialização do Framework,
-     * delegando a execução para o FrontController.
+     * Processa a requisição feita via browser após a inicialização do Framework
      */
     public static function handler()
     {
         self::logMessage('[RESET_LOG_MESSAGES]');
-
-// Instantiate the app
         AppFactory::setContainer(self::$container);
         self::$app = AppFactory::create();
-// Create Request object from globals
         $serverRequestCreator = ServerRequestCreatorFactory::create();
-        self::$request = $serverRequestCreator->createServerRequestFromGlobals();
+        $request = $serverRequestCreator->createServerRequestFromGlobals();
+        $callableResolver = self::$app->getCallableResolver();
 
-        self::$isAjax = (self::$request->getHeaderLine('X-Requested-With') === 'XMLHttpRequest');
-        //if (self::$isAjax) {
-        //    self::$ajax = self::$container->get(MAjax::class);
-        //}
-        //self::$baseURL = self::$request->getUri()->getBaseUrl();
-        self::$frontController = self::$container->get(MFrontController::class);
-        //$auth = self::$conf['login']['class'];
-        //self::$auth = new $auth();
-        self::$frontController->init(self::$request);
-        //self::$isLogged = self::$auth->checkLogin();
-        return self::$frontController->handler();
+        $displayErrorDetails = Manager::getContainer()->get('settings')['displayErrorDetails'];
+
+// Create Error Handler
+        $responseFactory = self::$app->getResponseFactory();
+        $errorHandler = new HttpErrorHandler($callableResolver, $responseFactory);
+
+// Create Shutdown Handler
+        $shutdownHandler = new ShutdownHandler($request, $errorHandler, $displayErrorDetails);
+        register_shutdown_function($shutdownHandler);
+
+        //$confPath = Manager::getConfPath();
+// Register middleware
+        if (file_exists(self::$confPath . '/middleware.php')) {
+            $middleware = require self::$confPath . '/middleware.php';
+            $middleware(self::$app);
+        }
+
+// Register routes
+        $routes = require self::$confPath . '/routes.php';
+        $routes(self::$app);
+
+// Parse json, form data and xml
+        self::$app->addBodyParsingMiddleware();
+
+// Add Routing Middleware
+        self::$app->addRoutingMiddleware();
+
+// Add Error Middleware
+        $errorMiddleware = self::$app->addErrorMiddleware($displayErrorDetails, false, false);
+        $errorMiddleware->setDefaultErrorHandler($errorHandler);
+        // Run App & Emit Response
+        $response = self::$app->handle($request);
+        $responseEmitter = new ResponseEmitter();
+        $responseEmitter->emit($response);
     }
 
     public static function getApp(): App
@@ -255,49 +279,50 @@ class Manager
         return self::$app;
     }
 
-    public static function getErrorHandler(): ErrorHandler
-    {
-        return self::$errorHandler;
-    }
+
+//    public static function getErrorHandler(): ErrorHandler
+//    {
+//        return self::$errorHandler;
+//    }
 
     /**
      * Base path
      * @return string
      */
-    public static function getHome(): string
-    {
-        return self::$basePath;
-    }
+//    public static function getHome(): string
+//    {
+//        return self::$basePath;
+//    }
 
-    public static function getBasePath(): string
-    {
-        return self::$basePath;
-    }
-
-    public static function getAppPath(): string
-    {
-        return self::$appPath;
-    }
-
-    public static function getConfPath(): string
-    {
-        return self::$confPath;
-    }
-
-    public static function getOrkesterPath(): string
-    {
-        return self::$classPath;
-    }
-
-    public static function getVarPath(): string
-    {
-        return self::$varPath;
-    }
-
-    public static function getPublicPath(): string
-    {
-        return self::$publicPath;
-    }
+//    public static function getBasePath(): string
+//    {
+//        return self::$basePath;
+//    }
+//
+//    public static function getAppPath(): string
+//    {
+//        return self::$appPath;
+//    }
+//
+//    public static function getConfPath(): string
+//    {
+//        return self::$confPath;
+//    }
+//
+//    public static function getOrkesterPath(): string
+//    {
+//        return self::$classPath;
+//    }
+//
+//    public static function getVarPath(): string
+//    {
+//        return self::$varPath;
+//    }
+//
+//    public static function getPublicPath(): string
+//    {
+//        return self::$publicPath;
+//    }
 
     public static function getConf(string $key)
     {
@@ -361,10 +386,10 @@ class Manager
         return self::$cache;
     }
 
-    public static function getLog(): ?MLog
-    {
-        return self::$log;
-    }
+//    public static function getLog(): ?MLog
+//    {
+//        return self::$log;
+//    }
 
 
     public static function arrayMergeOverwrite(array $arr1, array $arr2): array
@@ -475,10 +500,10 @@ class Manager
 //        }
 //    }
 //
-//    public static function logMessage(string $msg)
-//    {
-//        self::$log->logMessage($msg);
-//    }
+    public static function logMessage(string $msg)
+    {
+        self::$log->logMessage($msg);
+    }
 //
 //    public static function getRequest(): Request|null
 //    {
