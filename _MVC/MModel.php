@@ -2,25 +2,23 @@
 
 namespace Orkester\MVC;
 
-//use Orkester\Database\MSql;
-//use Orkester\Exception\EOrkesterException;
-//use Orkester\Exception\ESecurityException;
-//use Orkester\Exception\EValidationException;
-//use Orkester\Manager;
-//use Orkester\Persistence\Map\AssociationMap;
-//use Orkester\Persistence\Map\AttributeMap;
-//use Orkester\Persistence\Criteria\DeleteCriteria;
-//use Orkester\Persistence\Criteria\InsertCriteria;
-//use Orkester\Persistence\Criteria\RetrieveCriteria;
-//use Orkester\Persistence\Criteria\UpdateCriteria;
-//use Orkester\Persistence\Map\ClassMap;
-//use Orkester\Persistence\PersistenceTransaction;
-//use Orkester\Security\Authorization\AllowAllAuthorization;
-//use Orkester\Security\Authorization\IAuthorization;
+use Orkester\Database\MSql;
+use Orkester\Exception\EOrkesterException;
+use Orkester\Exception\ESecurityException;
+use Orkester\Exception\EValidationException;
+use Orkester\Manager;
+use Orkester\Persistence\Map\AssociationMap;
+use Orkester\Persistence\Map\AttributeMap;
+use Orkester\Persistence\Criteria\DeleteCriteria;
+use Orkester\Persistence\Criteria\InsertCriteria;
+use Orkester\Persistence\Criteria\RetrieveCriteria;
+use Orkester\Persistence\Criteria\UpdateCriteria;
+use Orkester\Persistence\Map\ClassMap;
+use Orkester\Persistence\PersistenceTransaction;
+use Orkester\Security\Authorization\AllowAllAuthorization;
+use Orkester\Security\Authorization\IAuthorization;
 
-use Illuminate\Database\Eloquent\Model;
-
-class MModel extends Model
+class MModel
 {
 
     public IAuthorization $authorization;
@@ -32,8 +30,6 @@ class MModel extends Model
     public static function init(): void
     {
     }
-
-    /*
 
     public static function beginTransaction(): PersistenceTransaction
     {
@@ -100,6 +96,7 @@ class MModel extends Model
         $classMap = $classMap ?? static::getClassMap();
         $errors = [];
         static::beforeSave($object);
+        /** @var AttributeMap $attributeMap */
         foreach($classMap->getAttributesMap() as $attributeMap) {
             try {
                 $value = $object->{$attributeMap->getName()} ?? null;
@@ -141,6 +138,9 @@ class MModel extends Model
     {
     }
 
+    /**
+     * @throws EValidationException
+     */
     public function insert(object $object)
     {
         static::beforeInsert($object);
@@ -156,6 +156,9 @@ class MModel extends Model
     {
     }
 
+    /**
+     * @throws EValidationException
+     */
     public function update(object $object, object $old)
     {
         static::beforeUpdate($object, $old);
@@ -339,6 +342,7 @@ class MModel extends Model
             $classMap = static::getClassMap();
             $oldEntity = empty($id) ? null : static::getById($id);
             $entity = is_null($oldEntity) ? [] : (array)$oldEntity;
+            /** @var AttributeMap $attributeMap */
             foreach ($classMap->getAttributesMap() as $attributeMap) {
                 if (empty($attributeMap->getReference()) && ($allowFk || $attributeMap->getKeyType() == 'none')) {
                     $attributeName = $attributeMap->getName();
@@ -568,6 +572,5 @@ class MModel extends Model
             throw $e;
         }
     }
-    */
 
 }
