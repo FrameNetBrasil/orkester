@@ -21,6 +21,8 @@ use DI\Container;
 //use Orkester\Services\Http\MAjax;
 use Orkester\Handlers\HttpErrorHandler;
 use Orkester\Handlers\ShutdownHandler;
+use Orkester\Persistence\PersistentManager;
+use Orkester\Services\Cache\MCacheFast;
 use Orkester\Services\MLog;
 //use Orkester\Services\MSession;
 //use Orkester\UI\MBasePainter;
@@ -74,6 +76,9 @@ class Manager
     static private Container $container;
     static private ?MLog $log = NULL;
     static private App $app;
+    static private ?Psr16Adapter $cache = NULL;
+    static private ?PersistentManager $persistentManager = NULL;
+
 //    private static ?RequestInterface $request;
 
 //    static private string $appPath;
@@ -89,7 +94,6 @@ class Manager
 //    static private MAuth $auth;
 //    static private array $databases = [];
 //    static private ?MLogin $login = NULL;
-//    static private ?Psr16Adapter $cache = NULL;
 
     /**
      * Configuration values
@@ -208,9 +212,7 @@ class Manager
         if (file_exists(self::$confPath . '/environment.php')) {
             self::loadConf(self::$confPath . '/environment.php');
         }
-        self::$log = self::$container->make(MLog::class, [
-            'options' => self::getConf('logs')
-        ]);
+        self::$log = new MLog(self::getConf('logs'));
         Manager::$data = (object)[];
 
         register_shutdown_function("shutdown");
@@ -386,10 +388,10 @@ class Manager
         return self::$cache;
     }
 
-//    public static function getLog(): ?MLog
-//    {
-//        return self::$log;
-//    }
+    public static function getLog(): ?MLog
+    {
+        return self::$log;
+    }
 
 
     public static function arrayMergeOverwrite(array $arr1, array $arr2): array
@@ -541,17 +543,13 @@ class Manager
 //        return $model;
 //    }
 //
-//    public static function getPersistentManager(string $datasource = 'orkester'): PersistentManager
-//    {
-//        if (!isset(self::$persistence[$datasource])) {
-//            if (!isset(self::$persistence[$datasource])) {
-//                $config = Manager::getConf("db.{$datasource}");
-//                $level = Manager::getConf("logs.level");
-//                self::$persistence[$datasource] = self::$container->get('PersistentManager');
-//            }
-//        }
-//        return self::$persistence[$datasource];
-//    }
+    public static function getPersistentManager(): PersistentManager
+    {
+        if (is_null(self::$persistentManager)) {
+            self::$persistentManager = PersistentManager::getInstance();
+        }
+        return self::$persistentManager;
+    }
 //
 //    public static function getPersistence(string $datasource)
 //    {
@@ -624,10 +622,10 @@ class Manager
 //        self::$data = $data;
 //    }
 //
-//    public static function getData(): object
-//    {
-//        return self::$data;
-//    }
+    public static function getData(): object
+    {
+        return self::$data;
+    }
 //
 //    public static function addData(string $field, $value): object
 //    {

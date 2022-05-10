@@ -51,7 +51,7 @@ return function (ContainerBuilder $containerBuilder) {
 //            $ajax->initialize(Manager::getOptions('charset'));
 //            return $ajax;
 //        },
-        MLog::class => create(),
+//        MLog::class => create(),
 //        MSession::class => create(),
 //        MContext::class => DI\autowire(),
 //        MDatabase::class => create(),
