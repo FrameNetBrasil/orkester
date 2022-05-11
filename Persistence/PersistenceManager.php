@@ -13,27 +13,28 @@ use Orkester\Manager;
 //use Orkester\Persistence\Criteria\RetrieveCriteria;
 //use Orkester\Persistence\Criteria\PersistentCriteria;
 //use Orkester\Persistence\Map\AssociationMap;
+use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\ClassMap;
 use Phpfastcache\Helper\Psr16Adapter;
 use WeakMap;
 
 
-class PersistentManager
+class PersistenceManager
 {
 
     static private $instance = NULL;
-    private PersistenceSQL $persistence;
+    public PersistenceSQL $persistence;
 //    private PersistentConfigLoader $configLoader;
-    private Psr16Adapter $classMaps;
+    public Psr16Adapter $classMaps;
 //    //private ?MDatabase $connection = NULL;
 //    private array $dbConnections = [];
 //    private array $converters = [];
-//    private WeakMap $originalData;
+    public WeakMap $originalData;
 
-    public static function getInstance(): PersistentManager
+    public static function getInstance(): PersistenceManager
     {
         if (self::$instance == NULL) {
-            self::$instance = new PersistentManager();
+            self::$instance = new PersistenceManager();
             self::$instance->classMaps = Manager::getCache();
             self::$instance->originalData = new WeakMap();
             self::$instance->persistence = new PersistenceSQL();
@@ -42,21 +43,28 @@ class PersistentManager
         return self::$instance;
     }
 
-    private function getSignature(string $className): string {
-        return md5($className);
+    private function getSignature(MModel $class): string {
+        $stat = stat($class->getFileName());
+        $lastModification = $stat['mtime'];
+        return md5(get_class($class) . $lastModification);
     }
 
-    public function getClassMap(string $className): ClassMap
+    public function getClassMap(MModel $class): ClassMap
     {
-        $key = $this->getSignature($className);
+        $key = $this->getSignature($class);
         if ($this->classMaps->has($key)) {
             $classMap = $this->classMaps->get($key);
         } else {
-            $className::init();
-            $classMap = $this->configLoader->getClassMap($className);
+            $class->init();
+            $classMap = $class->getInitClassMap();
             $this->classMaps->set($key, $classMap);
         }
         return $classMap;
+    }
+
+    public function getCriteria(ClassMap $classMap)
+    {
+        return new RetrieveCriteria($classMap);
     }
 
     /*
@@ -279,10 +287,6 @@ class PersistentManager
         $cache->delete($key);
     }
 
-    public function getCriteria(ClassMap $classMap)
-    {
-        return new RetrieveCriteria($classMap);
-    }
 
     public function getDeleteCriteria(ClassMap $classMap): DeleteCriteria
     {

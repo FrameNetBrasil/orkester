@@ -77,10 +77,10 @@ class MLog
 
     }
 
-//    public function setLevel(string $level)
-//    {
-//        $this->level = $level;
-//    }
+    public function setLevel(string $level)
+    {
+        $this->level = $level;
+    }
 //
 //    public function logSQL(string $sql, string $db, bool $force = false)
 //    {

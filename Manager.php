@@ -8,6 +8,7 @@ namespace Orkester;
 
 use DI\ContainerBuilder;
 use DI\Container;
+
 //use Orkester\Database\MDatabase;
 //use Orkester\MVC\MContext;
 //use Orkester\MVC\MFrontController;
@@ -21,9 +22,10 @@ use DI\Container;
 //use Orkester\Services\Http\MAjax;
 use Orkester\Handlers\HttpErrorHandler;
 use Orkester\Handlers\ShutdownHandler;
-use Orkester\Persistence\PersistentManager;
-use Orkester\Services\Cache\MCacheFast;
+use Orkester\Persistence\PersistenceManager;
+use Orkester\Services\MCacheFast;
 use Orkester\Services\MLog;
+
 //use Orkester\Services\MSession;
 //use Orkester\UI\MBasePainter;
 //use Orkester\Utils\MUtil;
@@ -35,6 +37,9 @@ use Slim\Factory\ServerRequestCreatorFactory;
 use Slim\Handlers\ErrorHandler;
 use Slim\Psr7\Request;
 use Slim\ResponseEmitter;
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Events\Dispatcher;
+use Illuminate\Container\Container as LaravelContainer;
 
 
 //define('MAESTRO_NAME', 'Maestro 4.0');
@@ -77,7 +82,7 @@ class Manager
     static private ?MLog $log = NULL;
     static private App $app;
     static private ?Psr16Adapter $cache = NULL;
-    static private ?PersistentManager $persistentManager = NULL;
+    static private ?PersistenceManager $persistenceManager = NULL;
 
 //    private static ?RequestInterface $request;
 
@@ -465,14 +470,52 @@ class Manager
 //        return new $class;
 //    }
 
-    public static function getDatabase(string $databaseName = ''): ?MDatabase
+    public static function getDatabase(string $databaseName = ''): ?Capsule
     {
-        if (!isset(self::$databases[$databaseName])) {
-            self::$databases[$databaseName] = self::$container->make(MDatabase::class, [
-                'databaseName' => $databaseName
-            ]);
-        }
-        return self::$databases[$databaseName];
+//        if (!isset(self::$databases[$databaseName])) {
+//            self::$databases[$databaseName] = self::$container->make(MDatabase::class, [
+//                'databaseName' => $databaseName
+//            ]);
+//        }
+//        return self::$databases[$databaseName];
+
+        $capsule = new Capsule;
+
+        $data = self::getConf('db.' . $databaseName);
+
+//        'db' => 'mysql',
+//            'driver' => 'pdo_mysql',
+//            'host' => '',
+//            'dbname' => '',
+//            'user' => '',
+//            'password' => '',
+//            'formatDate' => '%e/%m/%Y',
+//            'formatTimeWhere' => '%T',
+//            'formatDateWhere' => '%Y/%m/%e',
+//            'charset' => 'utf8mb4',
+//            'collate' => 'utf8mb4_general_ci',
+//
+        print_r($data);
+        $capsule->addConnection([
+            'driver' => $data['db'] ?? 'mysql',
+            'host' => $data['host'] ?? 'localhost',
+            'database' => $data['dbname'] ?? 'database',
+            'username' => $data['user'] ?? 'root',
+            'password' => $data['password'] ?? 'password',
+            'charset' => $data['charset'] ?? 'utf8',
+            'collation' => $data['collate'] ?? 'utf8_unicode_ci',
+            'prefix' => $data['prefix'] ?? '',
+        ]);
+
+// Set the event dispatcher used by Eloquent models... (optional)
+        $capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
+
+// Make this Capsule instance available globally via static methods... (optional)
+        $capsule->setAsGlobal();
+
+// Setup the Eloquent ORM... (optional; unless you've used setEventDispatcher())
+        $capsule->bootEloquent();
+        return $capsule;
     }
 
 //    public static function getDatabaseConfig(string $key, ?string $databaseName = null): mixed
@@ -543,12 +586,12 @@ class Manager
 //        return $model;
 //    }
 //
-    public static function getPersistentManager(): PersistentManager
+    public static function getPersistenceManager(): PersistenceManager
     {
-        if (is_null(self::$persistentManager)) {
-            self::$persistentManager = PersistentManager::getInstance();
+        if (is_null(self::$persistenceManager)) {
+            self::$persistenceManager = PersistenceManager::getInstance();
         }
-        return self::$persistentManager;
+        return self::$persistenceManager;
     }
 //
 //    public static function getPersistence(string $datasource)

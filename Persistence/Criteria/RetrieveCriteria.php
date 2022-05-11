@@ -12,7 +12,7 @@ use Orkester\Persistence\Map\ClassMap;
 //use Orkester\Types\MRange;
 //use PhpMyAdmin\SqlParser\Parser;
 
-class RetrieveCriteria extends PersistentCriteria
+class RetrieveCriteria //extends PersistentCriteria
 {
 //    private $command = '';
 //    private $distinct = FALSE;
@@ -21,13 +21,9 @@ class RetrieveCriteria extends PersistentCriteria
 //    private $setOperation = array();
 //    private $linguistic = false;
 
-    public function __construct(ClassMap $classMap, string $command = '')
+    public function __construct(ClassMap $classMap)
     {
-        parent::__construct($classMap);
-        $this->command = $command;
-        if ($this->command != '') {
-  //          $this->parseCommand();
-        }
+        //parent::__construct($classMap);
     }
 
     /*

@@ -16,7 +16,7 @@ use Orkester\Persistence\Criteria\PersistentCriteria;
 use Orkester\Persistence\Criteria\UpdateCriteria;
 use Orkester\Persistence\Map\ClassMap;
 
-class PersistenceSQL implements PersistenceBackend
+class PersistenceSQL //implements PersistenceBackend
 {
     private MDatabase|null $db;
     private bool $inTransaction = false;
@@ -25,7 +25,7 @@ class PersistenceSQL implements PersistenceBackend
 
     public function __construct()
     {
-        $this->db = Manager::getDatabase(Manager::getOptions('db'));
+        //$this->db = Manager::getDatabase(Manager::getOptions('db'));
     }
 
     public function setDb(ClassMap $classMap = null)

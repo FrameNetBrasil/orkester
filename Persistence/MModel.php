@@ -3,40 +3,64 @@
 namespace Orkester\Persistence;
 
 use Closure;
-use Orkerster\Persistence\Enum\AssociationType;
-use Orkerster\Persistence\Enum\AttributeType;
-use Orkerster\Persistence\Enum\JoinType;
-use Orkerster\Persistence\Enum\KeyType;
+use Orkester\Persistence\Criteria\Criteria;
+use Orkester\Persistence\Enum\Association;
+use Orkester\Persistence\Enum\Type;
+use Orkester\Persistence\Enum\Join;
+use Orkester\Persistence\Enum\Key;
 use Orkester\Manager;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
+use Illuminate\Database\Eloquent\Model as Eloquent;
 
-class MModel
+class MModel extends Eloquent
 {
-    private static ?ClassMap $classMap;
+    protected ClassMap $classMap;
+    protected string $fileName;
+//    protected $table = '';
+    protected $primaryKey = '';
+    public $timestamps = false;
+    protected $connection = '';
 
-    public static function init(): void
-    {
-        self::$classMap = new ClassMap(get_called_class());
+    public function __construct() {
+        $this->classMap = new ClassMap(get_called_class());
+        $this->fileName = __FILE__;
+        $this->timestamps = false;
+        $this->connection = Manager::getOptions('db');
     }
 
-    public static function table(string $tableName): void
-    {
-        self::$classMap->setTableName($tableName);
+    public function getFileName(): string {
+        return $this->fileName;
     }
 
-    public static function extends(string $className): void
+    public function init(): void
     {
-        self::$classMap->setSuperClassName($className);
+
     }
 
-    public static function attribute(
-        string $attributeName,
-        string $fieldName = '',
-        AttributeType $type = AttributeType::STRING,
-        KeyType $key = KeyType::NONE,
+    public function connection(string $connection) {
+        $this->connection = $connection;
+    }
+
+    public function table(string $name): void
+    {
+        $this->classMap->setTableName($name);
+        $this->table = $name;
+        print_r('table name = ' . $name . PHP_EOL);
+    }
+
+    public function extends(string $className): void
+    {
+        $this->classMap->setSuperClassName($className);
+    }
+
+    public function attribute(
+        string $name,
+        string $field = '',
+        Type $type = Type::STRING,
+        Key $key = Key::NONE,
         string $reference = '',
         string $alias = '',
         string $default = null,
@@ -44,7 +68,7 @@ class MModel
         string|Closure|null $validator = null,
     ): void
     {
-        $attributeMap = new AttributeMap($attributeName);
+        $attributeMap = new AttributeMap($name);
 //        if (isset($attr['index'])) {
 //            $attributeMap->setIndex($attr['index']);
 //        }
@@ -63,44 +87,92 @@ class MModel
 //            $attributeMap->setConverter($attr['converter']);
 //        }
 
-        $attributeMap->setColumnName($fieldName ?? $attributeName);
-        $attributeMap->setAlias($alias ?? $attributeName);
+        $attributeMap->setColumnName($field ?: $name);
+        $attributeMap->setAlias($alias ?: $name);
         $attributeMap->setReference($reference);
         $attributeMap->setKeyType($key);
-        $attributeMap->setIdGenerator($key == KeyType::PRIMARY ? 'identity' : '');
+        if ($key == Key::PRIMARY) {
+            $attributeMap->setIdGenerator('identity');
+            $this->primaryKey = $field ?: $name;
+        } else {
+            $attributeMap->setIdGenerator('');
+        }
         $attributeMap->setDefault($default);
         $attributeMap->setNullable($nullable);
         $attributeMap->setValidator($validator);
-        self::$classMap->addAttributeMap($attributeMap);
+        $this->classMap->addAttributeMap($attributeMap);
 
     }
 
-    public static function association(
-        string $associationName,
-        string $model,
-        string $keys = '',
-        AssociationType $type = AssociationType::ONE,
-        string $associativeTable = '',
-        string $order = '',
-        JoinType $join = JoinType::INNER,
+    public function associationOne(
+        string      $name,
+        string      $model,
+        string      $key = '',
+        Join        $join = Join::INNER,
     ): void
     {
-        $fromClassMap = self::$classMap;
+        $fromClassMap = $this->classMap;
         $fromClassName = $fromClassMap->getName();
         $toClassName = $model;
-        $associationMap = new AssociationMap($associationName);
+        $associationMap = new AssociationMap($name);
         $associationMap->setFromClassMap($fromClassMap);
         $associationMap->setToClassName($toClassName);
 //        $associationMap->setDeleteAutomatic(!empty($association['deleteAutomatic']));
 //        $associationMap->setSaveAutomatic(!empty($association['saveAutomatic']));
 //        $associationMap->setRetrieveAutomatic(!empty($association['retrieveAutomatic']));
 
-        $cardinality = 'oneToOne';
-        if ($type == AssociationType::MANY) {
-            $cardinality = 'oneToMany';
-        } elseif ($type == AssociationType::ASSOCIATIVE) {
-            $cardinality = 'manyToMany';
+        $associationMap->setCardinality(Association::ONE);
+
+        $autoAssociation = (strtolower($fromClassName) == strtolower($toClassName));
+        $associationMap->setAutoAssociation($autoAssociation);
+
+//        if (isset($association['index'])) {
+//            $associationMap->setIndexAttribute($association['index']);
+//        }
+
+        if ($key != '') {
+            $associationMap->addKeys($key, $key);
+        } else {
+            $key = $this->classMap->getKeyAttributeName();
+            $associationMap->addKeys($key, $key);
+        }
+
+        $keyAttributeMap = $this->classMap->getAttributeMap($key);
+        if (empty($keyAttributeMap)) {
+            self::attribute(name: $key,key: Key::FOREIGN, type:Type::INTEGER,nullable: false);
+        }
+        else {
+            if ($key != $this->classMap->getKeyAttributeName()) {
+                $keyAttributeMap->setKeyType(Key::FOREIGN);
+            }
+        }
+        $associationMap->setJoinType($join);
+        $fromClassMap->putAssociationMap($associationMap);
+    }
+
+    public function associationMany(
+        string      $name,
+        string      $model,
+        string      $keys = '',
+        Join        $join = Join::INNER,
+        string      $associativeTable = '',
+        string      $order = ''
+    ): void
+    {
+        $fromClassMap = $this->classMap;
+        $fromClassName = $fromClassMap->getName();
+        $toClassName = $model;
+        $associationMap = new AssociationMap($name);
+        $associationMap->setFromClassMap($fromClassMap);
+        $associationMap->setToClassName($toClassName);
+//        $associationMap->setDeleteAutomatic(!empty($association['deleteAutomatic']));
+//        $associationMap->setSaveAutomatic(!empty($association['saveAutomatic']));
+//        $associationMap->setRetrieveAutomatic(!empty($association['retrieveAutomatic']));
+
+        $cardinality = Association::MANY;
+        if ($associativeTable != '') {
             $associationMap->setAssociativeTable($associativeTable);
+            $cardinality = Association::ASSOCIATIVE;
         }
         $associationMap->setCardinality($cardinality);
 
@@ -111,7 +183,6 @@ class MModel
 //            $associationMap->setIndexAttribute($association['index']);
 //        }
 
-        $keyAttribute = '';
         if ($keys != '') {
             if (str_contains($keys, ':')) {
                 $k = explode(':', $keys);
@@ -122,18 +193,18 @@ class MModel
                 $associationMap->addKeys($keys, $keys);
             }
         } else {
-            $key = self::$classMap->getKeyAttributeName();
+            $key = $this->classMap->getKeyAttributeName();
             $associationMap->addKeys($key, $key);
             $keyAttribute = $key;
         }
 
-        $keyAttributeMap = self::$classMap->getAttributeMap($keyAttribute);
+        $keyAttributeMap = $this->classMap->getAttributeMap($keyAttribute);
         if (empty($keyAttributeMap)) {
-            self::attribute(attributeName: $keyAttribute,key: KeyType::FOREIGN, type:AttributeType::INTEGER,nullable: false );
+            self::attribute(name: $keyAttribute,key: Key::FOREIGN, type:Type::INTEGER,nullable: false );
         }
         else {
-            if ($key != self::$classMap->getKeyAttributeName()) {
-                $keyAttributeMap->setKeyType(KeyType::FOREIGN);
+            if ($key != $this->classMap->getKeyAttributeName()) {
+                $keyAttributeMap->setKeyType(Key::FOREIGN);
             }
         }
 
@@ -150,29 +221,29 @@ class MModel
             }
         }
 
-        if ($join != '') {
-            $associationMap->setJoinType($join);
-        }
-
+        $associationMap->setJoinType($join);
         $fromClassMap->putAssociationMap($associationMap);
-
-
     }
 
-    public static function getClassMap(): ClassMap
+    public function getInitClassMap(): ClassMap {
+        return $this->classMap;
+    }
+
+    public function getClassMap(): ClassMap
     {
-        return Manager::getPersistentManager()->getClassMap(get_called_class());
+        return Manager::getPersistenceManager()->getClassMap($this);
         //return self::$classMap;
     }
 
-    public static function getCriteria(ClassMap $classMap = null): RetrieveCriteria
+    public function getCriteria(ClassMap $classMap = null): Criteria
     {
         if (is_null($classMap)) {
-            $classMap = static::getClassMap();
+            $classMap = $this->getClassMap();
         }
-        return $classMap->getCriteria();
+//        print_r($classMap);
+        $query = $this->newQuery();
+        return new Criteria($classMap, $query);
     }
-
 
     /*
     public IAuthorization $authorization;

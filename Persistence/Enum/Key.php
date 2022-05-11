@@ -1,8 +1,8 @@
 <?php
 
-namespace Orkerster\Persistence\Enum;
+namespace Orkester\Persistence\Enum;
 
-enum KeyType: string
+enum Key: string
 {
     case NONE = '';
     case PRIMARY = 'primary';

@@ -1,8 +1,8 @@
 <?php
 
-namespace Orkerster\Persistence\Enum;
+namespace Orkester\Persistence\Enum;
 
-enum AttributeType: string
+enum Type: string
 {
     case INTEGER = 'integer';
     case STRING = 'string';

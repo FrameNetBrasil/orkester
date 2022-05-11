@@ -9,7 +9,9 @@ namespace Orkester\Persistence\Map;
 //use Orkester\Persistence\PersistentObject;
 //use Orkester\Utils\MUtil;
 
+use Orkester\Manager;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
+use Orkester\Persistence\Enum\Key;
 
 class ClassMap
 {
@@ -67,7 +69,7 @@ class ClassMap
         if ($columnName != '') {
             $this->attributeMaps[$attributeName] = $attributeMap;
             $this->fieldMaps[strtoupper($columnName)] = $attributeMap;
-            if ($attributeMap->getKeyType() == 'primary') {
+            if ($attributeMap->getKeyType() == Key::PRIMARY) {
                 $this->keyAttributeMap = $attributeMap;
             } else {
                 $this->updateAttributeMaps[$attributeName] = $attributeMap;
@@ -109,8 +111,7 @@ class ClassMap
 
     public function getCriteria(): ?RetrieveCriteria
     {
-        //return Manager::getPersistentManager()->getCriteria($this);
-        return null;
+        return Manager::getPersistenceManager()->getCriteria($this);
     }
 
 

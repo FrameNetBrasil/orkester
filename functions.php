@@ -187,9 +187,9 @@ function isJson($x)
 function errorHandler($errno, $errstr, $errfile, $errline)
 {
     $codes = Manager::getConf('logs.errorCodes');
-    if (Manager::supressWarning($errno, $errstr)) {
-        return;
-    }
+//    if (Manager::supressWarning($errno, $errstr)) {
+//        return;
+//    }
     if (in_array($errno, $codes)) {
         if (Manager::getLog()) {
             Manager::logMessage("[ERROR] [Code] $errno [Error] $errstr [File] $errfile [Line] $errline");
