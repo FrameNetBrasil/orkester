@@ -4,8 +4,8 @@ namespace Orkester\Persistence\Map;
 
 
 use Closure;
-use Orkerster\Persistence\Enum\AttributeType;
-use Orkerster\Persistence\Enum\KeyType;
+use Orkester\Persistence\Enum\Type;
+use Orkester\Persistence\Enum\Key;
 
 class AttributeMap
 {
@@ -18,11 +18,11 @@ class AttributeMap
     private bool $nullable = false;
     private string $reference = '';
 //    private $index = NULL;
-      private AttributeType $type = AttributeType::STRING;
+      private Type $type = Type::STRING;
 //    private $converter = NULL;
 //    private $handler = NULL;
 //    private $handled = false;
-    private KeyType $keyType = KeyType::NONE;
+    private Key $keyType = Key::NONE;
 //    private $idGenerator;
 //    private $db;
 //    private $platform;
@@ -46,7 +46,7 @@ class AttributeMap
         $this->classMap = $classMap;
     }
 
-    public function setType(AttributeType $type)
+    public function setType(Type $type)
     {
         $this->type = $type;
     }
@@ -71,10 +71,22 @@ class AttributeMap
         $this->reference = $reference;
     }
 
-    public function setKeyType(KeyType $type)
+    public function getReference(): string
+    {
+        return $this->reference;
+    }
+
+    public function setKeyType(Key $type)
     {
         $this->keyType = $type;
     }
+
+    public function getKeyType(): Key
+    {
+        return $this->keyType;
+    }
+
+
 
     public function setDefault(mixed $default)
     {
@@ -90,6 +102,18 @@ class AttributeMap
     {
         $this->validator = $validator;
     }
+
+    public function setIdGenerator(string $idGenerator)
+    {
+        $this->idGenerator = $idGenerator;
+    }
+
+    public function getIdGenerator(): string
+    {
+        return $this->idGenerator;
+    }
+
+
 
     /*
     public function getClassMap()
@@ -192,31 +216,12 @@ class AttributeMap
         return $object->$field;
     }
 
-    public function getReference(): string
-    {
-        return $this->reference;
-    }
-
     public function getTableName()
     {
         return $this->classMap->getTableName();
     }
 
 
-    public function getKeyType()
-    {
-        return $this->keyType;
-    }
-
-    public function setIdGenerator($idGenerator)
-    {
-        $this->idGenerator = $idGenerator;
-    }
-
-    public function getIdGenerator()
-    {
-        return $this->idGenerator;
-    }
 
     public function getFullyQualifiedName(?string $alias = '')
     {

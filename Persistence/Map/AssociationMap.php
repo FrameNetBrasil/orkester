@@ -9,7 +9,8 @@ namespace Orkester\Persistence\Map;
 //use Orkester\Persistence\Criteria\RetrieveCriteria;
 //use Orkester\Persistence\PersistentManager;
 
-use Orkerster\Persistence\Enum\JoinType;
+use Orkester\Persistence\Enum\Association;
+use Orkester\Persistence\Enum\Join;
 
 class AssociationMap
 {
@@ -20,7 +21,7 @@ class AssociationMap
 //    private ?ClassMap $toClassMap = NULL;
 //    private string $toClassName;
     private string $associativeTable;
-    private string $cardinality;
+    private Association $cardinality = Association::ONE;
 //    private bool $deleteAutomatic = FALSE;
 //    private bool $retrieveAutomatic = FALSE;
 //    private bool $saveAutomatic = FALSE;
@@ -32,13 +33,23 @@ class AssociationMap
     private string $order = '';
 //    private string $orderAttributes = '';
 //    private string $indexAttribute = '';
-    private JoinType $joinType = JoinType::INNER;
+    private Join $joinType = Join::INNER;
     private bool $autoAssociation = FALSE;
 
     public function __construct(string $name)
     {
         $this->name = $name;
         $this->inverse = FALSE;
+    }
+
+    public function setName(string $name): void
+    {
+        $this->name = $name;
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
     }
 
     public function setFromClassMap(ClassMap $classMap): void
@@ -62,12 +73,12 @@ class AssociationMap
         return $this->associativeTable;
     }
 
-    public function setCardinality(string $value = 'oneToOne'): void
+    public function setCardinality(Association $value = Association::ONE): void
     {
         $this->cardinality = $value;
     }
 
-    public function getCardinality(): string
+    public function getCardinality(): Association
     {
         return $this->cardinality;
     }
@@ -87,9 +98,21 @@ class AssociationMap
         $this->order = $order;
     }
 
-    public function setJoinType(JoinType $type)
+    public function setJoinType(Join $type)
     {
         $this->joinType = $type;
+    }
+
+    public function setToClassName(string $name): void
+    {
+        $this->toClassName = $name;
+    }
+
+    public function addKeys(string $fromKey, string $toKey): void
+    {
+        $this->fromKey = $fromKey;
+        $this->toKey = $toKey;
+//        $this->inverse = ($fromKey == $this->fromClassMap->getKeyAttributeName());
     }
 
 
@@ -104,10 +127,6 @@ class AssociationMap
         return $this->joinType;
     }
 
-    public function setToClassName(string $name): void
-    {
-        $this->toClassName = $name;
-    }
 
     public function getToClassName(): string
     {
@@ -129,12 +148,6 @@ class AssociationMap
         return $toClassMap;
     }
 
-    public function addKeys($fromKey, $toKey): void
-    {
-        $this->fromKey = $fromKey;
-        $this->toKey = $toKey;
-        $this->inverse = ($fromKey == $this->fromClassMap->getKeyAttributeName());
-    }
 
     public function getFromKey(): string
     {
@@ -160,15 +173,6 @@ class AssociationMap
         }
     }
 
-    public function setName(string $name): void
-    {
-        $this->name = $name;
-    }
-
-    public function getName(): string
-    {
-        return $this->name;
-    }
 
     public function setOrderAttributes(string $orderAttributes): void
     {

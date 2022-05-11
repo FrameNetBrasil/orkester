@@ -1,8 +1,8 @@
 <?php
 
-namespace Orkerster\Persistence\Enum;
+namespace Orkester\Persistence\Enum;
 
-enum AssociationType: string
+enum Association: string
 {
     case ONE = 'one';
     case MANY = 'many';

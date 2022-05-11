@@ -1,8 +1,8 @@
 <?php
 
-namespace Orkerster\Persistence\Enum;
+namespace Orkester\Persistence\Enum;
 
-enum JoinType: string
+enum Join: string
 {
     case INNER = 'inner';
     case LEFT = 'left';
