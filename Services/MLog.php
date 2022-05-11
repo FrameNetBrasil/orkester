@@ -80,7 +80,7 @@ class MLog
     private function getOption(string $option): string
     {
         $conf = Manager::getConf("logs");
-        return array_key_exists($option, $conf) ? $conf[$option] : '';
+        return $conf[$option] ?? '';
     }
 
     public function setLevel(string $level)
