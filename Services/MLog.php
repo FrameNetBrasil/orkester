@@ -49,6 +49,7 @@ class MLog
         $this->logger = new Logger($this->channel);
         // Create the handlers
         global $argv;
+
         if (in_array('--trace', $argv ?? [])) {
             $stdout = new StreamHandler('php://stdout');
             $stdout->setFormatter(new LineFormatter("%level_name%: %message% %context.user%" . PHP_EOL));
@@ -314,12 +315,13 @@ class MLog
 //            return;
 //        }
 
-        $formatter = $this->formatter;
-        if ($this->handle) {
-            @fwrite($this->handle, $formatter($level, $message, $context));
-        } else {
-            error_log($formatter($level, $message, $context, false));
-        }
+//        $formatter = $this->formatter;
+//        if ($this->handle) {
+//            @fwrite($this->handle, $formatter($level, $message, $context));
+//        } else {
+//            error_log($formatter($level, $message, $context, false));
+//        }
+        $this->logger->info($message);
     }
 
     private function format(string $level, string $message, array $context, bool $prefixDate = true): string

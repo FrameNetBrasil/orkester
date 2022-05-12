@@ -43,21 +43,23 @@ class PersistenceManager
         return self::$instance;
     }
 
-    private function getSignature(MModel $class): string {
-        $stat = stat($class->getFileName());
+    private function getSignature(string $className): string {
+        $fileName = $className::getFileName();
+        $stat = stat($fileName);
         $lastModification = $stat['mtime'];
-        return md5(get_class($class) . $lastModification);
+        return md5($className . $lastModification);
     }
 
-    public function getClassMap(MModel $class): ClassMap
+    public function getClassMap(string $className): ClassMap
     {
-        $key = $this->getSignature($class);
+        $key = $this->getSignature($className);
         if ($this->classMaps->has($key)) {
             $classMap = $this->classMaps->get($key);
         } else {
-            $class->init();
-            $classMap = $class->getInitClassMap();
-            $this->classMaps->set($key, $classMap);
+            $classMap = new ClassMap($className);
+            $className::setClassMap($classMap);
+            $className::init();
+            $this->classMaps->set($key, $classMap, 300);
         }
         return $classMap;
     }

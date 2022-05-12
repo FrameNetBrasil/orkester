@@ -9,6 +9,7 @@ namespace Orkester\Persistence\Map;
 //use Orkester\Persistence\Criteria\RetrieveCriteria;
 //use Orkester\Persistence\PersistentManager;
 
+use Orkester\Manager;
 use Orkester\Persistence\Enum\Association;
 use Orkester\Persistence\Enum\Join;
 
@@ -18,8 +19,8 @@ class AssociationMap
     private string $name;
     private ClassMap $fromClassMap;
     private string $fromClassName;
-//    private ?ClassMap $toClassMap = NULL;
-//    private string $toClassName;
+    private ?ClassMap $toClassMap = NULL;
+    private string $toClassName;
     private string $associativeTable;
     private Association $cardinality = Association::ONE;
 //    private bool $deleteAutomatic = FALSE;
@@ -28,8 +29,8 @@ class AssociationMap
     private bool $inverse = FALSE;
 //    private string $fromKey;
 //    private string $toKey;
-//    private ?AttributeMap $fromAttributeMap;
-//    private ?AttributeMap $toAttributeMap;
+    private ?AttributeMap $fromAttributeMap;
+    private ?AttributeMap $toAttributeMap;
     private string $order = '';
 //    private string $orderAttributes = '';
 //    private string $indexAttribute = '';
@@ -108,46 +109,17 @@ class AssociationMap
         $this->toClassName = $name;
     }
 
+    public function getToClassName(): string
+    {
+        return $this->toClassName;
+    }
+
     public function addKeys(string $fromKey, string $toKey): void
     {
         $this->fromKey = $fromKey;
         $this->toKey = $toKey;
 //        $this->inverse = ($fromKey == $this->fromClassMap->getKeyAttributeName());
     }
-
-
-    /*
-    public function getFromClassName(): string
-    {
-        return $this->fromClassName;
-    }
-
-    public function getJoinType(): string
-    {
-        return $this->joinType;
-    }
-
-
-    public function getToClassName(): string
-    {
-        return $this->toClassName;
-    }
-
-
-    public function setToClassMap(ClassMap $classMap): void
-    {
-        $this->toClassMap = $classMap;
-    }
-
-    public function getToClassMap(): ClassMap
-    {
-        $toClassMap = $this->toClassMap;
-        if ($toClassMap == NULL) {
-            $toClassMap = $this->toClassMap = Manager::getPersistentManager()->getClassMap($this->toClassName);
-        }
-        return $toClassMap;
-    }
-
 
     public function getFromKey(): string
     {
@@ -172,6 +144,38 @@ class AssociationMap
             $this->toAttributeMap = $this->toClassMap->getAttributeMap($this->toKey);
         }
     }
+
+    public function getToClassMap(): ClassMap
+    {
+        $toClassMap = $this->toClassMap;
+        if ($toClassMap == NULL) {
+            $toClassMap = $this->toClassMap = Manager::getPersistenceManager()->getClassMap($this->toClassName);
+        }
+        return $toClassMap;
+    }
+
+
+    /*
+    public function getFromClassName(): string
+    {
+        return $this->fromClassName;
+    }
+
+    public function getJoinType(): string
+    {
+        return $this->joinType;
+    }
+
+
+
+
+    public function setToClassMap(ClassMap $classMap): void
+    {
+        $this->toClassMap = $classMap;
+    }
+
+
+
 
 
     public function setOrderAttributes(string $orderAttributes): void
