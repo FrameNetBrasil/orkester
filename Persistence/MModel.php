@@ -13,50 +13,41 @@ use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
-use Illuminate\Database\Eloquent\Model as Eloquent;
+use \Illuminate\Database\Query\Builder;
 
-class MModel extends Eloquent
+class MModel
 {
-    protected ClassMap $classMap;
-    protected string $fileName;
-//    protected $table = '';
-    protected $primaryKey = '';
-    public $timestamps = false;
-    protected $connection = '';
+    public static ClassMap $classMap;
 
     public function __construct() {
-        $this->classMap = new ClassMap(get_called_class());
-        $this->fileName = __FILE__;
-        $this->timestamps = false;
-        $this->connection = Manager::getOptions('db');
     }
 
-    public function getFileName(): string {
-        return $this->fileName;
+    public static function getFileName(): string {
+        $rc = new \ReflectionClass(get_called_class());
+        return $rc->getFileName();
     }
 
-    public function init(): void
+    public static function setClassmap(ClassMap $classMap): void
     {
-
+        self::$classMap = $classMap;
     }
 
-    public function connection(string $connection) {
-        $this->connection = $connection;
-    }
-
-    public function table(string $name): void
+    public static function init(): void
     {
-        $this->classMap->setTableName($name);
-        $this->table = $name;
+    }
+
+    public static function table(string $name): void
+    {
+        self::$classMap->setTableName($name);
         print_r('table name = ' . $name . PHP_EOL);
     }
 
-    public function extends(string $className): void
+    public static function extends(string $className): void
     {
-        $this->classMap->setSuperClassName($className);
+        self::$classMap->setSuperClassName($className);
     }
 
-    public function attribute(
+    public static function attribute(
         string $name,
         string $field = '',
         Type $type = Type::STRING,
@@ -93,25 +84,24 @@ class MModel extends Eloquent
         $attributeMap->setKeyType($key);
         if ($key == Key::PRIMARY) {
             $attributeMap->setIdGenerator('identity');
-            $this->primaryKey = $field ?: $name;
         } else {
             $attributeMap->setIdGenerator('');
         }
         $attributeMap->setDefault($default);
         $attributeMap->setNullable($nullable);
         $attributeMap->setValidator($validator);
-        $this->classMap->addAttributeMap($attributeMap);
+        self::$classMap->addAttributeMap($attributeMap);
 
     }
 
-    public function associationOne(
+    public static function associationOne(
         string      $name,
         string      $model,
         string      $key = '',
         Join        $join = Join::INNER,
     ): void
     {
-        $fromClassMap = $this->classMap;
+        $fromClassMap = self::$classMap;
         $fromClassName = $fromClassMap->getName();
         $toClassName = $model;
         $associationMap = new AssociationMap($name);
@@ -133,16 +123,16 @@ class MModel extends Eloquent
         if ($key != '') {
             $associationMap->addKeys($key, $key);
         } else {
-            $key = $this->classMap->getKeyAttributeName();
+            $key = self::$classMap->getKeyAttributeName();
             $associationMap->addKeys($key, $key);
         }
 
-        $keyAttributeMap = $this->classMap->getAttributeMap($key);
+        $keyAttributeMap = self::$classMap->getAttributeMap($key);
         if (empty($keyAttributeMap)) {
             self::attribute(name: $key,key: Key::FOREIGN, type:Type::INTEGER,nullable: false);
         }
         else {
-            if ($key != $this->classMap->getKeyAttributeName()) {
+            if ($key != self::$classMap->getKeyAttributeName()) {
                 $keyAttributeMap->setKeyType(Key::FOREIGN);
             }
         }
@@ -150,7 +140,7 @@ class MModel extends Eloquent
         $fromClassMap->putAssociationMap($associationMap);
     }
 
-    public function associationMany(
+    public static function associationMany(
         string      $name,
         string      $model,
         string      $keys = '',
@@ -159,7 +149,7 @@ class MModel extends Eloquent
         string      $order = ''
     ): void
     {
-        $fromClassMap = $this->classMap;
+        $fromClassMap = self::$classMap;
         $fromClassName = $fromClassMap->getName();
         $toClassName = $model;
         $associationMap = new AssociationMap($name);
@@ -193,17 +183,18 @@ class MModel extends Eloquent
                 $associationMap->addKeys($keys, $keys);
             }
         } else {
-            $key = $this->classMap->getKeyAttributeName();
+            $toClassMap = $toClassName::getClassMap();
+            $key = $toClassMap->getKeyAttributeName();
             $associationMap->addKeys($key, $key);
             $keyAttribute = $key;
         }
 
-        $keyAttributeMap = $this->classMap->getAttributeMap($keyAttribute);
+        $keyAttributeMap = self::$classMap->getAttributeMap($keyAttribute);
         if (empty($keyAttributeMap)) {
             self::attribute(name: $keyAttribute,key: Key::FOREIGN, type:Type::INTEGER,nullable: false );
         }
         else {
-            if ($key != $this->classMap->getKeyAttributeName()) {
+            if ($key != self::$classMap->getKeyAttributeName()) {
                 $keyAttributeMap->setKeyType(Key::FOREIGN);
             }
         }
@@ -225,24 +216,20 @@ class MModel extends Eloquent
         $fromClassMap->putAssociationMap($associationMap);
     }
 
-    public function getInitClassMap(): ClassMap {
-        return $this->classMap;
-    }
-
-    public function getClassMap(): ClassMap
+    public static function getClassMap(): ClassMap
     {
-        return Manager::getPersistenceManager()->getClassMap($this);
+        return Manager::getPersistenceManager()->getClassMap(get_called_class());
         //return self::$classMap;
     }
 
-    public function getCriteria(ClassMap $classMap = null): Criteria
+    public static function getCriteria(string $datasource = ''): Criteria
     {
-        if (is_null($classMap)) {
-            $classMap = $this->getClassMap();
-        }
+//        if (is_null($classMap)) {
+            $classMap = self::getClassMap();
+//        }
 //        print_r($classMap);
-        $query = $this->newQuery();
-        return new Criteria($classMap, $query);
+        $db = Manager::getDatabase($datasource ?: Manager::getOptions('db'));
+        return new Criteria($classMap, $db);
     }
 
     /*

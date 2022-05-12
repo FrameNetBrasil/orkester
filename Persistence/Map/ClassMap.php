@@ -54,6 +54,15 @@ class ClassMap
         $this->tableName = $tableName;
     }
 
+    public function getTableName(string $alias = ''): string
+    {
+        $tableName = $this->tableName;
+        if (($alias != '') && ($alias != $tableName)) {
+            $tableName .= ' ' . $alias;
+        }
+        return $tableName;
+    }
+
     public function setSuperClassName(string $superClassName)
     {
         $this->superClassName = $superClassName;
@@ -109,10 +118,20 @@ class ClassMap
         $this->associationMaps[$associationMap->getName()] = $associationMap;
     }
 
-    public function getCriteria(): ?RetrieveCriteria
+    public function getAssociationMap(string $name): AssociationMap|null
     {
-        return Manager::getPersistenceManager()->getCriteria($this);
+        $associationMap = $this->associationMaps[$name] ?? NULL;
+        if ($associationMap != NULL) {
+            $associationMap->setKeysAttributes();
+        }
+        return $associationMap;
     }
+
+
+//    public function getCriteria(): ?RetrieveCriteria
+//    {
+//        return Manager::getPersistenceManager()->getCriteria($this);
+//    }
 
 
 
@@ -134,14 +153,6 @@ class ClassMap
     }
 
 
-    public function getTableName(string $alias = ''): string
-    {
-        $tableName = $this->tableName;
-        if (($alias != '') && ($alias != $tableName)) {
-            $tableName .= ' ' . $alias;
-        }
-        return $tableName;
-    }
 
     public function setTableAlias(string $tableAlias)
     {
@@ -277,14 +288,6 @@ class ClassMap
         return $this->referenceAttributeMaps[$attributeName] ?? null;
     }
 
-    public function getAssociationMap(string $name): AssociationMap|null
-    {
-        $associationMap = $this->associationMaps[$name] ?? NULL;
-        if ($associationMap != NULL) {
-            $associationMap->setKeysAttributes();
-        }
-        return $associationMap;
-    }
 
 
     public function getAssociationMaps(): array

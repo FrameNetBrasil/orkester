@@ -83,6 +83,7 @@ class Manager
     static private App $app;
     static private ?Psr16Adapter $cache = NULL;
     static private ?PersistenceManager $persistenceManager = NULL;
+    static private ?Capsule $capsule = NULL;
 
 //    private static ?RequestInterface $request;
 
@@ -220,6 +221,7 @@ class Manager
         self::$log = new MLog(self::getConf('logs'));
         Manager::$data = (object)[];
 
+        self::initDatabase();
         register_shutdown_function("shutdown");
     }
 
@@ -470,33 +472,25 @@ class Manager
 //        return new $class;
 //    }
 
-    public static function getDatabase(string $databaseName = ''): ?Capsule
+    public static function initDatabase()
     {
-//        if (!isset(self::$databases[$databaseName])) {
-//            self::$databases[$databaseName] = self::$container->make(MDatabase::class, [
-//                'databaseName' => $databaseName
-//            ]);
-//        }
-//        return self::$databases[$databaseName];
+        self::$capsule = new Capsule;
+// Set the event dispatcher used by Eloquent models... (optional)
+        self::$capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
+// Make this Capsule instance available globally via static methods... (optional)
+        self::$capsule->setAsGlobal();
+// Setup the Eloquent ORM... (optional; unless you've used setEventDispatcher())
+        //$capsule->bootEloquent();
+    }
 
-        $capsule = new Capsule;
+    public static function getDatabase(): Capsule {
+        return self::$capsule;
+    }
 
+    public static function addDatabase(string $databaseName)
+    {
         $data = self::getConf('db.' . $databaseName);
-
-//        'db' => 'mysql',
-//            'driver' => 'pdo_mysql',
-//            'host' => '',
-//            'dbname' => '',
-//            'user' => '',
-//            'password' => '',
-//            'formatDate' => '%e/%m/%Y',
-//            'formatTimeWhere' => '%T',
-//            'formatDateWhere' => '%Y/%m/%e',
-//            'charset' => 'utf8mb4',
-//            'collate' => 'utf8mb4_general_ci',
-//
-        print_r($data);
-        $capsule->addConnection([
+        self::$capsule->addConnection([
             'driver' => $data['db'] ?? 'mysql',
             'host' => $data['host'] ?? 'localhost',
             'database' => $data['dbname'] ?? 'database',
@@ -505,19 +499,8 @@ class Manager
             'charset' => $data['charset'] ?? 'utf8',
             'collation' => $data['collate'] ?? 'utf8_unicode_ci',
             'prefix' => $data['prefix'] ?? '',
-        ]);
-
-// Set the event dispatcher used by Eloquent models... (optional)
-        $capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
-
-// Make this Capsule instance available globally via static methods... (optional)
-        $capsule->setAsGlobal();
-
-// Setup the Eloquent ORM... (optional; unless you've used setEventDispatcher())
-        $capsule->bootEloquent();
-        return $capsule;
+        ], $databaseName);
     }
-
 //    public static function getDatabaseConfig(string $key, ?string $databaseName = null): mixed
 //    {
 //        $dbName = $databaseName ?? Manager::getOptions('db');
