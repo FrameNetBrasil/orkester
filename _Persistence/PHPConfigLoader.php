@@ -19,7 +19,7 @@ class PHPConfigLoader extends PersistentConfigLoader
     public function getSignature(string $className)
     {
         $class = $className;
-        /** @var MModel $class */
+        /** @var Model $class */
         $map = $class::$map;
         return md5($className . serialize($map));
     }
@@ -27,7 +27,7 @@ class PHPConfigLoader extends PersistentConfigLoader
     public function getMap(string $className): array
     {
         $class = $className;
-        /** @var MModel $class */
+        /** @var Model $class */
         $this->phpMaps[$className] = $class::$ORMMap;
         return $this->phpMaps[$className];
     }
@@ -35,7 +35,7 @@ class PHPConfigLoader extends PersistentConfigLoader
     public function getClassMap(string $className): ?ClassMap
     {
         $this->className = $className;
-        /** @var MModel $className array */
+        /** @var Model $className array */
         $map = $className::getMap();
         //mdump($map);
         $this->classMap = new ClassMap($this->className);
