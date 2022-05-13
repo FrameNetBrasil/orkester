@@ -22,6 +22,7 @@ use DI\Container;
 //use Orkester\Services\Http\MAjax;
 use Orkester\Handlers\HttpErrorHandler;
 use Orkester\Handlers\ShutdownHandler;
+use Orkester\Persistence\Model;
 use Orkester\Persistence\PersistenceManager;
 use Orkester\Services\MCacheFast;
 use Orkester\Services\MLog;
@@ -481,6 +482,7 @@ class Manager
         self::$capsule->setAsGlobal();
 // Setup the Eloquent ORM... (optional; unless you've used setEventDispatcher())
         //$capsule->bootEloquent();
+        Model::init();
     }
 
     public static function getDatabase(): Capsule {
@@ -569,13 +571,13 @@ class Manager
 //        return $model;
 //    }
 //
-    public static function getPersistenceManager(): PersistenceManager
-    {
-        if (is_null(self::$persistenceManager)) {
-            self::$persistenceManager = PersistenceManager::getInstance();
-        }
-        return self::$persistenceManager;
-    }
+//    public static function getPersistenceManager(): PersistenceManager
+//    {
+//        if (is_null(self::$persistenceManager)) {
+//            self::$persistenceManager = PersistenceManager::getInstance();
+//        }
+//        return self::$persistenceManager;
+//    }
 //
 //    public static function getPersistence(string $datasource)
 //    {

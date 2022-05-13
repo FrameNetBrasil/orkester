@@ -4,7 +4,9 @@ namespace Orkester\Persistence\Criteria;
 
 use Illuminate\Database\Query\Builder;
 use Orkester\Manager;
-use Orkester\Persistence\Map\ClassMap;
+use Orkester\Persistence\ClassMap;
+use Orkester\Persistence\Model;
+use Orkester\Persistence\PersistenceManager;
 
 class Criteria
 {
@@ -38,17 +40,21 @@ class Criteria
 
 //private $connection;
 
-    public function __construct(ClassMap $classMap, $db)
+    public function __construct(ClassMap $classMap, $databaseName)
     {
-        $this->model = $classMap->getName();
+        if ($databaseName == '') {
+            $databaseName = Manager::getOptions('db');
+        }
+        $connection = Model::getConnection($databaseName);
+        $this->model = $classMap->name;
         $this->maps[$this->model] = $classMap;
 //        $this->connection = $db->connection();
-        $this->query = $db->table($this->table());
+        $this->query = $connection->table($this->table());
     }
 
     public function addMapFor(string $className)
     {
-        $classMap = Manager::getPersistenceManager()->getClassMap($className);
+        $classMap = Model::getClassMap($className);
         $this->maps[$className] = $classMap;
     }
 
@@ -61,9 +67,9 @@ class Criteria
     {
         if ($className != '') {
             $this->registerJoinModel($className);
-            $tableName = $this->maps[$className]->getTableName();
+            $tableName = $this->maps[$className]->tableName;
         } else {
-            $tableName = $this->maps[$this->model]->getTableName();
+            $tableName = $this->maps[$this->model]->tableName;
         }
         return $tableName;
     }
@@ -88,7 +94,7 @@ class Criteria
         return $pk;
     }
 
-    public function fk($relationName, $className = '')
+    public function fk($relationName, $className = ''):object
     {
         if ($className != '') {
             $this->registerJoinModel($className);
@@ -102,55 +108,78 @@ class Criteria
     private function attribute($className, $attribute)
     {
         $attributeMap = $this->maps[$className]->getAttributeMap($attribute);
-        return $attributeMap->getColumnName();
+        return $attributeMap->columnName;
     }
 
     public function resolveField($attribute)
     {
-        $parts = explode('.', $attribute);
-        $n = count($parts) - 1;
-        if ($n == 0) {
-            return $this->table() . '.' . $this->attribute($this->model, $parts[0]);
+        if (str_contains($attribute, '(')) {
+            print_r($attribute . PHP_EOL);
+            $output = preg_replace_callback('/([\.\w]+)/',
+                function ($matches) {
+                    $arguments = [];
+                    $fields = explode(',', $matches[1]);
+                    print_r($fields);
+                    foreach($fields as $field) {
+                        $arguments[] = $this->resolveField($field);
+                    }
+                    print_r($arguments);
+                    return implode(',', $arguments);
+                },
+                $attribute);
+            print_r($output . PHP_EOL);
+            return $output;
         } else {
-            $baseClass = '';
-            $alias = $this->table($baseClass);
-            $join = [];
-            for ($i = 0; $i < $n; $i++) {
-                $relation = $parts[$i];
-                $fk = $this->fk($relation, $baseClass);
-                $table = $this->table($fk->getToClassName());
-                if (!isset($this->aliases[$alias . $table])) {
-                    $this->aliases[$alias . $table] = 'a' . ++$this->aliasCount;
+            $parts = explode('.', $attribute);
+            $n = count($parts) - 1;
+            if ($n == 0) {
+                $attributeMap = $this->maps[$this->model]->getAttributeMap($attribute);
+                if ($attributeMap->reference != '') {
+                    return $this->resolveField($attributeMap->reference);
+                } else {
+                    return $this->table() . '.' . $attributeMap->columnName;
                 }
-                $pkAlias = $this->aliases[$alias . $table];
-                if (!isset($this->listJoin[$pkAlias])) {
-                    $type = (isset($this->joinType[$relation]) ? $this->joinType[$relation] : 'inner');
-                    $fkField = $alias . '.' . $fk->getToKey();
-                    $pkField = $pkAlias . '.' . $fk->getFromKey();
-                    $join[] = [$table . ' as ' . $pkAlias, $fkField, '=', $pkField, $type];
-                    $this->listJoin[$pkAlias] = $pkAlias;
+            } else {
+                $baseClass = '';
+                $alias = $this->table($baseClass);
+                $join = [];
+                for ($i = 0; $i < $n; $i++) {
+                    $relation = $parts[$i];
+                    $fk = $this->fk($relation, $baseClass);
+                    $table = $this->table($fk->toClassName);
+                    if (!isset($this->aliases[$alias . $table])) {
+                        $this->aliases[$alias . $table] = 'a' . ++$this->aliasCount;
+                    }
+                    $pkAlias = $this->aliases[$alias . $table];
+                    if (!isset($this->listJoin[$pkAlias])) {
+                        $type = (isset($this->joinType[$relation]) ? $this->joinType[$relation] : 'inner');
+                        $fkField = $alias . '.' . $fk->toKey;
+                        $pkField = $pkAlias . '.' . $fk->fromKey;
+                        $join[] = [$table . ' as ' . $pkAlias, $fkField, '=', $pkField, $type];
+                        $this->listJoin[$pkAlias] = $pkAlias;
+                    }
+                    //    $this->listJoin[$fk[0]] = $fk[0];
+                    //}
+                    $baseClass = $fk->toClassName;
+                    $alias = $pkAlias;
                 }
-                //    $this->listJoin[$fk[0]] = $fk[0];
-                //}
-                $baseClass = $fk->getToClassName();
-                $alias = $pkAlias;
+                $field = $alias . '.' . $this->attribute($baseClass, $parts[$n]);
+                if (count($join)) {
+                    foreach ($join as $j) {
+                        if ($j[4] == 'inner') {
+                            $this->query = $this->query->join($j[0], $j[1], $j[2], $j[3]);
+                        }
+                        if ($j[4] == 'left') {
+                            $this->query = $this->query->leftJoin($j[0], $j[1], $j[2], $j[3]);
+                        }
+                        if ($j[4] == 'right') {
+                            $this->query = $this->query->rightJoin($j[0], $j[1], $j[2], $j[3]);
+                        }
+                    }
+                }
             }
-            $field = $alias . '.' . $this->attribute($baseClass, $parts[$n]);
-            if (count($join)) {
-                foreach ($join as $j) {
-                    if ($j[4] == 'inner') {
-                        $this->query = $this->query->join($j[0], $j[1], $j[2], $j[3]);
-                    }
-                    if ($j[4] == 'left') {
-                        $this->query = $this->query->leftJoin($j[0], $j[1], $j[2], $j[3]);
-                    }
-                    if ($j[4] == 'right') {
-                        $this->query = $this->query->rightJoin($j[0], $j[1], $j[2], $j[3]);
-                    }
-                }
-            }
+            return $field;
         }
-        return $field;
     }
 
     public function setJoinType($association, $type)
