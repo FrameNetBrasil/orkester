@@ -363,15 +363,15 @@ class QueryOperation extends AbstractOperation
             $subResult = group_by($subResult, $fk, false);
             $updatedRows = [];
             // this line is necessary for reasons beyond understanding
-            unset($row);
-            foreach ($rows as $row) {
+//            unset($row);
+            foreach ($rows as &$row) {
                 $value = $subResult[$row[$fromKey] ?? ''] ?? [];
                 if ($cardinality == 'oneToOne') {
                     $value = $value[0] ?? null;
                 }
-                if (in_array($fromKey, $columnsToExclude)) {
-                    unset($row[$fromKey]);
-                }
+//                if (in_array($fromKey, $columnsToExclude)) {
+//                    unset($row[$fromKey]);
+//                }
                 $row[$associationName] = $value;
                 $updatedRows[] = $row;
             }
