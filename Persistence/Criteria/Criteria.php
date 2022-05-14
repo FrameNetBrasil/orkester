@@ -96,6 +96,7 @@ class Criteria
 
     public function fk($relationName, $className = ''):object
     {
+        print_r('fk = ' . $relationName . ' '. $className);
         if ($className != '') {
             $this->registerJoinModel($className);
             $fk = $this->maps[$className]->getAssociationMap($relationName);
@@ -107,78 +108,92 @@ class Criteria
 
     private function attribute($className, $attribute)
     {
+        print_r('attribute to column = ' . $className . '.'. $attribute);
         $attributeMap = $this->maps[$className]->getAttributeMap($attribute);
         return $attributeMap->columnName;
     }
 
-    public function resolveField($attribute)
-    {
-        if (str_contains($attribute, '(')) {
-            print_r($attribute . PHP_EOL);
-            $output = preg_replace_callback('/([\.\w]+)/',
-                function ($matches) {
-                    $arguments = [];
-                    $fields = explode(',', $matches[1]);
-                    print_r($fields);
-                    foreach($fields as $field) {
-                        $arguments[] = $this->resolveField($field);
-                    }
-                    print_r($arguments);
-                    return implode(',', $arguments);
-                },
-                $attribute);
-            print_r($output . PHP_EOL);
-            return $output;
-        } else {
-            $parts = explode('.', $attribute);
-            $n = count($parts) - 1;
-            if ($n == 0) {
-                $attributeMap = $this->maps[$this->model]->getAttributeMap($attribute);
-                if ($attributeMap->reference != '') {
-                    return $this->resolveField($attributeMap->reference);
-                } else {
-                    return $this->table() . '.' . $attributeMap->columnName;
+    public function resolveOperandFunction($operand) {
+        print_r($operand . PHP_EOL);
+        $output = preg_replace_callback('/([\.\w]+)/',
+            function ($matches) {
+                $arguments = [];
+                $fields = explode(',', $matches[1]);
+                print_r($fields);
+                foreach($fields as $field) {
+                    $arguments[] = $this->resolveOperand($field);
                 }
-            } else {
-                $baseClass = '';
-                $alias = $this->table($baseClass);
-                $join = [];
-                for ($i = 0; $i < $n; $i++) {
-                    $relation = $parts[$i];
-                    $fk = $this->fk($relation, $baseClass);
-                    $table = $this->table($fk->toClassName);
-                    if (!isset($this->aliases[$alias . $table])) {
-                        $this->aliases[$alias . $table] = 'a' . ++$this->aliasCount;
-                    }
-                    $pkAlias = $this->aliases[$alias . $table];
-                    if (!isset($this->listJoin[$pkAlias])) {
-                        $type = (isset($this->joinType[$relation]) ? $this->joinType[$relation] : 'inner');
-                        $fkField = $alias . '.' . $fk->toKey;
-                        $pkField = $pkAlias . '.' . $fk->fromKey;
-                        $join[] = [$table . ' as ' . $pkAlias, $fkField, '=', $pkField, $type];
-                        $this->listJoin[$pkAlias] = $pkAlias;
-                    }
-                    //    $this->listJoin[$fk[0]] = $fk[0];
-                    //}
-                    $baseClass = $fk->toClassName;
-                    $alias = $pkAlias;
+                print_r($arguments);
+                return implode(',', $arguments);
+            },
+            $operand);
+        print_r($output . PHP_EOL);
+        return $output;
+    }
+
+    public function resolveOperandPath($operand) {
+        $parts = explode('.', $operand);
+        $n = count($parts) - 1;
+        $baseClass = '';
+        $alias = $this->table($baseClass);
+        $join = [];
+        for ($i = 0; $i < $n; $i++) {
+            $relation = $parts[$i];
+            $fk = $this->fk($relation, $baseClass);
+            $table = $this->table($fk->toClassName);
+            if (!isset($this->aliases[$alias . $table])) {
+                $this->aliases[$alias . $table] = 'a' . ++$this->aliasCount;
+            }
+            $pkAlias = $this->aliases[$alias . $table];
+            if (!isset($this->listJoin[$pkAlias])) {
+                $type = (isset($this->joinType[$relation]) ? $this->joinType[$relation] : 'inner');
+                $fkField = $alias . '.' . $fk->toKey;
+                $pkField = $pkAlias . '.' . $fk->fromKey;
+                $join[] = [$table . ' as ' . $pkAlias, $fkField, '=', $pkField, $type];
+                $this->listJoin[$pkAlias] = $pkAlias;
+            }
+            //    $this->listJoin[$fk[0]] = $fk[0];
+            //}
+            $baseClass = $fk->toClassName;
+            $alias = $pkAlias;
+        }
+        $field = $alias . '.' . $this->attribute($baseClass, $parts[$n]);
+        if (count($join)) {
+            foreach ($join as $j) {
+                if ($j[4] == 'inner') {
+                    $this->query = $this->query->join($j[0], $j[1], $j[2], $j[3]);
                 }
-                $field = $alias . '.' . $this->attribute($baseClass, $parts[$n]);
-                if (count($join)) {
-                    foreach ($join as $j) {
-                        if ($j[4] == 'inner') {
-                            $this->query = $this->query->join($j[0], $j[1], $j[2], $j[3]);
-                        }
-                        if ($j[4] == 'left') {
-                            $this->query = $this->query->leftJoin($j[0], $j[1], $j[2], $j[3]);
-                        }
-                        if ($j[4] == 'right') {
-                            $this->query = $this->query->rightJoin($j[0], $j[1], $j[2], $j[3]);
-                        }
-                    }
+                if ($j[4] == 'left') {
+                    $this->query = $this->query->leftJoin($j[0], $j[1], $j[2], $j[3]);
+                }
+                if ($j[4] == 'right') {
+                    $this->query = $this->query->rightJoin($j[0], $j[1], $j[2], $j[3]);
                 }
             }
-            return $field;
+        }
+
+    }
+
+    public function resolveOperandField($operand) {
+        $attributeMap = $this->maps[$this->model]->getAttributeMap($operand);
+        if ($attributeMap->reference != '') {
+            return $this->resolveOperandField($attributeMap->reference);
+        } else {
+            return $this->table() . '.' . $attributeMap->columnName;
+        }
+    }
+
+    public function resolveOperand($operand) {
+        if (is_string($operand)) {
+            if (str_contains($operand, '(')) {
+                return $this->resolveOperandFunction($operand);
+            }
+            if (str_contains($operand, '.')) {
+                return $this->resolveOperandPath($operand);
+            }
+            return $this->resolveOperandField($operand);
+        } else {
+            return $operand;
         }
     }
 
@@ -198,12 +213,12 @@ class Criteria
                         if ($attribute != '*') {
                             if (str_contains($attribute, ' as ')) {
                                 $parts = explode(' as ', $attribute);
-                                $field = $this->resolveField($parts[0]);
+                                $field = $this->resolveOperand($parts[0]);
                                 $alias = $parts[1];
                                 $this->columns[] = $field . ' as ' . $alias;
                                 $this->fieldAlias[$alias] = $field;
                             } else {
-                                $this->columns[] = $this->resolveField($attribute);
+                                $this->columns[] = $this->resolveOperand($attribute);
                             }
                         }
                     }
@@ -245,7 +260,7 @@ class Criteria
         if (isset($this->fieldAlias[$attribute])) {
             $field = $this->fieldAlias[$attribute];
         } else {
-            $field = $this->resolveField($attribute);
+            $field = $this->resolveOperand($attribute);
         }
         $uOp = strtoupper($op);
         $uValue = is_string($value) ? strtoupper($value) : $value;
@@ -274,12 +289,12 @@ class Criteria
         if (isset($this->fieldAlias[$attribute1])) {
             $field = $this->fieldAlias[$attribute1];
         } else {
-            $field = $this->resolveField($attribute1);
+            $field = $this->resolveOperand($attribute1);
         }
         if (isset($this->fieldAlias[$attribute2])) {
             $value = $this->fieldAlias[$attribute2];
         } else {
-            $value = $this->resolveField($attribute2);
+            $value = $this->resolveOperand($attribute2);
         }
         $this->whereColumn[] = [$field, $op, $value];
         return $this;
@@ -291,7 +306,7 @@ class Criteria
             if (isset($this->fieldAlias[$attribute])) {
                 $field = $this->fieldAlias[$attribute];
             } else {
-                $field = $this->resolveField($attribute);
+                $field = $this->resolveOperand($attribute);
             }
             $this->where[] = [$field, $op, $value];
         }
@@ -303,7 +318,7 @@ class Criteria
         if (isset($this->fieldAlias[$attribute])) {
             $this->orderBy[] = $this->fieldAlias[$attribute];
         } else {
-            $this->orderBy[] = $this->resolveField($attribute);
+            $this->orderBy[] = $this->resolveOperand($attribute);
         }
         $this->orderByDirection[] = $direction;
         return $this;
@@ -316,14 +331,14 @@ class Criteria
                 if (isset($this->fieldAlias[$attr])) {
                     $this->groupBy[] = $this->fieldAlias[$attr];
                 } else {
-                    $this->groupBy[] = $this->resolveField($attr);
+                    $this->groupBy[] = $this->resolveOperand($attr);
                 }
             }
         } else {
             if (isset($this->fieldAlias[$attribute])) {
                 $this->groupBy[] = $this->fieldAlias[$attribute];
             } else {
-                $this->groupBy[] = $this->resolveField($attribute);
+                $this->groupBy[] = $this->resolveOperand($attribute);
             }
         }
         return $this;
