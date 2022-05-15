@@ -4,7 +4,6 @@ namespace Orkester\Persistence;
 
 use Closure;
 use Illuminate\Database\Capsule\Manager as Capsule;
-use Orkester\Persistence\ClassMap;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
 use Orkester\Persistence\Enum\Type;
@@ -14,6 +13,7 @@ use Orkester\Manager;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
+use Orkester\Persistence\Map\ClassMap;
 use \Illuminate\Database\Query\Builder;
 use Phpfastcache\Helper\Psr16Adapter;
 
@@ -106,8 +106,7 @@ class Model
         string|Closure|null $validator = null,
     ): void
     {
-        $attributeMap = (object)[];
-        $attributeMap->name = $name;
+        $attributeMap = new AttributeMap($name);
 //        $attributeMap = new AttributeMap($name);
 //        if (isset($attr['index'])) {
 //            $attributeMap->setIndex($attr['index']);
@@ -150,8 +149,7 @@ class Model
         $fromClassName = $fromClassMap->name;
         $toClassName = $model;
         $toClassMap = self::getClassMap($toClassName);
-        $associationMap = (object)[];
-        $associationMap->name = $name;
+        $associationMap = new AssociationMap($name);
         $associationMap->fromClassMap = $fromClassMap;
         $associationMap->toClassName = $toClassName;
 //        $associationMap->setDeleteAutomatic(!empty($association['deleteAutomatic']));
@@ -196,8 +194,7 @@ class Model
         $fromClassMap = self::$classMaps[get_called_class()];
         $fromClassName = $fromClassMap->name;
         $toClassName = $model;
-        $associationMap = (object)[];
-        $associationMap->name = $name;
+        $associationMap = new AssociationMap($name);
         $associationMap->fromClassMap = $fromClassMap;
         $associationMap->toClassName = $toClassName;
 //        $associationMap->setDeleteAutomatic(!empty($association['deleteAutomatic']));

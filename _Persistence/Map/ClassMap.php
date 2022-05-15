@@ -19,7 +19,7 @@ class ClassMap
     private $superAssociationMap = NULL;
     private array $fieldMaps = [];
     private array $attributeMaps = [];
-    private AttributeMap $keyAttributeMap;
+    p AttributeMap $keyAttributeMap;
     private ?HookMap $hookMap = NULL;
     private array $hashedAttributeMaps = [];
     private array $updateAttributeMaps = [];
