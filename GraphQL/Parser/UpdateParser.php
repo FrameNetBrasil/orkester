@@ -8,12 +8,13 @@ use Orkester\Exception\ENotFoundException;
 use Orkester\GraphQL\Context;
 use Orkester\GraphQL\Operation\UpdateSingleOperation;
 use Orkester\GraphQL\Operation\UpsertSingleOperation;
+use Orkester\MVC\MAuthorizedModel;
 use Orkester\MVC\MModel;
 
 class UpdateParser
 {
 
-    public static function fromNode(FieldNode $root, MModel|string $model, Context $context): UpdateSingleOperation
+    public static function fromNode(FieldNode $root, MAuthorizedModel $model, Context $context): UpdateSingleOperation
     {
         $query = QueryParser::fromNode($root, $model, [], $context);
         $alias = $root->alias?->value;
@@ -28,5 +29,6 @@ class UpdateParser
             return new UpdateSingleOperation(
                 $name, $alias, $model, $query, $context->getNodeValue($id), $set);
         }
+        throw new EGraphQLNotFoundException('id', 'attribute');
     }
 }

@@ -8,9 +8,9 @@ use Orkester\Persistence\Criteria\RetrieveCriteria;
 class AllowAllAuthorization implements IAuthorization
 {
 
-    function criteria(MModel $model): RetrieveCriteria
+    function criteria(MModel|string $model): RetrieveCriteria
     {
-        return $model->getCriteria();
+        return $model::getCriteria();
     }
 
     function before(): ?bool

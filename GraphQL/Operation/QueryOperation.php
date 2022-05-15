@@ -7,6 +7,7 @@ use Orkester\GraphQL\Set\OperatorSet;
 use Orkester\GraphQL\Set\SelectionSet;
 use Orkester\GraphQL\Result;
 use Orkester\Manager;
+use Orkester\MVC\MAuthorizedModel;
 use Orkester\MVC\MModel;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\AssociationMap;
@@ -16,11 +17,11 @@ class QueryOperation implements \JsonSerializable
 {
 
     public function __construct(
-        protected string        $name,
-        protected MModel|string $model,
-        protected SelectionSet  $selectionSet,
-        protected OperatorSet   $operatorSet,
-        protected ?string       $alias = null,
+        protected string           $name,
+        protected MAuthorizedModel $model,
+        protected SelectionSet     $selectionSet,
+        protected OperatorSet      $operatorSet,
+        protected ?string          $alias = null,
 
     )
     {
@@ -108,7 +109,7 @@ class QueryOperation implements \JsonSerializable
 
     public function execute(Result $result)
     {
-        $criteria = $this->model::getCriteria();
+        $criteria = $this->model->getCriteria();
         $rows = $this->executeFrom($criteria, $result);
         $this->selectionSet->format($rows);
         $this::setupForSubQuery($criteria);
@@ -121,7 +122,7 @@ class QueryOperation implements \JsonSerializable
             "name" => $this->name,
             "alias" => $this->alias,
             "type" => "query",
-            "model" => $this->model::getName(),
+            "model" => $this->model->getName(),
             "selection" => $this->selectionSet->jsonSerialize(),
             "operators" => $this->operatorSet->jsonSerialize()
         ];

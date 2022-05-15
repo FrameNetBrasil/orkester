@@ -10,7 +10,7 @@ use Orkester\GraphQL\Set\SelectionSet;
 use Orkester\GraphQL\Context;
 use Orkester\GraphQL\Operation\AssociatedQueryOperation;
 use Orkester\GraphQL\Selection\FieldSelection;
-use Orkester\MVC\MModel;
+use Orkester\MVC\MAuthorizedModel;
 use Orkester\Persistence\Map\AssociationMap;
 
 class SelectionSetParser
@@ -20,8 +20,8 @@ class SelectionSetParser
     protected array $selectionSet = [];
 
     public function __construct(
-        protected MModel|string $model,
-        protected Context       $context
+        protected MAuthorizedModel $model,
+        protected Context          $context
     )
     {
     }
@@ -30,16 +30,16 @@ class SelectionSetParser
     {
         $name = $selectionNode->name->value;
         if ($name == '__typename') {
-            $operator = new FieldSelection($this->model::getName(), "__typename");
+            $operator = new FieldSelection($this->model->getName(), "__typename");
         } else if ($name == 'id') {
-            $operator = new FieldSelection($this->model::getKeyAttributeName(), 'id');
+            $operator = new FieldSelection($this->model->getKeyAttributeName(), 'id');
         } else {
             $operator = FieldSelection::fromNode($selectionNode, $this->model, $this->context);
             /** @var AssociationMap $associationMap */
-            if (!$operator && $associationMap = $this->model::getClassMap()->getAssociationMap($name)) {
+            if (!$operator && $associationMap = $this->model->getClassMap()->getAssociationMap($name)) {
                 $query = QueryParser::fromNode(
                     $selectionNode,
-                    $associationMap->getToClassName(),
+                    $this->context->getConfiguration()->getAuthorizedModel($associationMap->getToClassName()),
                     QueryParser::$associationOperations,
                     $this->context
                 );

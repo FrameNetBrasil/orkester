@@ -13,11 +13,16 @@ class MAuthorizedModel
     protected ?bool $before;
 
     public function __construct(
-        protected MModel         $model,
+        protected MModel|string  $model,
         protected IAuthorization $authorization
     )
     {
         $this->before = $this->authorization->before();
+    }
+
+    public function getName(): string
+    {
+        return $this->model::getName();
     }
 
     public function getCriteria(): RetrieveCriteria
@@ -27,7 +32,7 @@ class MAuthorizedModel
 
     public function getClassMap(): ClassMap
     {
-        return $this->model->getClassMap();
+        return $this->model::getClassMap();
     }
 
     public function canRead(string $attribute): bool
@@ -56,36 +61,32 @@ class MAuthorizedModel
 
     public function delete(int $pk): void
     {
-        if (!($this->before ?? $this->authorization->deleteEntity($pk))) {
-            throw new \DomainException('forbidden');
-        }
-        $this->model->delete($pk);
+        $this->model::delete($pk);
     }
 
-    public function getModel(): MModel
+    public function canDelete(int $pk): bool
     {
-        return $this->model;
+        return $this->before ?? $this->authorization->deleteEntity($pk);
     }
 
     public function getKeyAttributeName()
     {
-        return $this->model->getClassMap()->getKeyAttributeName();
+        return $this->model::getClassMap()->getKeyAttributeName();
     }
 
     /**
      * @throws EValidationException
      */
-    public function insert(object $object)
+    public function insert(object $object): int
     {
-        $this->model->insert($object);
+        return $this->model::insert($object);
     }
 
     public function update(object $object, object $old)
     {
         if ($this->canUpdateEntity($object->{$this->getKeyAttributeName()})) {
-            $this->model->update($object, $old);
-        }
-        else {
+            $this->model::update($object, $old);
+        } else {
             throw new \DomainException('forbidden');
         }
     }
@@ -97,10 +98,10 @@ class MAuthorizedModel
             ->limit(1)->asResult()[0];
     }
 
-    public function byId(int $id): ?object
+    public function getById(int $id): ?object
     {
         if ($this->canUpdateEntity($id)) {
-            return $this->model->getById($id);
+            return $this->model::getById($id);
         }
         return null;
     }

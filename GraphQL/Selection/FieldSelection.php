@@ -8,6 +8,7 @@ use Orkester\GraphQL\Formatter\BooleanFormatter;
 use Orkester\GraphQL\Formatter\DateTimeFormatter;
 use Orkester\GraphQL\Formatter\IFormatter;
 use Orkester\GraphQL\Parser\Parser;
+use Orkester\MVC\MAuthorizedModel;
 use Orkester\MVC\MModel;
 use Orkester\Persistence\Map\AttributeMap;
 
@@ -45,7 +46,7 @@ class FieldSelection implements \JsonSerializable
         return $this->field . ($this->alias ? " as $this->alias" : '');
     }
 
-    public static function fromNode(FieldNode $node, MModel|string $model, Context $context): ?FieldSelection
+    public static function fromNode(FieldNode $node, MAuthorizedModel $model, Context $context): ?FieldSelection
     {
         $arguments = Parser::toAssociativeArray($node->arguments, null);
         $skipExistCheck = false;
@@ -61,7 +62,7 @@ class FieldSelection implements \JsonSerializable
             $field = $node->name->value;
             $alias = $node->alias?->value ?? null;
         }
-        $attributeMap = $model::getClassMap()->getAttributeMapChain($field);
+        $attributeMap = $model->getClassMap()->getAttributeMapChain($field);
         if (!$skipExistCheck && !$attributeMap) {
             return null;
         }

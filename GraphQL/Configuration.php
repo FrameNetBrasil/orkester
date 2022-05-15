@@ -32,23 +32,23 @@ class Configuration
             ...$config['models']);
     }
 
-    public function getModelAuthorization(string|MModel $model): MAuthorizedModel
+    public function getAuthorizedModel(MModel|string $model): MAuthorizedModel
     {
         $name = $model::getName();
         $authorizationClass = "App\Authorization\\{$name}Authorization";
         try {
             $authorization = Manager::getContainer()->get($authorizationClass);
-        } catch(\Exception){
+        } catch (\Exception) {
             $authorization = Manager::getContainer()->get(AllowAllAuthorization::class);
         }
         return new MAuthorizedModel($model, $authorization);
     }
 
-    public function getModel(string $name): MModel|string
+    public function getModel(string $name): MAuthorizedModel
     {
         $key = $this->singularMap[$name] ?? $name;
         if ($model = $this->models[$key] ?? false) {
-            return $this->getMo$model;
+            return $this->getAuthorizedModel($model);
         }
         throw new EGraphQLNotFoundException($name, 'model');
     }
