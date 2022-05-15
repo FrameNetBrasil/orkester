@@ -16,26 +16,26 @@ use Orkester\Persistence\Enum\Key;
 class ClassMap
 {
 
-    private string $name;
-    private string $superClassName = '';
+    public string $name;
+    public string $superClassName = '';
+    private array $fieldMaps = [];
+    public array $attributeMaps = [];
+    private array $updateAttributeMaps = [];
+    private array $insertAttributeMaps = [];
+    private array $referenceAttributeMaps = [];
+    private array $associationMaps = [];
+    private bool $hasTypedAttribute = false;
+    public string $tableName = '';
 //    private string $resource;
 //    private bool $compareOnUpdate;
 //    private $superClassMap = NULL;
 //    private $superAssociationMap = NULL;
-    private array $fieldMaps = [];
-    private array $attributeMaps = [];
-    private AttributeMap $keyAttributeMap;
+    public AttributeMap $keyAttributeMap;
 //    private ?HookMap $hookMap = NULL;
 //    private array $hashedAttributeMaps = [];
-    private array $updateAttributeMaps = [];
-    private array $insertAttributeMaps = [];
-    private array $referenceAttributeMaps = [];
 //    private array $handledAttributeMaps = [];
-    private array $associationMaps = [];
 //    private array $conditionMaps = [];
-    private bool $hasTypedAttribute = false;
 //    private ?string $databaseName = null;
-    private string $tableName = '';
 //    private string $tableAlias;
 
 
@@ -44,49 +44,49 @@ class ClassMap
         $this->name = $name;
     }
 
-    public function getName(): string
-    {
-        return $this->name;
-    }
+//    public function getName(): string
+//    {
+//        return $this->name;
+//    }
 
-    public function setTableName(string $tableName)
-    {
-        $this->tableName = $tableName;
-    }
+//    public function setTableName(string $tableName)
+//    {
+//        $this->tableName = $tableName;
+//    }
+//
+//    public function getTableName(string $alias = ''): string
+//    {
+//        $tableName = $this->tableName;
+//        if (($alias != '') && ($alias != $tableName)) {
+//            $tableName .= ' ' . $alias;
+//        }
+//        return $tableName;
+//    }
 
-    public function getTableName(string $alias = ''): string
-    {
-        $tableName = $this->tableName;
-        if (($alias != '') && ($alias != $tableName)) {
-            $tableName .= ' ' . $alias;
-        }
-        return $tableName;
-    }
-
-    public function setSuperClassName(string $superClassName)
-    {
-        $this->superClassName = $superClassName;
-        //$this->superClassMap = $this->getManager()->getClassMap($superClassName);
-    }
+//    public function setSuperClassName(string $superClassName)
+//    {
+//        $this->superClassName = $superClassName;
+//        //$this->superClassMap = $this->getManager()->getClassMap($superClassName);
+//    }
 
     public function addAttributeMap(AttributeMap $attributeMap)
     {
-        $attributeMap->setClassMap($this);
-        $attributeName = $attributeMap->getName();
+        $attributeMap->classMap = $this;
+        $attributeName = $attributeMap->name;
 //        $this->hashedAttributeMaps[$attributeName] = $attributeMap;
-        $columnName = $attributeMap->getColumnName() ?? $attributeName;
+        $columnName = $attributeMap->columnName ?? $attributeName;
         if ($columnName != '') {
             $this->attributeMaps[$attributeName] = $attributeMap;
             $this->fieldMaps[strtoupper($columnName)] = $attributeMap;
-            if ($attributeMap->getKeyType() == Key::PRIMARY) {
+            if ($attributeMap->keyType == Key::PRIMARY) {
                 $this->keyAttributeMap = $attributeMap;
             } else {
                 $this->updateAttributeMaps[$attributeName] = $attributeMap;
             }
-            if ($attributeMap->getIdGenerator() != 'identity') {
+            if ($attributeMap->idGenerator != 'identity') {
                 $this->insertAttributeMaps[$attributeName] = $attributeMap;
             }
-            if ($attributeMap->getReference() != '') {
+            if ($attributeMap->reference != '') {
                 $this->referenceAttributeMaps[$attributeName] = $attributeMap;
             }
 //            if ($attributeMap->getHandled()) {
@@ -95,12 +95,7 @@ class ClassMap
         }
     }
 
-    public function getKeyAttributeName(): string
-    {
-        return $this->keyAttributeMap->getName();
-    }
-
-    public function getAttributeMap(string $name, bool $areSuperClassesIncluded = false): AttributeMap|null
+    public function getAttributeMap(string $name, bool $areSuperClassesIncluded = false): object|null
     {
         $attributeMap = $this->attributeMaps[$name] ?? null;
         if ($areSuperClassesIncluded) {
@@ -113,16 +108,17 @@ class ClassMap
         return $attributeMap;
     }
 
-    public function putAssociationMap(AssociationMap $associationMap)
+
+    public function addAssociationMap(AssociationMap $associationMap)
     {
-        $this->associationMaps[$associationMap->getName()] = $associationMap;
+        $this->associationMaps[$associationMap->name] = $associationMap;
     }
 
-    public function getAssociationMap(string $name): AssociationMap|null
+    public function getAssociationMap(string $name): object|null
     {
         $associationMap = $this->associationMaps[$name] ?? NULL;
         if ($associationMap != NULL) {
-            $associationMap->setKeysAttributes();
+//            $associationMap->setKeysAttributes();
         }
         return $associationMap;
     }
