@@ -2,13 +2,13 @@
 
 namespace Orkester\GraphQL\Operation;
 
-use Orkester\MVC\MModel;
+use Orkester\MVC\MAuthorizedModel;
 
 class AbstractModelMutationOperation
 {
     public function __construct(
         protected string         $name,
-        protected MModel|string  $model,
+        protected MAuthorizedModel  $model,
         protected QueryOperation $query,
         protected ?string $alias
     ){}

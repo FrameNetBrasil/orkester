@@ -34,7 +34,8 @@ class Executor
     )
     {
         $this->aliases = new Set();
-        $this->configuration ??= Configuration::fromArray(require Manager::getConfPath() . '/graphql.php');
+        $this->configuration = $configuration ??
+            Configuration::fromArray(require Manager::getConfPath() . '/graphql.php');
         $this->operations = $this->parse($query, $variables);
     }
 

@@ -76,4 +76,9 @@ class Context
         return array_find($this->fragments, fn($f) => $f->name->value == $name);
     }
 
+    public function getConfiguration(): Configuration
+    {
+        return $this->configuration;
+    }
+
 }

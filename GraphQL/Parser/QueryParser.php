@@ -6,6 +6,7 @@ use GraphQL\Language\AST\FieldNode;
 use Orkester\GraphQL\Set\OperatorSet;
 use Orkester\GraphQL\Context;
 use Orkester\GraphQL\Operation\QueryOperation;
+use Orkester\MVC\MAuthorizedModel;
 use Orkester\MVC\MModel;
 
 class QueryParser
@@ -30,7 +31,7 @@ class QueryParser
         'offset',
     ];
 
-    public static function fromNode(FieldNode $root, MModel|string $model, ?array $validArguments, Context $context): QueryOperation
+    public static function fromNode(FieldNode $root, MAuthorizedModel $model, ?array $validArguments, Context $context): QueryOperation
     {
         $selection = (new SelectionSetParser($model, $context))->parse($root->selectionSet);
         $operators = OperatorSet::fromNode($root->arguments, $validArguments, $context);
