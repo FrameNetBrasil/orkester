@@ -1,0 +1,56 @@
+schema {
+  query: Query
+}
+
+input WhereInt {
+  eq: Int
+  neq: Int
+  gt: Int
+  lt: Int
+  gte: Int
+  lte: Int
+  in: [Int!]
+  nin: [Int!]
+  eq: String
+  neq: String
+  gt: String
+  lt: String
+  gte: String
+  lte: String
+  in: [String!]
+  nin: [String!]
+  is_null: Boolean
+}
+
+input WhereString {
+  like: String
+  nlike: String
+  regex: String
+  eq: String
+  neq: String
+  gt: String
+  lt: String
+  gte: String
+  lte: String
+  in: [String!]
+  nin: [String!]
+  is_null: Boolean
+}
+
+input WhereBoolean {
+  eq: String
+  neq: String
+  eq: Boolean
+  neq: Boolean
+  is_null: Boolean
+}
+
+input OrderBy {
+  desc: String
+  asc: String
+}
+
+input Join {
+  inner: String
+  left: String
+}
