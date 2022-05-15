@@ -54,8 +54,9 @@ class MTrace
     public static function traceDebug($tag, ...$messages)
     {
         foreach($messages as $message) {
-            $message = print_r($message, true);
-            Manager::getLog()->logMessage("[$tag] $message");
+//            $message = print_r($message, true);
+//            Manager::getLog()->logMessage("[$tag] $message");
+            Manager::getLog()->getLogger()->debug($message, ['tag' => $tag]);
         }
 
     }

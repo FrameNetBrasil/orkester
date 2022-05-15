@@ -3,9 +3,9 @@ declare(strict_types=1);
 
 namespace Orkester\Handlers;
 
-use App\ResponseEmitter\ResponseEmitter;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Exception\HttpInternalServerErrorException;
+use Slim\ResponseEmitter;
 
 class ShutdownHandler
 {
@@ -76,8 +76,8 @@ class ShutdownHandler
             $exception = new HttpInternalServerErrorException($this->request, $message);
             $response = $this->errorHandler->__invoke($this->request, $exception, $this->displayErrorDetails, false, false);
 
-            $responseEmitter = new ResponseEmitter();
-            $responseEmitter->emit($response);
+//            $responseEmitter = new ResponseEmitter();
+//            $responseEmitter->emit($response);
         }
     }
 }

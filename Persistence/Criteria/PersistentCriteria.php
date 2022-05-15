@@ -48,6 +48,7 @@ class PersistentCriteria
     protected ?ClassMap $classMap = NULL;
     protected string $alias = '';
     protected array $parameters = [];
+    protected static int $autoParameter = 0;
     protected array /* of ClassMap */
         $classMaps = [];
     protected array /* of ClassMap/RetrieveCriteria */
@@ -595,6 +596,13 @@ class PersistentCriteria
     public function getParameters(): array
     {
         return $this->parameters;
+    }
+
+    public function setParameter(mixed $value, ?string $key = null): string
+    {
+        $key ??= ":_param" . ++self::$autoParameter;
+        $this->parameters[$key] = $value;
+        return $key;
     }
 
 

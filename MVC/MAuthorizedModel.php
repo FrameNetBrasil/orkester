@@ -54,7 +54,7 @@ class MAuthorizedModel
             $this->authorization->insertAttribute($attribute);
     }
 
-    public function delete(int $pk)
+    public function delete(int $pk): void
     {
         if (!($this->before ?? $this->authorization->deleteEntity($pk))) {
             throw new \DomainException('forbidden');
@@ -95,5 +95,13 @@ class MAuthorizedModel
         return $this->getCriteria()
             ->where($this->getKeyAttributeName(), '=', $pk)
             ->limit(1)->asResult()[0];
+    }
+
+    public function byId(int $id): ?object
+    {
+        if ($this->canUpdateEntity($id)) {
+            return $this->model->getById($id);
+        }
+        return null;
     }
 }

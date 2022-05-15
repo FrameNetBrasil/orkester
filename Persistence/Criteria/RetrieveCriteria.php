@@ -20,6 +20,7 @@ class RetrieveCriteria extends PersistentCriteria
     private $range = NULL;
     private $setOperation = array();
     private $linguistic = false;
+    protected static int $autoParamCount = 0;
 
     public function __construct(ClassMap $classMap, string $command = '')
     {
@@ -364,6 +365,17 @@ class RetrieveCriteria extends PersistentCriteria
     public function where($op1, $operator = '', $op2 = NULL)
     {
         $this->whereConditionCriteria->and_($op1, $operator, $op2);
+        return $this;
+    }
+
+    public function whereAll(array $conditions) {
+        if (!empty($conditions)) {
+            $criteria = $this->getNewConditionCriteria();
+            foreach ($conditions as $condition) {
+                $criteria->and_(...$condition);
+            }
+            $this->whereConditionCriteria->add($criteria);
+        }
         return $this;
     }
 

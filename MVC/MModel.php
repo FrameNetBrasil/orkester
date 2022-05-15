@@ -91,17 +91,21 @@ class MModel
         return $object;
     }
 
-    public static function save(object $object, ClassMap $classMap = null): int
+    public static function getKeyAttributeName(): string
+    {
+        return static::getClassMap()->getKeyAttributeName();
+    }
+
+    public static function normalize(object $object, ClassMap $classMap = null)
     {
         $classMap = $classMap ?? static::getClassMap();
         $errors = [];
-        static::beforeSave($object);
         /** @var AttributeMap $attributeMap */
-        foreach($classMap->getAttributesMap() as $attributeMap) {
+        foreach ($classMap->getAttributesMap() as $attributeMap) {
             try {
                 $value = $object->{$attributeMap->getName()} ?? null;
                 if ($validator = $attributeMap->getValidator()) {
-                    if(is_callable($validator)) {
+                    if (is_callable($validator)) {
                         $validator($value);
                     }
                     $object->{$attributeMap->getName()} = $value;
@@ -109,8 +113,7 @@ class MModel
                 if (is_null($value) && ($default = $attributeMap->getDefault())) {
                     if (is_callable($default)) {
                         $default($value);
-                    }
-                    else {
+                    } else {
                         $value = $default;
                     }
                 }
@@ -118,13 +121,20 @@ class MModel
                     throw new EValidationException([$attributeMap->getName() => 'attribute_not_nullable']);
                 }
                 $object->{$attributeMap->getName()} = $value;
-            } catch(EValidationException $e) {
+            } catch (EValidationException $e) {
                 $errors[] = $e->errors;
             }
         }
         if (!empty($errors)) {
             throw new EValidationException($errors);
         }
+    }
+
+    public static function save(object $object, ClassMap $classMap = null): int
+    {
+        $classMap = $classMap ?? static::getClassMap();
+        static::beforeSave($object);
+        static::normalize($object, $classMap);
         $pk = Manager::getPersistentManager()->saveObject($classMap, $object);
         static::afterSave($object, $pk);
         return $pk;
@@ -141,11 +151,12 @@ class MModel
     /**
      * @throws EValidationException
      */
-    public function insert(object $object)
+    public static function insert(object $object): int
     {
         static::beforeInsert($object);
         $pk = static::save($object);
         static::afterInsert($object, $pk);
+        return $pk;
     }
 
     public static function beforeInsert(object $object)
@@ -159,7 +170,7 @@ class MModel
     /**
      * @throws EValidationException
      */
-    public function update(object $object, object $old)
+    public static function update(object $object, object $old)
     {
         static::beforeUpdate($object, $old);
         $pk = static::save($object);
@@ -263,6 +274,30 @@ class MModel
     public static function existsId(int $primaryKey): bool
     {
         return static::exists([self::getClassMap()->getKeyAttributeName(), '=', $primaryKey]);
+    }
+
+    public static function getAuthorization(): IAuthorization
+    {
+        return new AllowAllAuthorization();
+    }
+
+    public static function addManyToMany(int $ownId, array|int $associatedIds, string $associationName)
+    {
+        $associationMap = self::getClassMap()->getAssociationMap($associationName);
+        $db = Manager::getDatabase(self::getClassMap()->getDatabaseName());
+        $associatedIds = is_array($associatedIds) ? $associatedIds : [$associatedIds];
+        $commands = array_map(
+            fn($id) => $associationMap->getAssociativeInsertStatement($db, $ownId, $id),
+            $associatedIds
+        );
+        Manager::getPersistentManager()->getPersistence()->execute($commands);
+    }
+
+    public static function getName(): string
+    {
+        $parts = explode('\\', static::class);
+        $className = $parts[count($parts) - 1];
+        return substr($className, 0, strlen($className) - 5);
     }
 
     public static function getAttributes(): array
@@ -374,7 +409,7 @@ class MModel
             }
             try {
                 static::save($entity);
-            } catch(EValidationException $e) {
+            } catch (EValidationException $e) {
                 throw new EValidationException(array_merge(...$e->errors));
             }
 

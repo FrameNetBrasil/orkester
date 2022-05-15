@@ -1,3 +1,18 @@
+let truncated = ''
+let truncatedCount = 0;
+
+function getLogger(level) {
+    switch (level) {
+        case "CRITICAL":
+        case "ERROR":
+            return console.error;
+        case "WARNING":
+            return console.warn;
+        default:
+            return console.log;
+    }
+}
+
 function connect(
     wsHost,
     wsPort,
@@ -13,29 +28,23 @@ function connect(
             console.debug("Trace connection opened");
         };
         socket.onmessage = event => {
-            const data = JSON.parse(event.data);
-            if (blacklist.includes(data.tag)) {
+            const data = JSON.parse(event.data)
+            if (blacklist.includes(data.level_name) || blacklist.includes(data.context.tag)) {
                 return;
             }
-            if (whitelist && !whitelist.includes(data.tag)) {
+            if (whitelist && !(whitelist.includes(data.level_name) || whitelist.includes(data.context.tag))) {
                 return;
             }
-            const message = data.tag === "CONSOLE" ?
-                JSON.parse(data.message) :
-                data.message;
-            let fn;
-            switch (data.tag) {
-                case "FATAL":
-                case "ERROR":
-                    fn = console.error;
-                    break;
-                case "WARN":
-                    fn = console.warn;
-                    break;
-                default:
-                    fn = console.log;
+            const log = getLogger(data.level_name)
+            if (data.context.tag === 'GRAPHQL') {
+                const message = JSON.parse(data.message)
+                log("GRAPHQL", message.type, message.alias || message.name, message)
+            } else {
+                const message = data.context.tag === "CONSOLE" ?
+                    JSON.parse(data.message) :
+                    data.message;
+                log(`%c${data.context.tag || data.level_name}`, css[data.tag] || "", message);
             }
-            fn(`%c${data.tag}`, css[data.tag] || "", message);
         };
         return socket;
     } catch (e) {

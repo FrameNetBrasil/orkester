@@ -3,6 +3,7 @@
 namespace Orkester;
 
 use Composer\Factory;
+use Monolog\Logger;
 use Orkester\Exception\EOrkesterException;
 use Orkester\Handlers\HttpErrorHandler;
 
@@ -222,7 +223,12 @@ class Manager
      */
     public static function handler()
     {
-        self::logMessage('[RESET_LOG_MESSAGES]');
+        try {
+            self::getLogger()->info(" ", ['tag' => '[RESET_LOG_MESSAGES]']);
+        } catch(\UnexpectedValueException $e) {
+            self::getLogger()->popHandler();
+            self::getLogger()->warning("Could not write to logfile", ['tag' => '[WARNING]']);
+        }
 
 // Instantiate the app
         AppFactory::setContainer(self::$container);
@@ -358,6 +364,11 @@ class Manager
     public static function getLog(): ?MLog
     {
         return self::$log;
+    }
+
+    public static function getLogger(): Logger
+    {
+        return self::$log->getLogger();
     }
 
     public static function getLogin(): ?MLogin
