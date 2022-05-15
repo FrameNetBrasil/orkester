@@ -124,6 +124,12 @@ class OperandString extends PersistentOperand
                 $o = new OperandAttributeMap($token, $attributeMap, $this->criteria);
                 $sql = $o->getSqlWhere();
             } else {
+//                if (is_numeric($token)) {
+//                    $sql = $token;
+//                } else {
+//                    $param = $this->criteria->setParameter($token, null);
+//                    $sql = ":$param";
+//                }
                 $sql = is_numeric($token) ? $token : "'{$token}'";
             }
         }

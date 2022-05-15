@@ -45,7 +45,7 @@ class MFrontController
     public function init(Request $request)
     {
         $this->request = $request;
-        Manager::logMessage('[FrontController::init] : ' . $this->request->getUri());
+        Manager::getLogger()->info($this->request->getUri(), ['tag' => '[FrontController::init]']);
         $this->app = $app = Manager::getApp();
 
         $callableResolver = $app->getCallableResolver();
@@ -85,7 +85,7 @@ class MFrontController
 
     public function handler()
     {
-        Manager::logMessage('[FrontController::handler]');
+        Manager::getLogger()->info(' ', ['tag' => '[FrontController::handler]']);
         $this->handlerRequest();
         $this->handlerResponse();
     }

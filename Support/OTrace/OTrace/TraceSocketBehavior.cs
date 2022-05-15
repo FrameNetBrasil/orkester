@@ -20,6 +20,6 @@ public class TraceSocketBehavior : WebSocketBehavior
 
     protected override void OnClose(CloseEventArgs e)
     {
-        Console.WriteLine($"Client closed: {Context.UserEndPoint}");
+        Console.WriteLine($"Client closed: {e.Reason}");
     }
 }

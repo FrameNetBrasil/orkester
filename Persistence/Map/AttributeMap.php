@@ -9,7 +9,7 @@ use Orkester\Types\MType;
 class AttributeMap
 {
 
-    private $classMap;
+    private ClassMap $classMap;
     private $name;
     private $columnName;
     private $alias;
