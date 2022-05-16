@@ -30,7 +30,7 @@ class SelectionSetParser
     {
         $name = $selectionNode->name->value;
         if ($name == '__typename') {
-            $operator = new FieldSelection($this->model->getName(), "__typename");
+            $operator = new FieldSelection("'{$this->model->getName()}'", "__typename");
         } else if ($name == 'id') {
             $operator = new FieldSelection($this->model->getKeyAttributeName(), 'id');
         } else {
