@@ -348,13 +348,14 @@ class QueryOperation extends AbstractOperation
             $associationCriteria = $toClassMap->getCriteria();
             $cardinality = $associationMap->getCardinality();
 
+            $values = array_filter(array_map(fn($r) => $r[$fromKey], $criteria->asResult()), fn($r) => !empty($r));
             if ($cardinality == 'oneToOne') {
                 $newAssociation = $this->createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey);
                 $joinField = $newAssociation->getName() . "." . $associationMap->getFromKey();
-                $associationCriteria->where($joinField, 'IN', $criteria);
+                $associationCriteria->where($joinField, 'IN', $values);
                 $associationCriteria->select($joinField);
             } else if ($cardinality == 'manyToOne' || $cardinality == 'oneToMany') {
-                $associationCriteria->where($fk, 'IN', $criteria);
+                $associationCriteria->where($fk, 'IN', $values);
                 $associationCriteria->select($fk);
             } else {
                 throw new EGraphQLException([$cardinality => 'Unhandled cardinality']);
