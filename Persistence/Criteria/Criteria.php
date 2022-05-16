@@ -7,6 +7,7 @@ use Orkester\Manager;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
 use Orkester\Persistence\PersistenceManager;
+use PhpMyAdmin\SqlParser\Parser;
 
 class Criteria
 {
@@ -33,7 +34,7 @@ class Criteria
 //    private $having = [];
 //    private $aliasCount = 0;
 //    private $alias;
-//    private $fieldAlias = [];
+    private $fieldAlias = [];
 //    private $subquery = [];
 
     private Builder $query;
@@ -67,12 +68,13 @@ class Criteria
             if (isset($query->havings)) {
                 $criteria->havings($query->havings);
             }
-            if (isset($query->joins)) {
-                $criteria->joins($query->joins);
-            }
             if (isset($query->orders)) {
                 $criteria->orders($query->orders);
             }
+            if (isset($query->joins)) {
+                $criteria->joins($query->joins);
+            }
+            print_r('==============================' . PHP_EOL);
             print_r($query->grammar->compileSelect($query));
         });
     }
@@ -88,9 +90,13 @@ class Criteria
         foreach ($columns as $i => $column) {
             if ($column == '*') {
                 $this->columns(array_keys($this->maps[$this->model]->attributeMaps));
+            } elseif (str_contains($column, ',')) {
+                $parser = new Parser("select " . $column);
+                foreach ($parser->statements[0]->expr as $j => $exp) {
+                    $columns[$j] = $this->resolveField($exp->expr, $exp->alias);
+                }
             } else {
                 $columns[$i] = $this->resolveField($column);
-                print_r($columns[$i] .PHP_EOL);
             }
         }
     }
@@ -99,6 +105,13 @@ class Criteria
     {
         print_r($wheres);
         foreach ($wheres as $i => $where) {
+            print_r($wheres[$i]['column'] . PHP_EOL);
+            if ($where['column'] == 'id') {
+                $wheres[$i]['column'] = $this->resolveField($this->maps[$this->model]->keyAttributeName);
+            } else {
+                $wheres[$i]['column'] = $this->resolveField($where['column']);
+            }
+            print_r($wheres[$i]['column'] . PHP_EOL);
         }
     }
 
@@ -126,13 +139,19 @@ class Criteria
     public function orders(array &$orders)
     {
         print_r($orders);
-        foreach ($orders as $i => $orders) {
+        foreach ($orders as $i => $order) {
+            if ($order['column'] == 'id') {
+                $orders[$i]['column'] = $this->resolveField($this->maps[$this->model]->keyAttributeName);
+            } else {
+                $orders[$i]['column'] = $this->resolveField($order['column']);
+            }
         }
     }
 
     public function __call(string $name, array $arguments)
     {
-        return $this->query->$name(...$arguments);
+        $result = $this->query->$name(...$arguments);
+        return ($result instanceof Builder) ? $this : $result;
     }
 
 
@@ -164,8 +183,16 @@ class Criteria
 
     private function resolveField($field, $alias = '')
     {
+        if (isset($this->fieldAlias[$field])) {
+            $field = $this->fieldAlias[$field];
+        }
         $operand = $this->resolveOperand($field);
-        $a = ($alias != '') ? " as {$alias}" : "";
+        $a = ($alias != '') ?: "";
+        $a = '';
+        if ($alias != '') {
+            $a = " as {$alias}";
+            $this->fieldAlias[$alias] = $field;
+        }
         if ($operand[0] == '@') {
             return substr($operand, 1) . $a;
         } else {
@@ -210,8 +237,8 @@ class Criteria
             $pkAlias = $this->aliases[$alias . $table];
             if (!isset($this->listJoin[$pkAlias])) {
                 $type = (isset($this->joinType[$relation]) ? $this->joinType[$relation] : 'inner');
-                $fkField = $alias . '.' . $fk->toKey;
-                $pkField = $pkAlias . '.' . $fk->fromKey;
+                $fkField = $alias . '.' . $this->columnName($fk->toClassname, $fk->toKey);
+                $pkField = $pkAlias . '.' . $this->columnName($fk->fromClassname, $fk->fromKey);
                 $join[] = [$table . ' as ' . $pkAlias, $fkField, '=', $pkField, $type];
                 $this->listJoin[$pkAlias] = $pkAlias;
             }
@@ -220,7 +247,7 @@ class Criteria
             $baseClass = $fk->toClassName;
             $alias = $pkAlias;
         }
-        $field = $alias . '.' . $this->attribute($baseClass, $parts[$n]);
+        $field = $alias . '.' . $this->columnName($baseClass, $parts[$n]);
         if (count($join)) {
             foreach ($join as $j) {
                 if ($j[4] == 'inner') {
@@ -263,7 +290,7 @@ class Criteria
         }
     }
 
-    public function fk($relationName, $className = ''):object
+    public function fk($relationName, $className = ''): object
     {
 //        print_r('fk = ' . $relationName . ' '. $className);
         if ($className != '') {
@@ -275,15 +302,29 @@ class Criteria
         return $fk;
     }
 
-    private function attribute($className, $attribute)
+    private function columnName($className, $attribute)
     {
-//        print_r('attribute to column = ' . $className . '.'. $attribute);
-        $attributeMap = $this->maps[$className]->getAttributeMap($attribute);
-        return $attributeMap->columnName;
+        print_r('attribute to column = ' . $className . '.'. $attribute);
+        return $this->maps[$className ?? $this->model]->getAttributeMap($attribute)->columnName;
     }
 
-
-
+    public function where($attribute, $op, $value)
+    {
+        $uOp = strtoupper($op);
+        $uValue = is_string($value) ? strtoupper($value) : $value;
+        if ($uValue === 'NULL') {
+            $this->query = $this->query->whereNull($attribute);
+        } else if ($uValue === 'NOT NULL') {
+            $this->query = $this->query->whereNotNull($attribute);
+        } else if ($uOp === 'IN') {
+            $this->query = $this->query->whereIN($attribute, $value);
+        } else if ($uOp === 'NOT IN') {
+            $this->query = $this->query->whereNotIN($attribute, $value);
+        } else {
+            $this->query = $this->query->where($attribute, $op, $value);
+        }
+        return $this;
+    }
 
     /*
 
