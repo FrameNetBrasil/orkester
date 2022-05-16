@@ -31,6 +31,7 @@ class ClassMap
 //    private $superClassMap = NULL;
 //    private $superAssociationMap = NULL;
     public AttributeMap $keyAttributeMap;
+    public string $keyAttributeName;
 //    private ?HookMap $hookMap = NULL;
 //    private array $hashedAttributeMaps = [];
 //    private array $handledAttributeMaps = [];
@@ -80,6 +81,7 @@ class ClassMap
             $this->fieldMaps[strtoupper($columnName)] = $attributeMap;
             if ($attributeMap->keyType == Key::PRIMARY) {
                 $this->keyAttributeMap = $attributeMap;
+                $this->keyAttributeName = $attributeName;
             } else {
                 $this->updateAttributeMaps[$attributeName] = $attributeMap;
             }
