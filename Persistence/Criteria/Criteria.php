@@ -205,40 +205,7 @@ class Criteria
         }
     }
 
-    private function resolveField($field, $alias = '')
-    {
-        if ($alias != '') {
-            if (isset($this->fieldAlias[$alias])) {
-                return $this->fieldAlias[$alias];
-            }
-        }
-        if ($field instanceof Expression) {
-            if ($alias != '') {
-                $this->fieldAlias[$alias] = $field;
-            }
-            return $field;
-        }
-        if (isset($this->fieldAlias[$field])) {
-            $field = $this->fieldAlias[$field];
-        }
-        $operand = $this->resolveOperand($field);
-        if ($operand instanceof Expression) {
-            if ($alias != '') {
-                $this->fieldAlias[$alias] = $field;
-                $operand = new Expression($operand->getValue() . " as {$alias}");
-            }
-            return $operand;
-        } else {
-            $a = '';
-            if ($alias != '') {
-                $a = " as {$alias}";
-                $this->fieldAlias[$alias] = $field;
-            }
-            return $operand . $a;
-        }
-    }
-
-    public function resolveOperandFunction($operand)
+    public function resolveOperandFunction($operand, $alias = '')
     {
         print_r($operand . PHP_EOL);
         //$output = preg_replace_callback('/(\()([\.\w]+)(\))/',
@@ -259,7 +226,7 @@ class Criteria
         return new Expression($output);
     }
 
-    public function resolveOperandPath($operand)
+    public function resolveOperandPath($operand, $alias = '')
     {
         $parts = explode('.', $operand);
         $n = count($parts) - 1;
@@ -311,33 +278,70 @@ class Criteria
 
     }
 
-    public function resolveOperandField($operand)
+    public function resolveOperandField($operand, $alias = '')
     {
         $attributeMap = $this->maps[$this->model]->getAttributeMap($operand);
         if (is_null($attributeMap)) {
             return $operand;
         } else if ($attributeMap->reference != '') {
-            return $this->resolveOperand($attributeMap->reference);
+            $field = $this->resolveOperand($attributeMap->reference, $alias);
+            if ($alias == '') {
+                $field = $field . ' as ' . $operand;
+            }
+            return $field;
         } else {
             return $this->table() . '.' . $attributeMap->columnName;
         }
     }
 
-    public function resolveOperand($operand)
+    public function resolveOperand($operand, $alias = '')
     {
         if (is_string($operand)) {
             if (is_numeric($operand)) {
                 return $operand;
             }
             if (str_contains($operand, '(')) {
-                return $this->resolveOperandFunction($operand);
+                return $this->resolveOperandFunction($operand, $alias);
             }
             if (str_contains($operand, '.')) {
-                return $this->resolveOperandPath($operand);
+                return $this->resolveOperandPath($operand, $alias);
             }
-            return $this->resolveOperandField($operand);
+            return $this->resolveOperandField($operand, $alias);
         } else {
             return $operand;
+        }
+    }
+
+    private function resolveField($field, $alias = '')
+    {
+        if ($alias != '') {
+            if (isset($this->fieldAlias[$alias])) {
+                return $this->fieldAlias[$alias];
+            }
+        }
+        if ($field instanceof Expression) {
+            if ($alias != '') {
+                $this->fieldAlias[$alias] = $field;
+            }
+            return $field;
+        }
+        if (isset($this->fieldAlias[$field])) {
+            $field = $this->fieldAlias[$field];
+        }
+        $operand = $this->resolveOperand($field, $alias);
+        if ($operand instanceof Expression) {
+            if ($alias != '') {
+                $this->fieldAlias[$alias] = $field;
+                $operand = new Expression($operand->getValue() . " as {$alias}");
+            }
+            return $operand;
+        } else {
+            $a = '';
+            if ($alias != '') {
+                $a = " as {$alias}";
+                $this->fieldAlias[$alias] = $field;
+            }
+            return $operand . $a;
         }
     }
 
