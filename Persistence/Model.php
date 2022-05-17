@@ -151,7 +151,9 @@ class Model
         $toClassMap = self::getClassMap($toClassName);
         $associationMap = new AssociationMap($name);
         $associationMap->fromClassMap = $fromClassMap;
+        $associationMap->fromClassName = $fromClassName;
         $associationMap->toClassName = $toClassName;
+        $associationMap->toClassMap = $toClassMap;
 //        $associationMap->setDeleteAutomatic(!empty($association['deleteAutomatic']));
 //        $associationMap->setSaveAutomatic(!empty($association['saveAutomatic']));
 //        $associationMap->setRetrieveAutomatic(!empty($association['retrieveAutomatic']));
@@ -194,9 +196,12 @@ class Model
         $fromClassMap = self::$classMaps[get_called_class()];
         $fromClassName = $fromClassMap->name;
         $toClassName = $model;
+        $toClassMap = self::getClassMap($toClassName);
         $associationMap = new AssociationMap($name);
         $associationMap->fromClassMap = $fromClassMap;
+        $associationMap->fromClassName = $fromClassName;
         $associationMap->toClassName = $toClassName;
+        $associationMap->toClassMap = $toClassMap;
 //        $associationMap->setDeleteAutomatic(!empty($association['deleteAutomatic']));
 //        $associationMap->setSaveAutomatic(!empty($association['saveAutomatic']));
 //        $associationMap->setRetrieveAutomatic(!empty($association['retrieveAutomatic']));
@@ -230,7 +235,9 @@ class Model
             //$toClassMap = $toClassName::getClassMap();
             $key = $fromClassMap->keyAttributeMap->name;
             $associationMap->fromKey = $key;
-            $associationMap->toKey = $key;
+            if ($cardinality == Association::ASSOCIATIVE) {
+                $associationMap->toKey = $toClassMap->keyAttributeMap->name;
+            }
             $keyAttribute = $key;
         }
 
