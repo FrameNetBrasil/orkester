@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
 use Orkester\Manager;
+use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
 use PhpMyAdmin\SqlParser\Parser;
@@ -23,28 +24,27 @@ class Criteria
 //    private $columnsRaw = [];
 //    private $aggregates = [];
 //    private $distinct = false;
-    private $alias;
-    private $aliases = [];
-    private $fieldAlias = [];
-    private $tableAlias = [];
+    public $alias;
+    public $aliases = [];
+    public $fieldAlias = [];
+    public $tableAlias = [];
 //    private $where = [];
 //    private $whereRaw = [];
 //    private $whereColumn = [];
-    private $listJoin = [];
-    private $join = [];
-//    private $joinCache = [];
-    private $joinType = [];
+    public $listJoin = [];
+//    private $join = [];
+    public $joinType = [];
 //    private $orderBy = [];
 //    private $orderByDirection = [];
 //    private $groupBy = [];
 //    private $having = [];
-//    private $aliasCount = 0;
+    public $aliasCount = 0;
 //    private $alias;
 //    private $subquery = [];
 
 
-    private Builder $query;
-    private Builder $processQuery;
+    public Builder $query;
+    public Builder $processQuery;
 
 //private $connection;
 
@@ -57,7 +57,7 @@ class Criteria
         $this->model = $classMap->name;
         $this->maps[$this->model] = $classMap;
 //        $this->connection = $db->connection();
-        $this->query = $connection->table($this->table());
+        $this->query = $connection->table($this->tableName());
         $criteria = $this;
         $this->query->beforeQuery(function ($query) use ($criteria) {
             $criteria->processQuery = $query;
@@ -99,15 +99,17 @@ class Criteria
         foreach ($columns as $i => $column) {
             if ($column == '*') {
                 $allColumns = array_keys($this->maps[$this->model]->attributeMaps);
-                $this->columns($allColumns);
+                foreach($allColumns as $j => $aColumn) {
+                    $columns[$j] = $this->resolveField('select', $aColumn);
+                }
             } elseif (str_contains($column, ',')) {
                 $parser = new Parser("select " . $column);
                 foreach ($parser->statements[0]->expr as $j => $exp) {
                     print_r('exp ' . $exp->expr . PHP_EOL);
-                    $columns[$j] = $this->resolveField($exp->expr, $exp->alias);
+                    $columns[$j] = $this->resolveField('select', $exp->expr, $exp->alias);
                 }
             } else {
-                $columns[$i] = $this->resolveField($column);
+                $columns[$i] = $this->resolveField('select', $column);
             }
         }
     }
@@ -117,13 +119,13 @@ class Criteria
 //        print_r($wheres);
         foreach ($wheres as $i => $where) {
             if ($where['type'] == 'Column') {
-                $wheres[$i]['first'] = $this->resolveField($where['first']);
-                $wheres[$i]['second'] = $this->resolveField($where['second']);
+                $wheres[$i]['first'] = $this->resolveField('where',$where['first']);
+                $wheres[$i]['second'] = $this->resolveField('where',$where['second']);
             } else {
                 if ($where['column'] == 'id') {
-                    $wheres[$i]['column'] = $this->resolveField($this->maps[$this->model]->keyAttributeName);
+                    $wheres[$i]['column'] = $this->resolveField('where',$this->maps[$this->model]->keyAttributeName);
                 } else {
-                    $wheres[$i]['column'] = $this->resolveField($where['column']);
+                    $wheres[$i]['column'] = $this->resolveField('where',$where['column']);
                 }
 //            print_r($wheres[$i]['column'] . PHP_EOL);
             }
@@ -137,10 +139,10 @@ class Criteria
             if (str_contains($group, ',')) {
                 $parser = new Parser("groupBy " . $group);
                 foreach ($parser->statements[0]->expr as $j => $exp) {
-                    $groups[$j] = $this->resolveField($exp->expr, $exp->alias);
+                    $groups[$j] = $this->resolveField('group',$exp->expr, $exp->alias);
                 }
             } else {
-                $groups[$i] = $this->resolveField($group);
+                $groups[$i] = $this->resolveField('group',$group);
             }
         }
     }
@@ -149,7 +151,7 @@ class Criteria
     {
 //        print_r($havings);
         foreach ($havings as $i => $having) {
-            $havings[$i]['column'] = $this->resolveField($having['column']);
+            $havings[$i]['column'] = $this->resolveField('having', $having['column']);
         }
     }
 
@@ -165,9 +167,9 @@ class Criteria
 //        print_r($orders);
         foreach ($orders as $i => $order) {
             if ($order['column'] == 'id') {
-                $orders[$i]['column'] = $this->resolveField($this->maps[$this->model]->keyAttributeName);
+                $orders[$i]['column'] = $this->resolveField('order',$this->maps[$this->model]->keyAttributeName);
             } else {
-                $orders[$i]['column'] = $this->resolveField($order['column']);
+                $orders[$i]['column'] = $this->resolveField('order', $order['column']);
             }
         }
     }
@@ -186,7 +188,15 @@ class Criteria
     }
 
 
-    public function table($className = '')
+    protected function registerJoinModel($className)
+    {
+        if (!isset($this->joinCache[$className])) {
+//            $this->joinCache[$className] = $className;
+            $this->addMapFor($className);
+        }
+    }
+
+    public function tableName(string $className = '')
     {
         if ($className != '') {
             $this->registerJoinModel($className);
@@ -197,123 +207,31 @@ class Criteria
         return $tableName;
     }
 
-    protected function registerJoinModel($className)
+    public function columnName(string $className, string $attribute)
     {
-        if (!isset($this->joinCache[$className])) {
-            $this->joinCache[$className] = $className;
-            $this->addMapFor($className);
-        }
+//        print_r('attribute to column = ' . $className . '.' . $attribute . PHP_EOL);
+        return $this->maps[$className ?: $this->model]->getAttributeMap($attribute)->columnName;
     }
 
-    public function resolveOperandFunction($operand, $alias = '')
-    {
-        print_r($operand . PHP_EOL);
-        //$output = preg_replace_callback('/(\()([\.\w]+)(\))/',
-        $output = preg_replace_callback('/(\()(.+)(\))/',
-            function ($matches) {
-                $arguments = [];
-                print_r($matches);
-                $fields = explode(',', $matches[2]);
-                foreach ($fields as $field) {
-                    print_r($field . PHP_EOL);
-                    $arguments[] = $this->resolveOperand($field);
-                }
-                print_r($arguments);
-                return "(" . implode(',', $arguments) . ")";
-            },
-            $operand);
-        print_r($output . PHP_EOL);
-        return new Expression($output);
+    public function getAttributeMap(string $attribute): ?AttributeMap {
+        return $this->maps[$this->model]->getAttributeMap($attribute);
     }
 
-    public function resolveOperandPath($operand, $alias = '')
+    public function getAssociationMap($relationName, $className = ''): object
     {
-        $parts = explode('.', $operand);
-        $n = count($parts) - 1;
-        $baseClass = '';
-        $tableName = $this->table($baseClass);
-        if (isset($this->aliases[$parts[0]])) {
-            $field = $parts[0] . '.' . $this->columnName($baseClass, $parts[1]);
+//        print_r('fk = ' . $relationName . ' '. $className);
+        if ($className != '') {
+            $this->registerJoinModel($className);
+            $associationMap = $this->maps[$className]->getAssociationMap($relationName);
         } else {
-            $join = [];
-            $alias = $tableName;
-            $joinIndex = '';
-            for ($i = 0; $i < $n; $i++) {
-                $associationName = $parts[$i];
-                $joinIndex .= $associationName;
-                $fk = $this->fk($associationName, $baseClass);
-                $tableName = $this->table($fk->toClassName);
-                if (!isset($this->tableAlias[$joinIndex])) {
-                    $this->tableAlias[$joinIndex] = 'a' . ++$this->aliasCount;
-                }
-                $toAlias = $this->tableAlias[$joinIndex];
-                if (!isset($this->listJoin[$joinIndex])) {
-                    $type = $this->joinType[$alias] ?: 'inner';
-                    $toField = $toAlias . '.' . $this->columnName($fk->toClassname, $fk->toKey);
-                    $fromField = $alias . '.' . $this->columnName($fk->fromClassname, $fk->fromKey);
-                    $join[] = [$tableName . ' as ' . $toAlias, $fromField, '=', $toField, $type];
-                    $this->listJoin[$joinIndex] = $alias;
-                }
-                //    $this->listJoin[$fk[0]] = $fk[0];
-                //}
-                $baseClass = $fk->toClassName;
-                $alias = $toAlias;
-            }
-            $field = $alias . '.' . $this->columnName($baseClass, $parts[$n]);
-            if (count($join)) {
-                foreach ($join as $j) {
-                    if ($j[4] == 'inner') {
-                        $this->processQuery->join($j[0], $j[1], $j[2], $j[3]);
-                    }
-                    if ($j[4] == 'left') {
-                        $this->processQuery->leftJoin($j[0], $j[1], $j[2], $j[3]);
-                    }
-                    if ($j[4] == 'right') {
-                        $this->processQuery->rightJoin($j[0], $j[1], $j[2], $j[3]);
-                    }
-                }
-            }
+            $associationMap = $this->maps[$this->model]->getAssociationMap($relationName);
         }
-        return $field;
-
+        return $associationMap;
     }
 
-    public function resolveOperandField($operand, $alias = '')
+    private function resolveField($context, $field, $alias = '')
     {
-        $attributeMap = $this->maps[$this->model]->getAttributeMap($operand);
-        if (is_null($attributeMap)) {
-            return $operand;
-        } else if ($attributeMap->reference != '') {
-            $field = $this->resolveOperand($attributeMap->reference, $alias);
-            if ($alias == '') {
-                $field = $field . ' as ' . $operand;
-            }
-            return $field;
-        } else {
-            return $this->table() . '.' . $attributeMap->columnName;
-        }
-    }
-
-    public function resolveOperand($operand, $alias = '')
-    {
-        if (is_string($operand)) {
-            if (is_numeric($operand)) {
-                return $operand;
-            }
-            if (str_contains($operand, '(')) {
-                return $this->resolveOperandFunction($operand, $alias);
-            }
-            if (str_contains($operand, '.')) {
-                return $this->resolveOperandPath($operand, $alias);
-            }
-            return $this->resolveOperandField($operand, $alias);
-        } else {
-            return $operand;
-        }
-    }
-
-    private function resolveField($field, $alias = '')
-    {
+        $alias ??= '';
         if ($alias != '') {
             if (isset($this->fieldAlias[$alias])) {
                 return $this->fieldAlias[$alias];
@@ -328,48 +246,18 @@ class Criteria
         if (isset($this->fieldAlias[$field])) {
             $field = $this->fieldAlias[$field];
         }
-        $operand = $this->resolveOperand($field, $alias);
-        if ($operand instanceof Expression) {
-            if ($alias != '') {
-                $this->fieldAlias[$alias] = $field;
-                $operand = new Expression($operand->getValue() . " as {$alias}");
-            }
-            return $operand;
-        } else {
-            $a = '';
-            if ($alias != '') {
-                $a = " as {$alias}";
-                $this->fieldAlias[$alias] = $field;
-            }
-            return $operand . $a;
-        }
+        $operand = new Operand($this, $field, $alias, $context);
+        return $operand->resolve();
     }
 
     public function alias($alias, $className = '')
     {
         $this->alias = $alias;
-        $this->aliases[$alias] = $this->table($className);
-        $this->query->from($this->table($className), $alias);
+        $this->aliases[$alias] = $this->tableName($className);
+        $this->query->from($this->tableName($className), $alias);
         return $this;
     }
 
-    public function fk($relationName, $className = ''): object
-    {
-//        print_r('fk = ' . $relationName . ' '. $className);
-        if ($className != '') {
-            $this->registerJoinModel($className);
-            $fk = $this->maps[$className]->getAssociationMap($relationName);
-        } else {
-            $fk = $this->maps[$this->model]->getAssociationMap($relationName);
-        }
-        return $fk;
-    }
-
-    private function columnName($className, $attribute)
-    {
-        print_r('attribute to column = ' . $className . '.' . $attribute . PHP_EOL);
-        return $this->maps[$className ?: $this->model]->getAttributeMap($attribute)->columnName;
-    }
 
     public function where($attribute, $op, $value)
     {
