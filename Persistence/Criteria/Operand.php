@@ -16,10 +16,11 @@ class Operand
     ){}
 
     public function resolve(): string|Expression {
+        $originalField = $this->field;
         $operand = $this->resolveOperand();
         if ($this->context == 'select') {
             if ($this->alias != '') {
-                $this->criteria->fieldAlias[$this->alias] = $this->field;
+                $this->criteria->fieldAlias[$this->alias] = $originalField;
                 if ($operand instanceof Expression) {
                     $operand = new Expression($operand->getValue() . " as {$this->alias}");
                 } else {
@@ -32,6 +33,7 @@ class Operand
 
     public function resolveOperand(): string|Expression
     {
+        print_r($this->field);
         if (is_string($this->field)) {
             if (is_numeric($this->field)) {
                 return $this->field;
@@ -50,16 +52,19 @@ class Operand
 
     public function resolveOperandFunction(): Expression
     {
+        $field = $this->field;
         $output = preg_replace_callback('/(\()(.+)(\))/',
             function ($matches) {
                 $arguments = [];
                 $fields = explode(',', $matches[2]);
-                foreach ($fields as $field) {
-                    $arguments[] = $this->resolveOperand($field);
+                foreach ($fields as $argument) {
+                    $this->field = $argument;
+                    $arguments[] = $this->resolveOperand();
                 }
                 return "(" . implode(',', $arguments) . ")";
             },
-            $this->field);
+            $field);
+        print_r($output);
         return new Expression($output);
     }
 
