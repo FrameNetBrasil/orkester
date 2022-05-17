@@ -9,4 +9,5 @@ enum Type: string
     case BOOLEAN = 'boolean';
     case FLOAT = 'float';
     case TIMESTAMP = 'timestamp';
+    case DATETIME = 'datetime';
 }
