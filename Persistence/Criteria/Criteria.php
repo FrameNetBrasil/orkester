@@ -116,16 +116,16 @@ class Criteria
 
     public function wheres(array &$wheres)
     {
-//        print_r($wheres);
         foreach ($wheres as $i => $where) {
             if ($where['type'] == 'Column') {
                 $wheres[$i]['first'] = $this->resolveField('where',$where['first']);
                 $wheres[$i]['second'] = $this->resolveField('where',$where['second']);
+            } else if ($where['type'] == 'Exists') {
             } else {
                 if ($where['column'] == 'id') {
                     $wheres[$i]['column'] = $this->resolveField('where',$this->maps[$this->model]->keyAttributeName);
                 } else {
-                    $wheres[$i]['column'] = $this->resolveField('where',$where['column']);
+                    $wheres[$i]['column'] = $this->resolveField('where', $where['column']);
                 }
 //            print_r($wheres[$i]['column'] . PHP_EOL);
             }
@@ -149,7 +149,8 @@ class Criteria
 
     public function havings(array &$havings)
     {
-//        print_r($havings);
+        print_r('havings');
+        print_r($havings );
         foreach ($havings as $i => $having) {
             $havings[$i]['column'] = $this->resolveField('having', $having['column']);
         }
@@ -258,15 +259,13 @@ class Criteria
         return $this;
     }
 
-
-    public function where($attribute, $op, $value)
+    public function where($attribute,  $operator = null, $value = null, $boolean = 'and')
     {
-        $uOp = strtoupper($op);
+        $uOp = strtoupper($operator);
         $uValue = is_string($value) ? strtoupper($value) : $value;
         if ($value instanceof Criteria) {
             $type = 'Sub';
             $column = $attribute;
-            $operator = $op;
             $query = $value->query;
             $boolean = 'and';
             $this->query->wheres[] = compact(
@@ -283,22 +282,31 @@ class Criteria
             } else if ($uOp === 'NOT IN') {
                 $this->query = $this->query->whereNotIN($attribute, $value);
             } else {
-                $this->query = $this->query->where($attribute, $op, $value);
+                $this->query = $this->query->where($attribute, $operator, $value, $boolean);
             }
         }
         return $this;
     }
 
-    public function orWhere($attribute, $op = null, $value = null)
+    public function orWhere($attribute,  $operator = null, $value = null)
     {
-        if ($attribute instanceof Closure && is_null($op)) {
-            $attribute($this);
-        }
+        return $this->where($attribute, $operator, $value, $boolean = 'or');
     }
 
     public function whereExists(Criteria $criteria)
     {
         $this->query->addWhereExistsQuery($criteria->query, 'and', false);
+        return $this;
+    }
+
+    public function join(string $className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
+    {
+        $tableName = $this->tableName($className);
+        $this->aliases[$alias] = $tableName;
+        $this->processQuery = $this->query;
+        $fromField = $this->resolveField('where',$first);
+        $toField = $this->resolveField('where',$second);
+        $this->query->join($tableName . ' as ' . $alias, $fromField, $operator, $toField, $type, $where);
         return $this;
     }
 
@@ -312,9 +320,10 @@ class Criteria
 //        $alias = $criteria->alias;
 //        $this->alias($alias, $criteria->model);
         $expression = '(' . $query . ') as ' . $alias;
+        $this->processQuery = $this->query;
         $this->query->addBinding($bindings, 'join');
-        $fromField = $this->resolveField($first);
-        $toField = $this->resolveField($second);
+        $fromField = $this->resolveField('where',$first);
+        $toField = $this->resolveField('where',$second);
         $this->query->join(new Expression($expression), $fromField, $operator, $toField, $type, $where);
         return $this;
     }

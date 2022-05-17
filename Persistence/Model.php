@@ -271,6 +271,14 @@ class Model
         return new Criteria($classMap, $databaseName);
     }
 
+    public static function getAssociation(string $associationChain, int $id): array
+    {
+        return static::getCriteria()
+            ->select($associationChain . '.*')
+            ->get()
+            ->toArray();
+    }
+
     /*
     public IAuthorization $authorization;
     public static RetrieveCriteria $criteria;
