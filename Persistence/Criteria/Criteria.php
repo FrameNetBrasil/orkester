@@ -7,43 +7,27 @@ use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
+use Illuminate\Support\Arr;
 use Orkester\Manager;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
 use PhpMyAdmin\SqlParser\Parser;
 
-class Criteria
+class Criteria extends \Illuminate\Database\Query\Builder
 {
     private $model;
     private $maps;
-
-
-//    private $map;
-//    private $columns = [];
-//    private $columnsRaw = [];
-//    private $aggregates = [];
-//    private $distinct = false;
     public $alias;
     public $aliases = [];
     public $fieldAlias = [];
     public $tableAlias = [];
-//    private $where = [];
-//    private $whereRaw = [];
-//    private $whereColumn = [];
     public $listJoin = [];
-//    private $join = [];
-    public $joinType = [];
-//    private $orderBy = [];
-//    private $orderByDirection = [];
-//    private $groupBy = [];
-//    private $having = [];
     public $aliasCount = 0;
-//    private $alias;
-//    private $subquery = [];
     public $parameters = [];
+    public $originalBindings = null;
 
-    public Builder $query;
+//    public Builder $query;
     public Builder $processQuery;
 
 //private $connection;
@@ -57,13 +41,17 @@ class Criteria
         $this->model = $classMap->name;
         $this->maps[$this->model] = $classMap;
 //        $this->connection = $db->connection();
-        $this->query = $connection->table($this->tableName());
+//        $this->query = $connection->table($this->tableName());
+        $connection->table($this->tableName());
+        parent::__construct($connection);
+        $this->from($this->tableName());
+    }
+
+    public function get($columns = ['*']) {
         $criteria = $this;
-        $this->query->beforeQuery(function ($query) use ($criteria) {
+
+        $this->beforeQuery(function ($query) use ($criteria) {
             $criteria->processQuery = $query;
-            if (isset($query->aggregate)) {
-                $criteria->aggregate($query->aggregate);
-            }
             if (isset($query->columns)) {
                 $criteria->columns($query->columns);
             }
@@ -82,15 +70,17 @@ class Criteria
             if (isset($query->joins)) {
                 $criteria->joins($query->joins);
             }
+            $criteria->bindings($query->bindings);
             print_r('==============================x' . PHP_EOL);
             print_r($query->grammar->compileSelect($query));
             print_r($query->getBindings());
         });
-    }
 
-    public function aggregate(array &$aggregate)
-    {
-//        print_r($aggregate);
+        return parent::get($columns);
+//        return collect($this->onceWithColumns(Arr::wrap($columns), function () {
+//            return $this->processor->processSelect($this, $this->runSelect());
+//        }));
+
     }
 
     public function columns(array &$columns)
@@ -99,7 +89,7 @@ class Criteria
         foreach ($columns as $i => $column) {
             if ($column == '*') {
                 $allColumns = array_keys($this->maps[$this->model]->attributeMaps);
-                foreach($allColumns as $j => $aColumn) {
+                foreach ($allColumns as $j => $aColumn) {
                     $columns[$j] = $this->resolveField('select', $aColumn);
                 }
             } elseif (str_contains($column, ',')) {
@@ -118,13 +108,12 @@ class Criteria
     {
         foreach ($wheres as $i => $where) {
             if ($where['type'] == 'Column') {
-                $wheres[$i]['first'] = $this->resolveField('where',$where['first']);
-                $wheres[$i]['second'] = $this->resolveField('where',$where['second']);
+                $wheres[$i]['first'] = $this->resolveField('where', $where['first']);
+                $wheres[$i]['second'] = $this->resolveField('where', $where['second']);
             } else if ($where['type'] == 'Exists') {
             } else {
-                print_r($where);
                 if ($where['column'] == 'id') {
-                    $wheres[$i]['column'] = $this->resolveField('where',$this->maps[$this->model]->keyAttributeName);
+                    $wheres[$i]['column'] = $this->resolveField('where', $this->maps[$this->model]->keyAttributeName);
                 } else {
                     $wheres[$i]['column'] = $this->resolveField('where', $where['column']);
                 }
@@ -140,10 +129,10 @@ class Criteria
             if (str_contains($group, ',')) {
                 $parser = new Parser("groupBy " . $group);
                 foreach ($parser->statements[0]->expr as $j => $exp) {
-                    $groups[$j] = $this->resolveField('group',$exp->expr, $exp->alias);
+                    $groups[$j] = $this->resolveField('group', $exp->expr, $exp->alias);
                 }
             } else {
-                $groups[$i] = $this->resolveField('group',$group);
+                $groups[$i] = $this->resolveField('group', $group);
             }
         }
     }
@@ -151,7 +140,7 @@ class Criteria
     public function havings(array &$havings)
     {
         print_r('havings');
-        print_r($havings );
+        print_r($havings);
         foreach ($havings as $i => $having) {
             $havings[$i]['column'] = $this->resolveField('having', $having['column']);
         }
@@ -169,18 +158,42 @@ class Criteria
 //        print_r($orders);
         foreach ($orders as $i => $order) {
             if ($order['column'] == 'id') {
-                $orders[$i]['column'] = $this->resolveField('order',$this->maps[$this->model]->keyAttributeName);
+                $orders[$i]['column'] = $this->resolveField('order', $this->maps[$this->model]->keyAttributeName);
             } else {
                 $orders[$i]['column'] = $this->resolveField('order', $order['column']);
             }
         }
     }
 
-    public function __call(string $name, array $arguments)
+    public function bindings(array &$bindings)
     {
-        $result = $this->query->$name(...$arguments);
-        return ($result instanceof Builder) ? $this : $result;
+        if (is_null($this->originalBindings)) {
+            $this->originalBindings = $bindings;
+        } else {
+            $bindings = $this->originalBindings;
+        }
+//        print_r($bindings);
+//        print_r($this->parameters);
+        foreach ($bindings as $type => $bindingType) {
+//            print_r($type . PHP_EOL);
+            foreach($bindingType as $i => $binding) {
+//                print_r($i . ' - ' . $binding . PHP_EOL);
+                if (str_starts_with($binding, ':')) {
+                    $parameter = substr($binding, 1);
+//                    print_r('parameter ' . $parameter . PHP_EOL);
+                    if (isset($this->parameters[$parameter])) {
+                        $bindings[$type][$i] = $this->parameters[$parameter];
+                    }
+                }
+            }
+        }
     }
+
+//    public function __call(string $name, array $arguments)
+//    {
+//        $result = $this->query->$name(...$arguments);
+//        return ($result instanceof Builder) ? $this : $result;
+//    }
 
 
     public function addMapFor(string $className)
@@ -215,18 +228,19 @@ class Criteria
         return ($attribute == '*') ? '*' : $this->maps[$className ?: $this->model]->getAttributeMap($attribute)->columnName;
     }
 
-    public function getAttributeMap(string $attribute): ?AttributeMap {
+    public function getAttributeMap(string $attribute): ?AttributeMap
+    {
         return $this->maps[$this->model]->getAttributeMap($attribute);
     }
 
-    public function getAssociationMap($relationName, $className = ''): object
+    public function getAssociationMap($associationName, $className = ''): object
     {
-//        print_r('fk = ' . $relationName . ' '. $className);
+        print_r('get association map for = ' . $associationName . ' '. $className);
         if ($className != '') {
             $this->registerJoinModel($className);
-            $associationMap = $this->maps[$className]->getAssociationMap($relationName);
+            $associationMap = $this->maps[$className]->getAssociationMap($associationName);
         } else {
-            $associationMap = $this->maps[$this->model]->getAssociationMap($relationName);
+            $associationMap = $this->maps[$this->model]->getAssociationMap($associationName);
         }
         return $associationMap;
     }
@@ -256,79 +270,82 @@ class Criteria
     {
         $this->alias = $alias;
         $this->aliases[$alias] = $this->tableName($className);
-        $this->query->from($this->tableName($className), $alias);
+        if ($className != $this->model) {
+            $this->from($this->tableName($className), $alias);
+        }
         return $this;
     }
 
-    public function where($attribute,  $operator = null, $value = null, $boolean = 'and')
+    public function where($attribute, $operator = null, $value = null, $boolean = 'and')
     {
         $uOp = strtoupper($operator);
         $uValue = is_string($value) ? strtoupper($value) : $value;
         if ($value instanceof Criteria) {
             $type = 'Sub';
             $column = $attribute;
-            $query = $value->query;
+            $query = $value;
             $boolean = 'and';
-            $this->query->wheres[] = compact(
+            $this->wheres[] = compact(
                 'type', 'column', 'operator', 'query', 'boolean'
             );
-            $this->query->addBinding($value->query->getBindings(), 'where');
+            $this->addBinding($value->getBindings(), 'where');
         } else {
             if (($uValue === 'NULL') || is_null($value)) {
-                $this->query = $this->query->whereNull($attribute);
+                $this->whereNull($attribute);
             } else if ($uValue === 'NOT NULL') {
-                $this->query = $this->query->whereNotNull($attribute);
+                $this->whereNotNull($attribute);
             } else if ($uOp === 'IN') {
-                $this->query = $this->query->whereIN($attribute, $value);
+                $this->whereIN($attribute, $value);
             } else if ($uOp === 'NOT IN') {
-                $this->query = $this->query->whereNotIN($attribute, $value);
+                $this->whereNotIN($attribute, $value);
             } else {
-                $this->query = $this->query->where($attribute, $operator, $value, $boolean);
+                parent::where($attribute, $operator, $value, $boolean);
             }
         }
         return $this;
     }
 
-    public function orWhere($attribute,  $operator = null, $value = null)
+    public function orWhere($attribute, $operator = null, $value = null)
     {
         return $this->where($attribute, $operator, $value, $boolean = 'or');
     }
 
-    public function whereExists(Criteria $criteria)
+    public function whereExistsCriteria(Criteria $criteria, $boolean = 'and', $not = false)
     {
-        $this->query->addWhereExistsQuery($criteria->query, 'and', false);
+        $this->addWhereExistsQuery($criteria, 'and', false);
         return $this;
     }
 
-    public function join(string $className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
+    public function joinClass(string $className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
     {
         $tableName = $this->tableName($className);
         $this->aliases[$alias] = $tableName;
-        $this->processQuery = $this->query;
-        $fromField = $this->resolveField('where',$first);
-        $toField = $this->resolveField('where',$second);
-        $this->query->join($tableName . ' as ' . $alias, $fromField, $operator, $toField, $type, $where);
+        $this->processQuery = $this;
+        $fromField = $this->resolveField('where', $first);
+        $toField = $this->resolveField('where', $second);
+        $this->join($tableName . ' as ' . $alias, $fromField, $operator, $toField, $type, $where);
         return $this;
     }
 
-    public function joinSub(Criteria $criteria, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
+    public function joinSubCriteria(Criteria $criteria, $as, $first, $operator = null, $second = null, $type = 'inner', $where = false)
     {
-        $criteria->alias = $alias;
-        $criteria->aliases[$alias] = $criteria->query;
-        $this->aliases[$alias] = $criteria->query;
-        [$query, $bindings] = $this->parseSub($criteria->query);
+        $criteria->alias = $as;
+        $criteria->aliases[$as] = $criteria;
+        $this->aliases[$as] = $criteria;
+        [$query, $bindings] = $this->parseSub($criteria);
 //        $expression = '('.$query.') as '.$this->query->grammar->wrapTable($as);
 //        $alias = $criteria->alias;
 //        $this->alias($alias, $criteria->model);
-        $expression = '(' . $query . ') as ' . $alias;
-        $this->processQuery = $this->query;
-        $this->query->addBinding($bindings, 'join');
-        $fromField = $this->resolveField('where',$first);
-        $toField = $this->resolveField('where',$second);
-        $this->query->join(new Expression($expression), $fromField, $operator, $toField, $type, $where);
+        $expression = '(' . $query . ') as ' . $as;
+        $this->processQuery = $this;
+        $this->addBinding($bindings, 'join');
+        $fromField = $this->resolveField('where', $first);
+        $toField = $this->resolveField('where', $second);
+        $this->join(new Expression($expression), $fromField, $operator, $toField, $type, $where);
         return $this;
     }
 
+    /*
     protected function parseSub($query)
     {
         if ($query instanceof Builder || $query instanceof EloquentBuilder || $query instanceof Relation) {
@@ -341,17 +358,21 @@ class Criteria
             );
         }
     }
+    */
 
-    public function addParameter(string $name) {
+    public function addParameter(string $name)
+    {
         $this->parameters[$name] = null;
     }
 
-    public function setParameter(string $name, $value) {
+    public function setParameter(string $name, $value)
+    {
         $this->parameters[$name] = $value;
     }
 
-    public function parameters(array $parameters) {
-        foreach($parameters as $p => $v) {
+    public function parameters(array $parameters)
+    {
+        foreach ($parameters as $p => $v) {
             $this->setParameter($p, $v);
         }
         return $this;
