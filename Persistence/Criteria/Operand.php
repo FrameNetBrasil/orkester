@@ -44,6 +44,9 @@ class Operand
             if (str_contains($this->field, '.')) {
                 return $this->resolveOperandPath();
             }
+            if(str_starts_with($this->field, ':')) {
+                return $this->resolveOperandParameter();
+            }
             return $this->resolveOperandField();
         } else {
             return $this->field;
@@ -116,6 +119,13 @@ class Operand
             $field = $alias . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
         }
         return $field;
+    }
+
+    public function resolveOperandParameter()
+    {
+        $name = substr($this->field, 1);
+        $this->criteria->addParameter($name);
+        return $this->field;
     }
 
     public function resolveOperandField()
