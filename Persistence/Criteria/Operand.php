@@ -9,13 +9,16 @@ use Orkester\Persistence\Enum\Join;
 class Operand
 {
     public function __construct(
-       public Criteria $criteria,
-       public string $field,
-       public string $alias = '',
-       public string $context = 'select'
-    ){}
+        public Criteria $criteria,
+        public string   $field,
+        public string   $alias = '',
+        public string   $context = 'select'
+    )
+    {
+    }
 
-    public function resolve(): string|Expression {
+    public function resolve(): string|Expression
+    {
         $originalField = $this->field;
         $operand = $this->resolveOperand();
         if ($this->context == 'select') {
@@ -44,7 +47,7 @@ class Operand
             if (str_contains($this->field, '.')) {
                 return $this->resolveOperandPath();
             }
-            if(str_starts_with($this->field, ':')) {
+            if (str_starts_with($this->field, ':')) {
                 return $this->resolveOperandParameter();
             }
             return $this->resolveOperandField();
@@ -77,7 +80,7 @@ class Operand
         $n = count($parts) - 1;
         $baseClass = '';
         $tableName = $this->criteria->tableName($baseClass);
-        if (isset($this->criteria->aliases[$parts[0]])) {
+        if (isset($this->criteria->aliases[$parts[0]]) || ($parts[0] == $tableName)) {
             $field = $parts[0] . '.' . $this->criteria->columnName($baseClass, $parts[1]);
         } else {
             $alias = $tableName;
@@ -102,7 +105,7 @@ class Operand
                             ->join($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $toField, '=', $toAlias . '.' . $toField);
 
                     } else {
-                        print_r('x'.$associationMap->toClassName . ' ' . $associationMap->fromClassName . PHP_EOL);
+                        print_r('x' . $associationMap->toClassName . ' ' . $associationMap->fromClassName . PHP_EOL);
                         $toField = $toAlias . '.' . $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
                         $fromField = $alias . '.' . $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
                         match ($associationMap->joinType) {
@@ -123,9 +126,14 @@ class Operand
 
     public function resolveOperandParameter()
     {
-        $name = substr($this->field, 1);
-        $this->criteria->addParameter($name);
+        $parameter = substr($this->field, 1);
+        print_r(PHP_EOL. 'parameter ' . $parameter . PHP_EOL);
+        print_r($this->criteria->parameters);
+        if (isset($this->criteria->parameters[$parameter])) {
+            return $this->criteria->parameters[$parameter];
+        }
         return $this->field;
+
     }
 
     public function resolveOperandField()

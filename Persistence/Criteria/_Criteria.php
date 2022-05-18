@@ -7,27 +7,44 @@ use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
-use Illuminate\Support\Arr;
 use Orkester\Manager;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
 use PhpMyAdmin\SqlParser\Parser;
 
-class Criteria extends \Illuminate\Database\Query\Builder
+class Criteria
 {
     private $model;
     private $maps;
+
+
+//    private $map;
+//    private $columns = [];
+//    private $columnsRaw = [];
+//    private $aggregates = [];
+//    private $distinct = false;
     public $alias;
     public $aliases = [];
     public $fieldAlias = [];
     public $tableAlias = [];
+//    private $where = [];
+//    private $whereRaw = [];
+//    private $whereColumn = [];
     public $listJoin = [];
+//    private $join = [];
+    public $joinType = [];
+//    private $orderBy = [];
+//    private $orderByDirection = [];
+//    private $groupBy = [];
+//    private $having = [];
     public $aliasCount = 0;
+//    private $alias;
+//    private $subquery = [];
     public $parameters = [];
     public $originalBindings = null;
 
-//    public Builder $query;
+    public Builder $query;
     public Builder $processQuery;
 
 //private $connection;
@@ -41,17 +58,16 @@ class Criteria extends \Illuminate\Database\Query\Builder
         $this->model = $classMap->name;
         $this->maps[$this->model] = $classMap;
 //        $this->connection = $db->connection();
-//        $this->query = $connection->table($this->tableName());
-        $connection->table($this->tableName());
-        parent::__construct($connection);
-        $this->from($this->tableName());
+        $this->query = $connection->table($this->tableName());
     }
 
-    public function get($columns = ['*']) {
+    public function get() {
         $criteria = $this;
-
-        $this->beforeQuery(function ($query) use ($criteria) {
+        $this->query->beforeQuery(function ($query) use ($criteria) {
             $criteria->processQuery = $query;
+            if (isset($query->aggregate)) {
+                $criteria->aggregate($query->aggregate);
+            }
             if (isset($query->columns)) {
                 $criteria->columns($query->columns);
             }
@@ -75,12 +91,13 @@ class Criteria extends \Illuminate\Database\Query\Builder
             print_r($query->grammar->compileSelect($query));
             print_r($query->getBindings());
         });
+        return $this->query->get();
 
-        return parent::get($columns);
-//        return collect($this->onceWithColumns(Arr::wrap($columns), function () {
-//            return $this->processor->processSelect($this, $this->runSelect());
-//        }));
+    }
 
+    public function aggregate(array &$aggregate)
+    {
+//        print_r($aggregate);
     }
 
     public function columns(array &$columns)
@@ -117,6 +134,10 @@ class Criteria extends \Illuminate\Database\Query\Builder
                 } else {
                     $wheres[$i]['column'] = $this->resolveField('where', $where['column']);
                 }
+//                if (str_starts_with($where['value'], ':')) {
+//                    $wheres[$i]['value'] = $this->resolveField('where', $where['value']);
+//                    print_r('value = '. $wheres[$i]['value'] . PHP_EOL);
+//                }
 //            print_r($wheres[$i]['column'] . PHP_EOL);
             }
         }
@@ -172,15 +193,15 @@ class Criteria extends \Illuminate\Database\Query\Builder
         } else {
             $bindings = $this->originalBindings;
         }
-//        print_r($bindings);
-//        print_r($this->parameters);
+        print_r($bindings);
+        print_r($this->parameters);
         foreach ($bindings as $type => $bindingType) {
-//            print_r($type . PHP_EOL);
+            print_r($type . PHP_EOL);
             foreach($bindingType as $i => $binding) {
-//                print_r($i . ' - ' . $binding . PHP_EOL);
+                print_r($i . ' - ' . $binding . PHP_EOL);
                 if (str_starts_with($binding, ':')) {
                     $parameter = substr($binding, 1);
-//                    print_r('parameter ' . $parameter . PHP_EOL);
+                    print_r('parameter ' . $parameter . PHP_EOL);
                     if (isset($this->parameters[$parameter])) {
                         $bindings[$type][$i] = $this->parameters[$parameter];
                     }
@@ -189,11 +210,11 @@ class Criteria extends \Illuminate\Database\Query\Builder
         }
     }
 
-//    public function __call(string $name, array $arguments)
-//    {
-//        $result = $this->query->$name(...$arguments);
-//        return ($result instanceof Builder) ? $this : $result;
-//    }
+    public function __call(string $name, array $arguments)
+    {
+        $result = $this->query->$name(...$arguments);
+        return ($result instanceof Builder) ? $this : $result;
+    }
 
 
     public function addMapFor(string $className)
@@ -233,14 +254,14 @@ class Criteria extends \Illuminate\Database\Query\Builder
         return $this->maps[$this->model]->getAttributeMap($attribute);
     }
 
-    public function getAssociationMap($associationName, $className = ''): object
+    public function getAssociationMap($relationName, $className = ''): object
     {
-        print_r('get association map for = ' . $associationName . ' '. $className);
+//        print_r('fk = ' . $relationName . ' '. $className);
         if ($className != '') {
             $this->registerJoinModel($className);
-            $associationMap = $this->maps[$className]->getAssociationMap($associationName);
+            $associationMap = $this->maps[$className]->getAssociationMap($relationName);
         } else {
-            $associationMap = $this->maps[$this->model]->getAssociationMap($associationName);
+            $associationMap = $this->maps[$this->model]->getAssociationMap($relationName);
         }
         return $associationMap;
     }
@@ -270,9 +291,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
     {
         $this->alias = $alias;
         $this->aliases[$alias] = $this->tableName($className);
-        if ($className != $this->model) {
-            $this->from($this->tableName($className), $alias);
-        }
+        $this->query->from($this->tableName($className), $alias);
         return $this;
     }
 
@@ -283,23 +302,23 @@ class Criteria extends \Illuminate\Database\Query\Builder
         if ($value instanceof Criteria) {
             $type = 'Sub';
             $column = $attribute;
-            $query = $value;
+            $query = $value->query;
             $boolean = 'and';
-            $this->wheres[] = compact(
+            $this->query->wheres[] = compact(
                 'type', 'column', 'operator', 'query', 'boolean'
             );
-            $this->addBinding($value->getBindings(), 'where');
+            $this->query->addBinding($value->query->getBindings(), 'where');
         } else {
             if (($uValue === 'NULL') || is_null($value)) {
-                $this->whereNull($attribute);
+                $this->query = $this->query->whereNull($attribute);
             } else if ($uValue === 'NOT NULL') {
-                $this->whereNotNull($attribute);
+                $this->query = $this->query->whereNotNull($attribute);
             } else if ($uOp === 'IN') {
-                $this->whereIN($attribute, $value);
+                $this->query = $this->query->whereIN($attribute, $value);
             } else if ($uOp === 'NOT IN') {
-                $this->whereNotIN($attribute, $value);
+                $this->query = $this->query->whereNotIN($attribute, $value);
             } else {
-                parent::where($attribute, $operator, $value, $boolean);
+                $this->query = $this->query->where($attribute, $operator, $value, $boolean);
             }
         }
         return $this;
@@ -310,42 +329,41 @@ class Criteria extends \Illuminate\Database\Query\Builder
         return $this->where($attribute, $operator, $value, $boolean = 'or');
     }
 
-    public function whereExistsCriteria(Criteria $criteria, $boolean = 'and', $not = false)
+    public function whereExists(Criteria $criteria)
     {
-        $this->addWhereExistsQuery($criteria, 'and', false);
+        $this->query->addWhereExistsQuery($criteria->query, 'and', false);
         return $this;
     }
 
-    public function joinClass(string $className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
+    public function join(string $className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
     {
         $tableName = $this->tableName($className);
         $this->aliases[$alias] = $tableName;
-        $this->processQuery = $this;
+        $this->processQuery = $this->query;
         $fromField = $this->resolveField('where', $first);
         $toField = $this->resolveField('where', $second);
-        $this->join($tableName . ' as ' . $alias, $fromField, $operator, $toField, $type, $where);
+        $this->query->join($tableName . ' as ' . $alias, $fromField, $operator, $toField, $type, $where);
         return $this;
     }
 
-    public function joinSubCriteria(Criteria $criteria, $as, $first, $operator = null, $second = null, $type = 'inner', $where = false)
+    public function joinSub(Criteria $criteria, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
     {
-        $criteria->alias = $as;
-        $criteria->aliases[$as] = $criteria;
-        $this->aliases[$as] = $criteria;
-        [$query, $bindings] = $this->parseSub($criteria);
+        $criteria->alias = $alias;
+        $criteria->aliases[$alias] = $criteria->query;
+        $this->aliases[$alias] = $criteria->query;
+        [$query, $bindings] = $this->parseSub($criteria->query);
 //        $expression = '('.$query.') as '.$this->query->grammar->wrapTable($as);
 //        $alias = $criteria->alias;
 //        $this->alias($alias, $criteria->model);
-        $expression = '(' . $query . ') as ' . $as;
-        $this->processQuery = $this;
-        $this->addBinding($bindings, 'join');
+        $expression = '(' . $query . ') as ' . $alias;
+        $this->processQuery = $this->query;
+        $this->query->addBinding($bindings, 'join');
         $fromField = $this->resolveField('where', $first);
         $toField = $this->resolveField('where', $second);
-        $this->join(new Expression($expression), $fromField, $operator, $toField, $type, $where);
+        $this->query->join(new Expression($expression), $fromField, $operator, $toField, $type, $where);
         return $this;
     }
 
-    /*
     protected function parseSub($query)
     {
         if ($query instanceof Builder || $query instanceof EloquentBuilder || $query instanceof Relation) {
@@ -358,7 +376,6 @@ class Criteria extends \Illuminate\Database\Query\Builder
             );
         }
     }
-    */
 
     public function addParameter(string $name)
     {
