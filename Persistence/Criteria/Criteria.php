@@ -41,7 +41,7 @@ class Criteria
     public $aliasCount = 0;
 //    private $alias;
 //    private $subquery = [];
-
+    public $parameters = [];
 
     public Builder $query;
     public Builder $processQuery;
@@ -82,7 +82,7 @@ class Criteria
             if (isset($query->joins)) {
                 $criteria->joins($query->joins);
             }
-            print_r('==============================' . PHP_EOL);
+            print_r('==============================x' . PHP_EOL);
             print_r($query->grammar->compileSelect($query));
             print_r($query->getBindings());
         });
@@ -122,6 +122,7 @@ class Criteria
                 $wheres[$i]['second'] = $this->resolveField('where',$where['second']);
             } else if ($where['type'] == 'Exists') {
             } else {
+                print_r($where);
                 if ($where['column'] == 'id') {
                     $wheres[$i]['column'] = $this->resolveField('where',$this->maps[$this->model]->keyAttributeName);
                 } else {
@@ -211,7 +212,7 @@ class Criteria
     public function columnName(string $className, string $attribute)
     {
 //        print_r('attribute to column = ' . $className . '.' . $attribute . PHP_EOL);
-        return $this->maps[$className ?: $this->model]->getAttributeMap($attribute)->columnName;
+        return ($attribute == '*') ? '*' : $this->maps[$className ?: $this->model]->getAttributeMap($attribute)->columnName;
     }
 
     public function getAttributeMap(string $attribute): ?AttributeMap {
@@ -341,347 +342,21 @@ class Criteria
         }
     }
 
-    /*
-
-    public function pk($className = '')
-    {
-        if ($className != '') {
-            $this->registerJoinModel($className);
-            $pk = $this->maps[$className]['primaryKey'];
-        } else {
-            $pk = $this->maps[$this->model]['primaryKey'];
-        }
-        return $pk;
+    public function addParameter(string $name) {
+        $this->parameters[$name] = null;
     }
 
-
-
-
-    public function setJoinType($association, $type)
-    {
-        $this->joinType[$association] = $type;
+    public function setParameter(string $name, $value) {
+        $this->parameters[$name] = $value;
     }
 
-
-    public function select()
-    {
-        if ($numargs = func_num_args()) {
-            foreach (func_get_args() as $arg) {
-                $attributes = explode(',', $arg);
-                if (count($attributes)) {
-                    foreach ($attributes as $attribute) {
-                        $attribute = trim($attribute);
-                        if ($attribute != '*') {
-                            if (str_contains($attribute, ' as ')) {
-                                list($field,$alias) = explode(' as ', $attribute);
-                                $this->resolveField($field,$alias);
-                                $this->fieldAlias[$alias] = $field;
-                            } else {
-                                $this->resolveField($attribute);
-                            }
-                        }
-                    }
-                } else {
-                    $this->resolveField($arg);
-                }
-            }
+    public function parameters(array $parameters) {
+        foreach($parameters as $p => $v) {
+            $this->setParameter($p, $v);
         }
         return $this;
     }
 
-    public function selectRaw($field)
-    {
-        $this->columnsRaw[] = $field;
-        return $this;
-    }
-
-    public function distinct()
-    {
-        $this->distinct = true;
-        return $this;
-    }
-
-    public function aggregate($field)
-    {
-        $this->aggregates[] = $field;
-        return $this;
-    }
-
-    public function subquery($query)
-    {
-        $this->subquery[] = $query;
-        return $this;
-    }
-
-    public function where($attribute, $op, $value)
-    {
-        if (isset($this->fieldAlias[$attribute])) {
-            $field = $this->resolveField($this->fieldAlias[$attribute]);
-        } else {
-            $field = $this->resolveField($attribute);
-        }
-        $uOp = strtoupper($op);
-        $uValue = is_string($value) ? strtoupper($value) : $value;
-        if ($uValue === 'NULL') {
-            $this->query = $this->query->whereNull($field);
-        } else if ($uValue === 'NOT NULL') {
-            $this->query = $this->query->whereNotNull($field);
-        } else if ($uOp === 'IN') {
-            $this->query = $this->query->whereIN($field, $value);
-        } else if ($uOp === 'NOT IN') {
-            $this->query = $this->query->whereNotIN($field, $value);
-        } else {
-            $this->query = $this->query->where($field, $op, $value);
-        }
-        return $this;
-    }
-
-    public function whereRaw($expression, $op, $value)
-    {
-        $this->whereRaw[] = [$expression, $op, $value];
-        return $this;
-    }
-
-    public function whereField($attribute1, $op, $attribute2)
-    {
-        if (isset($this->fieldAlias[$attribute1])) {
-            $field = $this->fieldAlias[$attribute1];
-        } else {
-            $field = $this->resolveOperand($attribute1);
-        }
-        if (isset($this->fieldAlias[$attribute2])) {
-            $value = $this->fieldAlias[$attribute2];
-        } else {
-            $value = $this->resolveOperand($attribute2);
-        }
-        $this->whereColumn[] = [$field, $op, $value];
-        return $this;
-    }
-
-    public function when($flag, $attribute, $op, $value)
-    {
-        if ($flag != '') {
-            if (isset($this->fieldAlias[$attribute])) {
-                $field = $this->fieldAlias[$attribute];
-            } else {
-                $field = $this->resolveOperand($attribute);
-            }
-            $this->where[] = [$field, $op, $value];
-        }
-        return $this;
-    }
-
-    public function orderBy($attribute, $direction = 'asc')
-    {
-        if (isset($this->fieldAlias[$attribute])) {
-            $this->query->orderBy($this->resolveOperand($this->fieldAlias[$attribute]), $direction);
-        } else {
-            $this->query->orderBy($this->resolveOperand($attribute), $direction);
-        }
-        return $this;
-    }
-
-    public function groupBy($attribute)
-    {
-        if (is_array($attribute)) {
-            foreach ($attribute as $attr) {
-                $this->groupBy($attr);
-            }
-        } else {
-            if (isset($this->fieldAlias[$attribute])) {
-                $this->query->groupBy($this->resolveOperand($this->fieldAlias[$attribute]));
-            } else {
-                $this->query->groupBy($this->resolveOperand($attribute));
-            }
-        }
-        return $this;
-    }
-
-    public function having($attribute, $op, $value)
-    {
-        if (isset($this->fieldAlias[$attribute])) {
-            $field = $this->resolveField($this->fieldAlias[$attribute]);
-        } else {
-            $field = $this->resolveField($attribute);
-        }
-        $this->query->having($field, $op, $value);
-        return $this;
-    }
-
-    public function query($params = null)
-    {
-        $query = $this->query;
-        print_r($this->columns);
-        $columns = empty($this->columns) ? '*' : $this->columns;
-        $query->select($columns);
-        if (count($this->columnsRaw) > 0) {
-            foreach ($this->columnsRaw as $columnsRaw) {
-                $query->selectRaw($columnsRaw);
-            }
-        }
-        if ($this->distinct) {
-            $query = $query->distinct();
-        }
-        if (count($this->aggregates)) {
-            foreach ($this->aggregates as $aggregate) {
-                $query->selectRaw($aggregate);
-            }
-        }
-        if (count($this->join)) {
-            foreach ($this->join as $join) {
-                if ($join[4] == 'inner') {
-                    $query = $query->join($join[0], $join[1], $join[2], $join[3]);
-                }
-                if ($join[4] == 'left') {
-                    $query = $query->leftJoin($join[0], $join[1], $join[2], $join[3]);
-                }
-                if ($join[4] == 'right') {
-                    $query = $query->rightJoin($join[0], $join[1], $join[2], $join[3]);
-                }
-            }
-        }
-        if (count($this->where)) {
-            foreach ($this->where as $where) {
-                if ($where[2] === 'NULL') {
-                    $query = $query->whereNull($where[0]);
-                } else if ($where[2] === 'NOT NULL') {
-                    $query = $query->whereNotNull($where[0]);
-                } else if ($where[1] === 'IN') {
-                    $query = $query->whereIN($where[0], $where[2]);
-                } else if ($where[1] === 'NOT IN') {
-                    $query = $query->whereNotIN($where[0], $where[2]);
-                } else {
-                    $query = $query->where($where[0], $where[1], $where[2]);
-                }
-            }
-        }
-        if (count($this->whereRaw)) {
-            foreach ($this->whereRaw as $where) {
-                $query = $query->whereRaw("{$where[0]} {$where[1]} ?", $where[2]);
-            }
-        }
-        if (count($this->whereColumn)) {
-            foreach ($this->whereColumn as $where) {
-                $query = $query->whereColumn($where[0], $where[1], $where[2]);
-            }
-        }
-        if (count($this->orderBy)) {
-            foreach ($this->orderBy as $i => $orderBy) {
-                $direction = $this->orderByDirection[$i];
-                $query = $query->orderBy($orderBy, $direction);
-            }
-        }
-        if (count($this->groupBy)) {
-            foreach ($this->groupBy as $groupBy) {
-                $query = $query->groupBy($groupBy);
-            }
-            if (count($this->having)) {
-                foreach ($this->having as $having) {
-                    $query = $query->havingRaw($having[0] . ' ' . $having[1] . ' ' . $having[2]);
-                }
-            }
-        }
-        if (count($this->subquery)) {
-            foreach ($this->subquery as $subquery) {
-                $query = $query->addSelect($subquery);
-            }
-        }
-        if (isset($params->grid)) {
-            if (isset($params->grid['pageSize'])) {
-                if ($params->grid['pageSize']) {
-                    $query = $query->limit($params->grid['pageSize']);
-                }
-                if ($params->grid['pageNumber']) {
-                    $query = $query->offset($params->grid['pageSize'] * ($params->grid['pageNumber'] - 1));
-                }
-            }
-        }
-
-        return $query;
-    }
-
-    public function count()
-    {
-        //$query->selectRaw("count(*) as n");
-        if ($this->distinct) {
-            $query = $query->distinct();
-        }
-        if (count($this->join)) {
-            foreach ($this->join as $join) {
-                if ($join[4] == 'inner') {
-                    $query = $query->join($join[0], $join[1], $join[2], $join[3]);
-                }
-                if ($join[4] == 'left') {
-                    $query = $query->leftJoin($join[0], $join[1], $join[2], $join[3]);
-                }
-                if ($join[4] == 'right') {
-                    $query = $query->rightJoin($join[0], $join[1], $join[2], $join[3]);
-                }
-            }
-        }
-        if (count($this->where)) {
-            foreach ($this->where as $where) {
-                if ($where[2] === 'NULL') {
-                    $query = $query->whereNull($where[0]);
-                } else if ($where[2] === 'NOT NULL') {
-                    $query = $query->whereNotNull($where[0]);
-                } else if ($where[1] === 'IN') {
-                    $query = $query->whereIN($where[0], $where[2]);
-                } else if ($where[1] === 'NOT IN') {
-                    $query = $query->whereNotIN($where[0], $where[2]);
-                } else {
-                    $query = $query->where($where[0], $where[1], $where[2]);
-                }
-            }
-        }
-        if (count($this->whereRaw)) {
-            foreach ($this->whereRaw as $where) {
-                $query = $query->whereRaw("{$where[0]} {$where[1]} ?", $where[2]);
-            }
-        }
-        if (count($this->whereColumn)) {
-            foreach ($this->whereColumn as $where) {
-                $query = $query->whereColumn($where[0], $where[1], $where[2]);
-            }
-        }
-        if (count($this->groupBy)) {
-            foreach ($this->groupBy as $groupBy) {
-                $query = $query->groupBy($groupBy);
-            }
-            if (count($this->having)) {
-                foreach ($this->having as $having) {
-                    $query = $query->havingRaw($having[0] . ' ' . $having[1] . ' ' . $having[2]);
-                }
-            }
-        }
-
-        if (count($this->groupBy)) {
-            $query->select($this->columns);
-            if (count($this->columnsRaw) > 0) {
-                foreach ($this->columnsRaw as $columnsRaw) {
-                    $query->selectRaw($columnsRaw);
-                }
-            }
-            if ($this->distinct) {
-                $query = $query->distinct();
-            }
-            if (count($this->aggregates)) {
-                foreach ($this->aggregates as $aggregate) {
-                    $query->selectRaw($aggregate);
-                }
-            }
-
-            $n = \DB::query()->fromSub($query, 'temp_query')->count();
-            return $n;
-        } else {
-            $query->selectRaw("count(*) as n");
-            $result = $query->first()->toArray();
-            return $result['n'];
-        }
-
-
-    }
-*/
     public function dump()
     {
         print_r($this->toSql());
