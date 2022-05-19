@@ -148,6 +148,12 @@ class Operand
             $this->field = $attributeMap->reference;
             return $this->resolveOperand();
         } else {
+            if ($attributeMap->name != $attributeMap->columnName) {
+                $this->alias = $attributeMap->name;
+            }
+            if ($this->context == 'upsert') {
+                return $attributeMap->columnName;
+            }
             return $this->criteria->tableName() . '.' . $attributeMap->columnName;
         }
     }

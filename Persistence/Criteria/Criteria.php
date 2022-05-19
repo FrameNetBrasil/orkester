@@ -47,40 +47,59 @@ class Criteria extends \Illuminate\Database\Query\Builder
         $this->from($this->tableName());
     }
 
+    public function parseSelf() {
+        $this->parseCriteria($this, $this);
+    }
+
+    public function parseCriteria($query, $criteria) {
+        $criteria->processQuery = $query;
+        if (isset($query->columns)) {
+            $criteria->columns($query->columns);
+        }
+        if (isset($query->wheres)) {
+            $criteria->wheres($query->wheres);
+        }
+        if (isset($query->groups)) {
+            $criteria->groups($query->groups);
+        }
+        if (isset($query->havings)) {
+            $criteria->havings($query->havings);
+        }
+        if (isset($query->orders)) {
+            $criteria->orders($query->orders);
+        }
+        if (isset($query->joins)) {
+            $criteria->joins($query->joins);
+        }
+        $criteria->bindings($query->bindings);
+        print_r('==============================x' . PHP_EOL);
+        print_r($query->grammar->compileSelect($query));
+        print_r($query->getBindings());
+    }
+
     public function get($columns = ['*']) {
         $criteria = $this;
 
         $this->beforeQuery(function ($query) use ($criteria) {
-            $criteria->processQuery = $query;
-            if (isset($query->columns)) {
-                $criteria->columns($query->columns);
-            }
-            if (isset($query->wheres)) {
-                $criteria->wheres($query->wheres);
-            }
-            if (isset($query->groups)) {
-                $criteria->groups($query->groups);
-            }
-            if (isset($query->havings)) {
-                $criteria->havings($query->havings);
-            }
-            if (isset($query->orders)) {
-                $criteria->orders($query->orders);
-            }
-            if (isset($query->joins)) {
-                $criteria->joins($query->joins);
-            }
-            $criteria->bindings($query->bindings);
-            print_r('==============================x' . PHP_EOL);
-            print_r($query->grammar->compileSelect($query));
-            print_r($query->getBindings());
+            $criteria->parseCriteria($query, $criteria);
         });
 
         return parent::get($columns);
-//        return collect($this->onceWithColumns(Arr::wrap($columns), function () {
-//            return $this->processor->processSelect($this, $this->runSelect());
-//        }));
+    }
 
+    public function insert(array $values) {
+        foreach($values as $i => $row) {
+            $this->upserts($values[$i]);
+        }
+        return parent::insert($values);
+    }
+
+    public function update(array|object $values) {
+        if (is_object($values)) {
+            $values = (array)$values;
+        }
+        $this->upserts($values);
+        parent::update($values);
     }
 
     public function columns(array &$columns)
@@ -161,6 +180,17 @@ class Criteria extends \Illuminate\Database\Query\Builder
                 $orders[$i]['column'] = $this->resolveField('order', $this->maps[$this->model]->keyAttributeName);
             } else {
                 $orders[$i]['column'] = $this->resolveField('order', $order['column']);
+            }
+        }
+    }
+
+    public function upserts(array &$values)
+    {
+        foreach ($values as $name => $value) {
+            $fieldName = $this->resolveField('upsert', $name);
+            if ($fieldName != $name) {
+                unset($values[$name]);
+                $values[$fieldName] = $value;
             }
         }
     }
