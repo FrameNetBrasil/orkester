@@ -21,7 +21,7 @@ class ClassMap
     private array $fieldMaps = [];
     public array $attributeMaps = [];
     private array $updateAttributeMaps = [];
-    private array $insertAttributeMaps = [];
+    public array $insertAttributeMaps = [];
     private array $referenceAttributeMaps = [];
     private array $associationMaps = [];
     private bool $hasTypedAttribute = false;
@@ -85,7 +85,8 @@ class ClassMap
             } else {
                 $this->updateAttributeMaps[$attributeName] = $attributeMap;
             }
-            if ($attributeMap->idGenerator != 'identity') {
+            //if (($attributeMap->idGenerator != 'identity') && ($attributeMap->reference == '')){
+            if ($attributeMap->reference == '') {
                 $this->insertAttributeMaps[$attributeName] = $attributeMap;
             }
             if ($attributeMap->reference != '') {
@@ -125,12 +126,10 @@ class ClassMap
         return $associationMap;
     }
 
-
 //    public function getCriteria(): ?RetrieveCriteria
 //    {
 //        return Manager::getPersistenceManager()->getCriteria($this);
 //    }
-
 
 
     /*
