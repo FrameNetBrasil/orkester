@@ -4,7 +4,7 @@ namespace Orkester\Persistence\Enum;
 
 enum Join: string
 {
-    case INNER = 'inner';
-    case LEFT = 'left';
-    case RIGHT = 'right';
+    case INNER = 'INNER';
+    case LEFT = 'LEFT';
+    case RIGHT = 'RIGHT';
 }
