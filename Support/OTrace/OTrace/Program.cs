@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Immutable;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -15,71 +16,51 @@ void StartWebSocketServer(IPAddress ip, int port)
     Console.WriteLine($"WebSocket Server started at {ws.Address}:{ws.Port}");
 }
 
-void ProcessTraceMessage(string tag, string message)
-{
-    if (!string.IsNullOrWhiteSpace(tag) && !string.IsNullOrWhiteSpace(message))
-    {
-        TraceSocketBehavior.Broadcast(JsonSerializer.Serialize(new
-        {
-            tag,
-            message
-        }, new JsonSerializerOptions
-        {
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-        }));        
-    }
-    
-    // Console.WriteLine(message);
-    // Console.WriteLine($"##########  {tag} END OF MESSAGE ##############");
-}
+const int BufferSize = 8192;
 
 void ReadTraceSocket(Socket socket)
 {
-    Span<byte> buffer = stackalloc byte[8192];
     var builder = new StringBuilder();
 
-    void CompleteMessage(string tag)
+    void Flush()
     {
-        if (builder.Length > 0)
+        if (builder.Length > 14)
         {
-            ProcessTraceMessage(tag, builder.ToString());
-            builder.Clear();
+            TraceSocketBehavior.Broadcast(builder.Remove(0, 14).ToString());
         }
+
+        builder.Clear();
     }
 
-    string tag = "";
-    while (true)
+    Span<byte> buffer = stackalloc byte[BufferSize];
+    try
     {
-        try
+        while (true)
         {
             var read = socket.Receive(buffer);
             if (read == 0) break;
+
             using var reader = new StringReader(Encoding.UTF8.GetString(buffer.Slice(0, read)));
             string? line;
             while ((line = reader.ReadLine()) != null)
             {
-                var match = Regex.Match(line, @"^\[([\w_:]+)\]");
+                var match = Regex.Match(line, @"^<record_start>");
                 if (match.Success)
                 {
-                    CompleteMessage(tag);
-                    tag = match.Groups[1].Value;
-                    builder.Append(line.Substring(tag.Length + 2));
-                }
-                else
-                {
-                    builder.Append(line);
+                    Flush();
                 }
 
-                builder.Append(Environment.NewLine);
+                builder.Append(line);
             }
         }
-        catch (SocketException)
-        {
-            break;
-        }
     }
-
-    CompleteMessage(tag);
+    catch (SocketException)
+    {
+    }
+    finally
+    {
+        Flush();
+    }
 }
 
 void StartTraceListener(IPAddress ip, int port)

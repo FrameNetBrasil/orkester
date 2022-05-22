@@ -2,34 +2,32 @@
 
 namespace Orkester\GraphQL\Operation;
 
-use GraphQL\Language\AST\FieldNode;
-use JetBrains\PhpStorm\ArrayShape;
-use Orkester\GraphQL\ExecutionContext;
-use Orkester\Persistence\Criteria\RetrieveCriteria;
+use Orkester\GraphQL\Result;
+use Orkester\GraphQL\Value\GraphQLValue;
 
-class TotalOperation extends AbstractOperation
+class TotalOperation implements \JsonSerializable
 {
 
-    public function __construct(ExecutionContext $context, protected FieldNode $node)
+    public function __construct(
+        protected GraphQLValue $operation,
+        protected ?string       $alias
+    )
     {
-        parent::__construct($context);
     }
 
-    public function getEndpointName(): string
+    public function execute(Result $result)
     {
-        return $this->node->name->value;
+        $criteria = $result->getCriteria(($this->operation)($result));
+        $name = $this->alias ?? '__total';
+        $result->addResult($name, $criteria->count());
     }
 
-    #[ArrayShape(['criteria' => "\Orkester\Persistence\Criteria\RetrieveCriteria", 'result' => "int"])]
-    public function execute(): ?array
+    public function jsonSerialize()
     {
-        /** @var RetrieveCriteria $criteria */
-        $criteria = $this->context->results[$this->getEndpointName()]['criteria'];
-        $criteria->setAlias('q');
-        QueryOperation::prepareForSubCriteria($criteria);
         return [
-            'criteria' => $criteria,
-            'result' => $criteria->count()
+            'name' => '__total',
+            'alias' => $this->alias,
+            'operation' => $this->operation->jsonSerialize()
         ];
     }
 }

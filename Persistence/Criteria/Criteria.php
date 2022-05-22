@@ -3,12 +3,11 @@
 namespace Orkester\Persistence\Criteria;
 
 use Closure;
-use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
-use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
-use Illuminate\Support\Arr;
-use Orkester\Manager;
+use Illuminate\Support\Str;
+use Monolog\Logger;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
@@ -16,9 +15,14 @@ use PhpMyAdmin\SqlParser\Parser;
 
 class Criteria extends \Illuminate\Database\Query\Builder
 {
-    private $model;
-    private $maps;
-    public $alias;
+    private string|Model $model;
+    /**
+     * @var ClassMap[] $maps
+     */
+    private array $maps;
+    protected Logger $logger;
+    public string $alias;
+    public ClassMap $classMap;
     public $aliases = [];
     public $fieldAlias = [];
     public $tableAlias = [];
@@ -32,13 +36,13 @@ class Criteria extends \Illuminate\Database\Query\Builder
 
 //private $connection;
 
-    public function __construct(ClassMap $classMap, $databaseName)
+    public function __construct(ClassMap $classMap, Connection $connection, Logger $logger)
     {
-        if ($databaseName == '') {
-            $databaseName = Manager::getOptions('db');
-        }
-        $connection = Model::getConnection($databaseName);
-        $this->model = $classMap->name;
+        $this->logger = $logger;
+        $this->setFetchAssoc($connection);
+//        $connection->getPdo()->setAttribute(\PDO::ATTR_DEFAULT_FETCH_MODE, \PDO::FETCH_ASSOC);
+        $this->classMap = $classMap;
+        $this->model = $classMap->model;
         $this->maps[$this->model] = $classMap;
 //        $this->connection = $db->connection();
 //        $this->query = $connection->table($this->tableName());
@@ -47,11 +51,19 @@ class Criteria extends \Illuminate\Database\Query\Builder
         $this->from($this->tableName());
     }
 
-    public function parseSelf() {
+    public function setFetchAssoc(Connection $connection)
+    {
+        $class = new \ReflectionClass(get_class($connection));
+        $class->getProperty('fetchMode')->setValue($connection, \PDO::FETCH_ASSOC);
+    }
+
+    public function parseSelf()
+    {
         $this->parseCriteria($this, $this);
     }
 
-    public function parseCriteria($query, $criteria) {
+    public function parseCriteria($query, Criteria $criteria)
+    {
         $criteria->processQuery = $query;
         if (isset($query->columns)) {
             $criteria->columns($query->columns);
@@ -77,24 +89,26 @@ class Criteria extends \Illuminate\Database\Query\Builder
         print_r($query->getBindings());
     }
 
-    public function get($columns = ['*']) {
+    public function get($columns = ['*'])
+    {
         $criteria = $this;
 
         $this->beforeQuery(function ($query) use ($criteria) {
             $criteria->parseCriteria($query, $criteria);
         });
-
         return parent::get($columns);
     }
 
-    public function insert(array $values) {
-        foreach($values as $i => $row) {
+    public function insert(array $values)
+    {
+        foreach ($values as $i => $row) {
             $this->upserts($values[$i]);
         }
         return parent::insert($values);
     }
 
-    public function update(array|object $values) {
+    public function update(array|object $values)
+    {
         if (is_object($values)) {
             $values = (array)$values;
         }
@@ -206,7 +220,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
 //        print_r($this->parameters);
         foreach ($bindings as $type => $bindingType) {
 //            print_r($type . PHP_EOL);
-            foreach($bindingType as $i => $binding) {
+            foreach ($bindingType as $i => $binding) {
 //                print_r($i . ' - ' . $binding . PHP_EOL);
                 if (str_starts_with($binding, ':')) {
                     $parameter = substr($binding, 1);
@@ -265,7 +279,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
 
     public function getAssociationMap($associationName, $className = ''): object
     {
-        print_r('get association map for = ' . $associationName . ' '. $className);
+        print_r('get association map for = ' . $associationName . ' ' . $className);
         if ($className != '') {
             $this->registerJoinModel($className);
             $associationMap = $this->maps[$className]->getAssociationMap($associationName);
@@ -410,8 +424,14 @@ class Criteria extends \Illuminate\Database\Query\Builder
 
     public function dump()
     {
-        print_r($this->toSql());
-        print_r($this->getBindings());
+        $sql = $this->toSql();
+
+        foreach ($this->getBindings() as $binding) {
+            $sql = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('"%s"', $binding)), $sql);
+        }
+        $this->logger->info($sql);
+//        print_r($this->toSql());
+//        print_r($this->getBindings());
         return $this;
     }
 

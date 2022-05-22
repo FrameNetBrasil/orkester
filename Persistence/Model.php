@@ -3,52 +3,50 @@
 namespace Orkester\Persistence;
 
 use Closure;
+use Illuminate\Container\Container as LaravelContainer;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Database\Connection;
+use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Arr;
+use Monolog\Logger;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
 use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Enum\Key;
 use Orkester\Manager;
-use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
-use \Illuminate\Database\Query\Builder;
 use Phpfastcache\Helper\Psr16Adapter;
+use Psr\Log\LoggerInterface;
 
 class Model
 {
     public static ClassMap $classMap;
     public static Psr16Adapter $cachedClassMaps;
-    public static Capsule $database;
-    private static array $connections = [];
+    public static Capsule $capsule;
     private static array $classMaps = [];
 
-    public static function init(): void
+    public static function init(array $dbConfigurations): void
     {
         self::$cachedClassMaps = Manager::getCache();
-        self::$database = Manager::getDatabase();
-    }
-
-    public static function getDatabase(): Capsule
-    {
-        return self::$database;
-    }
-
-    public static function addDatabase(string $databaseName)
-    {
-        Manager::addDatabase($databaseName);
-    }
-
-    public static function getConnection(string $databaseName)
-    {
-        if (!isset(self::$connections[$databaseName])) {
-            self::addDatabase($databaseName);
-            self::$connections[$databaseName] = self::$database->connection($databaseName);
+        self::$capsule = new Capsule();
+        self::$capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
+        self::$capsule->setAsGlobal();
+        self::$capsule->setFetchMode(\PDO::FETCH_ASSOC);
+        foreach ($dbConfigurations as $name => $conf) {
+            self::$capsule->addConnection([
+                'driver' => $conf['db'] ?? 'mysql',
+                'host' => $conf['host'] ?? 'localhost',
+                'database' => $conf['dbname'] ?? 'database',
+                'username' => $conf['user'] ?? 'root',
+                'password' => $conf['password'] ?? 'password',
+                'charset' => $conf['charset'] ?? 'utf8',
+                'collation' => $conf['collate'] ?? 'utf8_unicode_ci',
+                'prefix' => $conf['prefix'] ?? '',
+            ], $name);
         }
-        return self::$connections[$databaseName];
     }
 
     public static function getFileName(): string
@@ -65,8 +63,9 @@ class Model
         return md5($className . $lastModification);
     }
 
-    public static function getClassMap(string $className): ClassMap
+    public static function getClassMap(string|Model $className = null): ClassMap
     {
+        $className ??= static::class;
         if (!isset(self::$classMaps[$className])) {
             $key = self::getSignature($className);
             if (self::$cachedClassMaps->has($key)) {
@@ -147,7 +146,7 @@ class Model
     ): void
     {
         $fromClassMap = self::$classMaps[get_called_class()];
-        $fromClassName = $fromClassMap->name;
+        $fromClassName = $fromClassMap->model;
         $toClassName = $model;
         $toClassMap = self::getClassMap($toClassName);
         $associationMap = new AssociationMap($name);
@@ -195,7 +194,7 @@ class Model
     ): void
     {
         $fromClassMap = self::$classMaps[get_called_class()];
-        $fromClassName = $fromClassMap->name;
+        $fromClassName = $fromClassMap->model;
         $toClassName = $model;
         $toClassMap = self::getClassMap($toClassName);
         $associationMap = new AssociationMap($name);
@@ -266,32 +265,40 @@ class Model
         $fromClassMap->addAssociationMap($associationMap);
     }
 
-    public static function getCriteria(string $databaseName = ''): Criteria
+    public static function getCriteria(string $databaseName = null): Criteria
     {
+        $databaseName ??= Manager::getOptions('db');
+        $connection = self::$capsule->getConnection($databaseName);
         $classMap = self::getClassMap(get_called_class());
-        return new Criteria($classMap, $databaseName);
+
+        $container = Manager::getContainer();
+        return $container->call(
+            fn(Logger $logger) => new Criteria($classMap, $connection, $logger->withName('criteria'))
+        );
     }
 
     public static function getAssociation(string $associationChain, int $id): array
     {
         return static::getCriteria()
             ->select($associationChain)
-            ->where('id','=',$id)
+            ->where('id', '=', $id)
             ->get()
             ->toArray();
     }
 
-    public static function find(int $id) {
+    public static function find(int $id): ?object
+    {
         return static::getCriteria()->find($id);
     }
 
-    public static function save(object $object): ?int {
+    public static function save(object $object): ?int
+    {
         $classMap = self::getClassMap(get_called_class());
         $array = (array)$object;
         $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
         $key = $classMap->keyAttributeName;
-        $criteria = new Criteria($classMap, '');
-        $criteria->upsert([$fields],[$key],array_keys($fields));
+        $criteria = self::getCriteria();
+        $criteria->upsert([$fields], [$key], array_keys($fields));
         $lastInsertId = $criteria->getConnection()->getPdo()->lastInsertId();
         return $lastInsertId;
     }
@@ -302,13 +309,14 @@ class Model
         $key = $classMap->keyAttributeName;
         $criteria = static::getCriteria();
         return $criteria
-            ->where($key,'=', $id)
+            ->where($key, '=', $id)
             ->delete();
     }
 
-    public static function insert(array|object $data): ?int {
-        $classMap = self::getClassMap(get_called_class());
-        $criteria = new Criteria($classMap, '');
+    public static function insert(array|object $data): ?int
+    {
+        $classMap = static::getClassMap(get_called_class());
+        $criteria = static::getCriteria();
         if (is_object($data)) {
             $array = (array)$data;
             $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
@@ -320,33 +328,44 @@ class Model
         return $lastInsertId;
     }
 
-    public static function insertUsingCriteria(array $fields, Criteria $usingCriteria): ?int {
-        $classMap = self::getClassMap(get_called_class());
+    public static function insertUsingCriteria(array $fields, Criteria $usingCriteria): ?int
+    {
+        $classMap = static::getClassMap(get_called_class());
         $usingCriteria->parseSelf();
-        $criteria = new Criteria($classMap, '');
+        $criteria = static::getCriteria();
         $criteria->insertUsing($fields, $usingCriteria);
         $lastInsertId = $criteria->getConnection()->getPdo()->lastInsertId();
         return $lastInsertId;
     }
 
-    public static function update(object $object) {
+    public static function update(object $object)
+    {
         $classMap = self::getClassMap(get_called_class());
         $array = (array)$object;
         $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
         $key = $classMap->keyAttributeName;
         // key must be present
         if (isset($fields[$key])) {
-            $criteria = new Criteria($classMap, '');
-            $criteria->where($key,'=', $fields[$key])->update($fields);
+            $criteria = static::getCriteria();
+            $criteria->where($key, '=', $fields[$key])->update($fields);
         }
     }
 
-    public static function updateCriteria() {
+    public static function updateCriteria()
+    {
         return static::getCriteria();
     }
 
-    public static function deleteCriteria() {
+    public static function deleteCriteria()
+    {
         return static::getCriteria();
+    }
+
+    public static function getName(): string
+    {
+        $parts = explode('\\', static::class);
+        $className = $parts[count($parts) - 1];
+        return substr($className, 0, strlen($className) - 5);
     }
 
     /*

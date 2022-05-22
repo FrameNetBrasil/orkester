@@ -8,11 +8,11 @@
         <div>
             <div>
                 <label for="host">Host</label>
-                <input id="host" name="host" value="0.0.0.0">
+                <input id="host" name="host" value="localhost">
             </div>
             <div>
                 <label for="port">Port</label>
-                <input id="port" name="port" value="9998">
+                <input id="port" name="port" value="9991">
             </div>
         </div>
         <div style="display: flex; flex-direction: column;">
@@ -84,7 +84,6 @@
     let socket = undefined;
     let isConnected = false;
     connectButton.onclick = function () {
-        console.log('click')
         if (isConnected) {
             socket.close();
             isConnected = false;
@@ -99,7 +98,6 @@
                 [],
                 undefined
             )
-            console.log(socket)
             socket.addEventListener("open", event => {
                 isConnected = true;
                 connectButton.innerHTML = "Disconnect";
