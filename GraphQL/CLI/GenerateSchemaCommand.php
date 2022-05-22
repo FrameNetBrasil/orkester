@@ -135,7 +135,7 @@ EOD;
                 $toTypename = $this->getTypename($associationMap->getToClassName(), $output);
                 $cardinality = $associationMap->getCardinality() == 'oneToMany' ?
                     "[$toTypename!]!" : $toTypename;
-                $typedef .= "  {$associationMap->getName()}: {$cardinality}" . PHP_EOL;
+                $typedef .= "  {$associationMap->getName()}(where: Where$toTypename): {$cardinality}" . PHP_EOL;
             }
         }
         $typedef .= "}" . PHP_EOL;

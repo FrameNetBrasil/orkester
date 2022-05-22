@@ -20,6 +20,7 @@ use DI\Container;
 //use Orkester\Security\MSSL;
 //use Orkester\Services\Cache\MCacheFast;
 //use Orkester\Services\Http\MAjax;
+use Monolog\Logger;
 use Orkester\Handlers\HttpErrorHandler;
 use Orkester\Handlers\ShutdownHandler;
 use Orkester\Persistence\Model;
@@ -73,7 +74,7 @@ class Manager
      * Instância singleton.
      */
 //    static private $instance = NULL;
-    static private string $basePath;
+//    static private string $basePath;
     static private string $confPath;
     static private string $classPath;
 
@@ -145,7 +146,7 @@ class Manager
     {
         $reflection = new \ReflectionClass(\Composer\Autoload\ClassLoader::class);
         $basePath = dirname($reflection->getFileName(), 3);
-        self::$basePath = $basePath;
+//        self::$basePath = $basePath;
         self::$confPath = $basePath . '/conf';
         self::loadConf(self::$confPath . '/conf.php');
 
@@ -167,8 +168,8 @@ class Manager
             $containerBuilder->enableCompilation($tmpPath);
         }
         // Set up settings
-        $baseSettings = require self::$classPath . '/Conf/settings.php';
-        $baseSettings($containerBuilder);
+//        $baseSettings = require self::$classPath . '/Conf/settings.php';
+//        $baseSettings($containerBuilder);
         if (file_exists(self::$confPath . '/settings.php')) {
             $settings = require self::$confPath . '/settings.php';
             $settings($containerBuilder);
@@ -219,10 +220,12 @@ class Manager
         if (file_exists(self::$confPath . '/environment.php')) {
             self::loadConf(self::$confPath . '/environment.php');
         }
-        self::$log = new MLog(self::getConf('logs'));
+        self::$log = new MLog(self::$container->get(Logger::class));
         Manager::$data = (object)[];
 
-        self::initDatabase();
+        self::$log->log(Logger::INFO, "INIT");
+
+        Model::init(self::getConf('db'));
         register_shutdown_function("shutdown");
     }
 
@@ -314,10 +317,10 @@ class Manager
 //        return self::$appPath;
 //    }
 //
-//    public static function getConfPath(): string
-//    {
-//        return self::$confPath;
-//    }
+    public static function getConfPath(): string
+    {
+        return self::$confPath;
+    }
 //
 //    public static function getOrkesterPath(): string
 //    {
@@ -388,7 +391,7 @@ class Manager
     public static function getCache(): Psr16Adapter
     {
         if (is_null(self::$cache)) {
-            mtrace('=== creating cache');
+//            mtrace('creating cache');
             $driver = self::$conf['cache']['type'] ?: 'apcu';
             $cacheObj = new MCacheFast($driver);
             self::$cache = $cacheObj->getCache();
@@ -472,37 +475,6 @@ class Manager
 //        $class = self::$conf['mad'][$className];
 //        return new $class;
 //    }
-
-    public static function initDatabase()
-    {
-        self::$capsule = new Capsule;
-// Set the event dispatcher used by Eloquent models... (optional)
-        self::$capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
-// Make this Capsule instance available globally via static methods... (optional)
-        self::$capsule->setAsGlobal();
-// Setup the Eloquent ORM... (optional; unless you've used setEventDispatcher())
-        //$capsule->bootEloquent();
-        Model::init();
-    }
-
-    public static function getDatabase(): Capsule {
-        return self::$capsule;
-    }
-
-    public static function addDatabase(string $databaseName)
-    {
-        $data = self::getConf('db.' . $databaseName);
-        self::$capsule->addConnection([
-            'driver' => $data['db'] ?? 'mysql',
-            'host' => $data['host'] ?? 'localhost',
-            'database' => $data['dbname'] ?? 'database',
-            'username' => $data['user'] ?? 'root',
-            'password' => $data['password'] ?? 'password',
-            'charset' => $data['charset'] ?? 'utf8',
-            'collation' => $data['collate'] ?? 'utf8_unicode_ci',
-            'prefix' => $data['prefix'] ?? '',
-        ], $databaseName);
-    }
 //    public static function getDatabaseConfig(string $key, ?string $databaseName = null): mixed
 //    {
 //        $dbName = $databaseName ?? Manager::getOptions('db');

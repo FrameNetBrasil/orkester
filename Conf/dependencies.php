@@ -1,7 +1,13 @@
 <?php
 declare(strict_types=1);
 
+use Carbon\Carbon;
 use DI\ContainerBuilder;
+use Monolog\Formatter\LineFormatter;
+use Monolog\Handler\SocketHandler;
+use Monolog\Handler\WhatFailureGroupHandler;
+use Orkester\Manager;
+use Orkester\Services\OTraceFormatter;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -21,6 +27,7 @@ use Monolog\Processor\UidProcessor;
 //use Orkester\Manager;
 //use Orkester\MVC\MContext;
 use Orkester\Services\MLog;
+
 //use Orkester\Services\MSession;
 //use Orkester\Services\Http\MAjax;
 //use Orkester\Services\Http\MRequest;
@@ -29,61 +36,48 @@ use Orkester\Services\MLog;
 
 return function (ContainerBuilder $containerBuilder) {
     $containerBuilder->addDefinitions([
-        LoggerInterface::class => function (ContainerInterface $c) {
-            $settings = $c->get('settings');
+        Logger::class => function (ContainerInterface $c) {
+            $lineFormat = "[%datetime%] %channel%.[%level_name%]%context.tag%: %message%";
+            $dateFormat = "Y/m/d H:i:s";
+            $conf = Manager::getConf("logs");
+            $handlers = [];
 
-            $loggerSettings = $settings['logger'];
-            $logger = new Logger($loggerSettings['name']);
+            $logger = new Logger($conf['channel'] ?? null);
 
-            $processor = new UidProcessor();
-            $logger->pushProcessor($processor);
+            if ($conf['stdout'] ?? false) {
+                $stdoutHandler = new StreamHandler('php://stdout');
+                $stdoutHandler->setFormatter(new LineFormatter("[%level_name%]%context.tag%: %message%"));
+                $handlers[] = $stdoutHandler;
+            }
 
-            $handler = new StreamHandler($loggerSettings['path'], $loggerSettings['level']);
-            $logger->pushHandler($handler);
+            if ($port = $conf['port'] ?? false) {
+                $strict = $conf['strict'] ?? false;
+                if (!$strict || $strict == $_SERVER['REMOTE_ADDR']) {
+                    $peer = $conf['peer'] ?? '';
+                    $socketHandler =
+                        (new SocketHandler("tcp://$peer:$port"))
+                            ->setFormatter(new OTraceFormatter())
+                            ->setPersistent(true);
+                    $handlers[] = $socketHandler;
+                }
+            }
 
+            $dir = $conf['path'] ?? '';
+            if (!file_exists($dir)) {
+                mkdir($dir, recursive: true);
+            }
+            $file = $dir . DIRECTORY_SEPARATOR .
+                ($conf['channel'] ?? '') . '_' .
+                Carbon::now()->format('Y_m_d_H') . '.log';
+
+            $fileHandler =
+                (new StreamHandler($file, filePermission: 644))
+                    ->setFormatter(new LineFormatter($lineFormat, $dateFormat));
+            $handlers[] = $fileHandler;
+
+            $groupHandler = new WhatFailureGroupHandler($handlers);
+            $logger->pushHandler($groupHandler);
             return $logger;
         },
-
-//        MRequest::class => create(),
-//        MResponse::class => create(),
-//        MAjax::class => function() {
-//            $ajax = new MAjax();
-//            $ajax->initialize(Manager::getOptions('charset'));
-//            return $ajax;
-//        },
-//        MLog::class => create(),
-//        MSession::class => create(),
-//        MContext::class => DI\autowire(),
-//        MDatabase::class => create(),
-//        MPage::class => create(),
-//        'PersistenceBackend' => function() {
-//            return new PersistenceSQL();
-//        },
-//        'PersistentConfigLoader' => function() {
-//            return new \Orkester\Persistence\PHPConfigLoader();
-//        },
-//        'PersistentManager' => function() {
-//            return PersistentManager::getInstance();
-//        },
-//        'app\\*Controller' => function (ContainerInterface $c, RequestedEntry $entry) {
-//            $class = $entry->getName();
-//            $reflection = new ReflectionClass($class);
-//            $params = $reflection->getConstructor()->getParameters();
-//            $constructor = array();
-//            foreach ($params as $param) {
-//                $constructor[] = $c->get($param->getClass()->getName());
-//            }
-//            return new $class(...$constructor);
-//        },
-//        'app\\*Service' => function (ContainerInterface $c, RequestedEntry $entry) {
-//            $class = $entry->getName();
-//            $reflection = new ReflectionClass($class);
-//            $params = $reflection->getConstructor()->getParameters();
-//            $constructor = array();
-//            foreach ($params as $param) {
-//                $constructor[] = $c->get($param->getClass()->getName());
-//            }
-//            return new $class(...$constructor);
-//        },
     ]);
 };

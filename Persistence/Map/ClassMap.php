@@ -10,19 +10,27 @@ namespace Orkester\Persistence\Map;
 //use Orkester\Utils\MUtil;
 
 use Orkester\Manager;
+use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Enum\Key;
+use Orkester\Persistence\Model;
 
 class ClassMap
 {
 
-    public string $name;
+    public string|Model $model;
     public string $superClassName = '';
     private array $fieldMaps = [];
+    /**
+     * @var AttributeMap[] $attributeMaps
+     */
     public array $attributeMaps = [];
     private array $updateAttributeMaps = [];
     public array $insertAttributeMaps = [];
     private array $referenceAttributeMaps = [];
+    /**
+     * @var AssociationMap[] $associationMaps
+     */
     private array $associationMaps = [];
     private bool $hasTypedAttribute = false;
     public string $tableName = '';
@@ -40,9 +48,9 @@ class ClassMap
 //    private string $tableAlias;
 
 
-    public function __construct(string $name)
+    public function __construct(string|Model $name)
     {
-        $this->name = $name;
+        $this->model = $name;
     }
 
 //    public function getName(): string
@@ -98,7 +106,7 @@ class ClassMap
         }
     }
 
-    public function getAttributeMap(string $name, bool $areSuperClassesIncluded = false): object|null
+    public function getAttributeMap(string $name, bool $areSuperClassesIncluded = false): AttributeMap|null
     {
         $attributeMap = $this->attributeMaps[$name] ?? null;
         if ($areSuperClassesIncluded) {
@@ -126,10 +134,25 @@ class ClassMap
         return $associationMap;
     }
 
-//    public function getCriteria(): ?RetrieveCriteria
-//    {
-//        return Manager::getPersistenceManager()->getCriteria($this);
-//    }
+    public function getAttributeMapChain(string $path): ?AttributeMap
+    {
+        $parts = explode('.', $path);
+        $classMap = $this;
+        for ($i = 0; $i < count($parts) - 1; $i++) {
+            /** @var AssociationMap $associationMap */
+            if ($associationMap = $classMap->getAssociationMap($parts[$i])) {
+                $classMap = $associationMap->toClassMap;
+            } else {
+                return null;
+            }
+        }
+        return $classMap->getAttributeMap(last($parts));
+    }
+
+    public function getCriteria(): Criteria
+    {
+        return $this->model::getCriteria();
+    }
 
 
     /*
