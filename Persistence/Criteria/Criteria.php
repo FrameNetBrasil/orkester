@@ -8,6 +8,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Str;
 use Monolog\Logger;
+use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
@@ -27,6 +28,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
     public $fieldAlias = [];
     public $tableAlias = [];
     public $listJoin = [];
+    public $associationJoin = [];
     public $aliasCount = 0;
     public $parameters = [];
     public $originalBindings = null;
@@ -287,6 +289,12 @@ class Criteria extends \Illuminate\Database\Query\Builder
             $associationMap = $this->maps[$this->model]->getAssociationMap($associationName);
         }
         return $associationMap;
+    }
+
+    public function setAssociationType(string $association, Join $type): Criteria
+    {
+        $this->associationJoin[$association] = $type;
+        return $this;
     }
 
     private function resolveField($context, $field, $alias = '')

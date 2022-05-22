@@ -83,8 +83,12 @@ class Operand
         if (isset($this->criteria->aliases[$parts[0]]) || ($parts[0] == $tableName)) {
             $field = $parts[0] . '.' . $this->criteria->columnName($baseClass, $parts[1]);
         } else {
+            $chain = implode('.', array_slice($parts, 0, -1));
+            $associationJoinType = $this->criteria->associationJoin[$chain] ?? Join::INNER;
+            print_r('---' . $chain . ' - ' . $associationJoinType->value . PHP_EOL);
             $alias = $tableName;
             $joinIndex = '';
+            $last = $n - 1;
             for ($i = 0; $i < $n; $i++) {
                 $associationName = $parts[$i];
                 $joinIndex .= $associationName;
@@ -100,15 +104,19 @@ class Operand
                         $fromField = $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
                         $associativeTableName = $associationMap->associativeTable;
                         $associativeTableAlias = 'a' . ++$this->criteria->aliasCount;
+                        $joinType = ($i == $last) ? $associationJoinType : $associationMap->joinType;
+                        match ($joinType) {
+                            Join::INNER => $this->criteria->processQuery->join($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
+                            Join::LEFT => $this->criteria->processQuery->leftJoin($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
+                            Join::RIGHT =>$this->criteria->processQuery->rigthJoin($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
+                        };
                         $this->criteria->processQuery
-                            ->join($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField)
                             ->join($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $toField, '=', $toAlias . '.' . $toField);
-
                     } else {
-                        print_r('x' . $associationMap->toClassName . ' ' . $associationMap->fromClassName . PHP_EOL);
                         $toField = $toAlias . '.' . $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
                         $fromField = $alias . '.' . $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
-                        match ($associationMap->joinType) {
+                        $joinType = ($i == $last) ? $associationJoinType : $associationMap->joinType;
+                        match ($joinType) {
                             Join::INNER => $this->criteria->processQuery->join($toTableName . ' as ' . $toAlias, $fromField, '=', $toField),
                             Join::LEFT => $this->criteria->processQuery->leftJoin($toTableName . ' as ' . $toAlias, $fromField, '=', $toField),
                             Join::RIGHT => $this->criteria->processQuery->rightJoin($toTableName . ' as ' . $toAlias, $fromField, '=', $toField),

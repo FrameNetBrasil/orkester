@@ -7,6 +7,7 @@ use GraphQL\Language\AST\VariableNode;
 use Orkester\GraphQL\Context;
 use Orkester\GraphQL\Result;
 use Orkester\Persistence\Criteria\Criteria;
+use Orkester\Persistence\Enum\Join;
 
 class JoinArgument extends AbstractArgument implements \JsonSerializable
 {
@@ -15,7 +16,8 @@ class JoinArgument extends AbstractArgument implements \JsonSerializable
     {
         foreach (($this->value)($result) as $join) {
             foreach($join as $joinType => $association) {
-                $criteria->setAssociationType($association, $joinType);
+                $type = Join::from($joinType);
+                $criteria->setAssociationType($association, $type);
             }
         }
         return $criteria;
