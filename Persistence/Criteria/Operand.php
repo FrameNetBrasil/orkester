@@ -36,7 +36,6 @@ class Operand
 
     public function resolveOperand(): string|Expression
     {
-        print_r($this->field);
         if (is_string($this->field)) {
             if (is_numeric($this->field)) {
                 return $this->field;
@@ -70,7 +69,6 @@ class Operand
                 return "(" . implode(',', $arguments) . ")";
             },
             $field);
-        print_r($output);
         return new Expression($output);
     }
 
@@ -85,7 +83,6 @@ class Operand
         } else {
             $chain = implode('.', array_slice($parts, 0, -1));
             $associationJoinType = $this->criteria->associationJoin[$chain] ?? Join::INNER;
-            print_r('---' . $chain . ' - ' . $associationJoinType->value . PHP_EOL);
             $alias = $tableName;
             $joinIndex = '';
             $last = $n - 1;
@@ -135,8 +132,8 @@ class Operand
     public function resolveOperandParameter()
     {
         $parameter = substr($this->field, 1);
-        print_r(PHP_EOL. 'parameter ' . $parameter . PHP_EOL);
-        print_r($this->criteria->parameters);
+//        print_r(PHP_EOL. 'parameter ' . $parameter . PHP_EOL);
+//        print_r($this->criteria->parameters);
         if (isset($this->criteria->parameters[$parameter])) {
             return $this->criteria->parameters[$parameter];
         }
