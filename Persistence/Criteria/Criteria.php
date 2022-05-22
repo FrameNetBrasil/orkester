@@ -86,9 +86,9 @@ class Criteria extends \Illuminate\Database\Query\Builder
             $criteria->joins($query->joins);
         }
         $criteria->bindings($query->bindings);
-        print_r('==============================x' . PHP_EOL);
+//        print_r('==============================x' . PHP_EOL);
         print_r($query->grammar->compileSelect($query));
-        print_r($query->getBindings());
+//        print_r($query->getBindings());
     }
 
     public function get($columns = ['*'])
@@ -120,7 +120,6 @@ class Criteria extends \Illuminate\Database\Query\Builder
 
     public function columns(array &$columns)
     {
-        print_r($columns);
         foreach ($columns as $i => $column) {
             if ($column == '*') {
                 $allColumns = array_keys($this->maps[$this->model]->attributeMaps);
@@ -130,7 +129,6 @@ class Criteria extends \Illuminate\Database\Query\Builder
             } elseif (str_contains($column, ',')) {
                 $parser = new Parser("select " . $column);
                 foreach ($parser->statements[0]->expr as $j => $exp) {
-                    print_r('exp ' . $exp->expr . PHP_EOL);
                     $columns[$j] = $this->resolveField('select', $exp->expr, $exp->alias);
                 }
             } else {
@@ -174,8 +172,6 @@ class Criteria extends \Illuminate\Database\Query\Builder
 
     public function havings(array &$havings)
     {
-        print_r('havings');
-        print_r($havings);
         foreach ($havings as $i => $having) {
             $havings[$i]['column'] = $this->resolveField('having', $having['column']);
         }
@@ -281,7 +277,6 @@ class Criteria extends \Illuminate\Database\Query\Builder
 
     public function getAssociationMap($associationName, $className = ''): object
     {
-        print_r('get association map for = ' . $associationName . ' ' . $className);
         if ($className != '') {
             $this->registerJoinModel($className);
             $associationMap = $this->maps[$className]->getAssociationMap($associationName);
