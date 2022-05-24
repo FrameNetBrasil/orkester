@@ -338,7 +338,7 @@ class QueryOperation extends AbstractOperation
         $removedParameters = $this->prepareForSubCriteria($criteria);
 
         foreach ($this->subOperations as $associationName => $operation) {
-            $operation->parameters = &$this->parameters;
+//            $operation->parameters = &$this->parameters;
             $associationMap = $classMap->getAssociationMap($associationName);
             $fromKey = $associationMap->getFromKey();
             $fk = $associationMap->getToKey();
