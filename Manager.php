@@ -24,11 +24,11 @@ use Monolog\Logger;
 use Orkester\Handlers\HttpErrorHandler;
 use Orkester\Handlers\ShutdownHandler;
 use Orkester\Persistence\Model;
-use Orkester\Persistence\PersistenceManager;
+//use Orkester\Persistence\PersistenceManager;
 use Orkester\Services\MCacheFast;
 use Orkester\Services\MLog;
 
-//use Orkester\Services\MSession;
+use Orkester\Services\MSession;
 //use Orkester\UI\MBasePainter;
 //use Orkester\Utils\MUtil;
 use Phpfastcache\Helper\Psr16Adapter;
@@ -89,7 +89,7 @@ class Manager
 
 //    private static ?RequestInterface $request;
 
-//    static private string $appPath;
+    static private string $appPath;
 //    static private string $publicPath;
 //    static private string $varPath;
 //    static private string $baseURL;
@@ -114,7 +114,7 @@ class Manager
     /**
      * @var MSession
      */
-//    private static ?MSession $session = null;
+    private static ?MSession $session = null;
 //    private static $returnType;
 //    private static $persistence;
 
@@ -150,9 +150,9 @@ class Manager
         self::$confPath = $basePath . '/conf';
         self::loadConf(self::$confPath . '/conf.php');
 
-//        $optAddDir = self::getOptions('appDir');
-//        $appDir = empty($optAddDir) ? 'app' : $optAddDir;
-//        self::$appPath = $basePath . "/$appDir";
+        $optAddDir = self::getOptions('appDir');
+        $appDir = empty($optAddDir) ? 'app' : $optAddDir;
+        self::$appPath = $basePath . "/$appDir";
 
 //        self::$publicPath = $basePath . '/public';
         self::$classPath = $basePath . '/vendor/elymatos/orkester';
@@ -214,9 +214,9 @@ class Manager
 //        if (file_exists(self::$confPath . '/arangodb.php')) {
 //            self::loadConf(self::$confPath . '/arangodb.php');
 //        }
-//        if (file_exists(self::$confPath . '/api.php')) {
-//            self::loadConf(self::$confPath . '/api.php');
-//        }
+        if (file_exists(self::$confPath . '/api.php')) {
+            self::loadConf(self::$confPath . '/api.php');
+        }
         if (file_exists(self::$confPath . '/environment.php')) {
             self::loadConf(self::$confPath . '/environment.php');
         }
@@ -312,11 +312,11 @@ class Manager
 //        return self::$basePath;
 //    }
 //
-//    public static function getAppPath(): string
-//    {
-//        return self::$appPath;
-//    }
-//
+    public static function getAppPath(): string
+    {
+        return self::$appPath;
+    }
+
     public static function getConfPath(): string
     {
         return self::$confPath;
@@ -577,10 +577,10 @@ class Manager
 //        return self::$persistence[$datasource];
 //    }
 
-//    public static function setSession(MSession $session): void
-//    {
-//        self::$session = $session;
-//    }
+    public static function setSession(MSession $session): void
+    {
+        self::$session = $session;
+    }
 //
 //    public static function getSession(): MSession|null
 //    {
@@ -617,11 +617,11 @@ class Manager
 //        return self::getBaseURL($absolute) . ($file ? '/' . $file : '');
 //    }
 //
-//    public static function setData(object $data): void
-//    {
-//        self::$data = $data;
-//    }
-//
+    public static function setData(object $data): void
+    {
+        self::$data = $data;
+    }
+
     public static function getData(): object
     {
         return self::$data;
