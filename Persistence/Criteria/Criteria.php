@@ -41,7 +41,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
     public function __construct(ClassMap $classMap, Connection $connection, Logger $logger)
     {
         $this->logger = $logger;
-        $this->setFetchAssoc($connection);
+//        $this->setFetchAssoc($connection);
 //        $connection->getPdo()->setAttribute(\PDO::ATTR_DEFAULT_FETCH_MODE, \PDO::FETCH_ASSOC);
         $this->classMap = $classMap;
         $this->model = $classMap->model;
@@ -87,8 +87,8 @@ class Criteria extends \Illuminate\Database\Query\Builder
         }
         $criteria->bindings($query->bindings);
 //        print_r('==============================x' . PHP_EOL);
-        print_r($query->grammar->compileSelect($query));
-//        print_r($query->getBindings());
+        print_r($query->grammar->compileSelect($query) . PHP_EOL);
+        print_r($query->getBindings());
     }
 
     public function get($columns = ['*'])

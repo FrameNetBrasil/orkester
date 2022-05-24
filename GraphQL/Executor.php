@@ -90,6 +90,7 @@ class Executor
 
     protected function parseMutation(FieldNode $root, Context $context)
     {
+        mdump($root->name);
         if (preg_match("/insert([\w\d]+)/", $root->name->value, $matches)) {
             $model = $this->configuration->getModel(lcfirst($matches[1]));
             $operation = UpsertParser::fromNode($root, $model, $context, true);
