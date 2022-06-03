@@ -87,8 +87,8 @@ class Criteria extends \Illuminate\Database\Query\Builder
         }
         $criteria->bindings($query->bindings);
 //        print_r('==============================x' . PHP_EOL);
-        print_r($query->grammar->compileSelect($query) . PHP_EOL);
-        print_r($query->getBindings());
+//        print_r($query->grammar->compileSelect($query) . PHP_EOL);
+//        print_r($query->getBindings());
     }
 
     public function get($columns = ['*'])
@@ -266,17 +266,24 @@ class Criteria extends \Illuminate\Database\Query\Builder
 
     public function columnName(string $className, string $attribute)
     {
-//        print_r('attribute to column = ' . $className . '.' . $attribute . PHP_EOL);
+//        mdump('attribute to column = ' . $className . '.' . $attribute . PHP_EOL);
         return ($attribute == '*') ? '*' : $this->maps[$className ?: $this->model]->getAttributeMap($attribute)->columnName;
     }
 
-    public function getAttributeMap(string $attribute): ?AttributeMap
+    public function getAttributeMap(string $attributeName, $className = ''): ?AttributeMap
     {
-        return $this->maps[$this->model]->getAttributeMap($attribute);
+        if ($className != '') {
+            $this->registerJoinModel($className);
+            $attributeMap = $this->maps[$className]->getAttributeMap($attributeName);
+        } else {
+            $attributeMap = $this->maps[$this->model]->getAttributeMap($attributeName);
+        }
+        return $attributeMap;
     }
 
     public function getAssociationMap($associationName, $className = ''): object
     {
+//        mdump('getAssociationMap  className: ' . ($className != '' ? $className : $this->model) . '.' . $associationName . PHP_EOL);
         if ($className != '') {
             $this->registerJoinModel($className);
             $associationMap = $this->maps[$className]->getAssociationMap($associationName);
