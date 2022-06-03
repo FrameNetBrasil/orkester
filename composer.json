@@ -26,8 +26,8 @@
         "composer/composer": "^2.2",
         "webonyx/graphql-php": "^14.11",
         "phpmyadmin/sql-parser": "^5.5",
-        "illuminate/database": "^9.13",
-        "illuminate/events": "^9.11"
+        "illuminate/database": "^8",
+        "illuminate/events": "^8"
     },
     "autoload": {
         "files": [
