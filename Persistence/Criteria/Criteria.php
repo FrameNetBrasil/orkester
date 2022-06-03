@@ -2,13 +2,12 @@
 
 namespace Orkester\Persistence\Criteria;
 
-use Closure;
 use Illuminate\Database\Connection;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Str;
 use Monolog\Logger;
 use Orkester\Persistence\Enum\Join;
+use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
@@ -33,71 +32,38 @@ class Criteria extends \Illuminate\Database\Query\Builder
     public $parameters = [];
     public $originalBindings = null;
 
-//    public Builder $query;
-    public Builder $processQuery;
-
-//private $connection;
-
     public function __construct(ClassMap $classMap, Connection $connection, Logger $logger)
     {
         $this->logger = $logger;
-//        $this->setFetchAssoc($connection);
-//        $connection->getPdo()->setAttribute(\PDO::ATTR_DEFAULT_FETCH_MODE, \PDO::FETCH_ASSOC);
         $this->classMap = $classMap;
         $this->model = $classMap->model;
         $this->maps[$this->model] = $classMap;
-//        $this->connection = $db->connection();
-//        $this->query = $connection->table($this->tableName());
         $connection->table($this->tableName());
         parent::__construct($connection);
         $this->from($this->tableName());
     }
 
-    public function setFetchAssoc(Connection $connection)
+    public function applyBeforeQueryCallbacks()
     {
-        $class = new \ReflectionClass(get_class($connection));
-        $class->getProperty('fetchMode')->setValue($connection, \PDO::FETCH_ASSOC);
-    }
-
-    public function parseSelf()
-    {
-        $this->parseCriteria($this, $this);
-    }
-
-    public function parseCriteria($query, Criteria $criteria)
-    {
-        $criteria->processQuery = $query;
-        if (isset($query->columns)) {
-            $criteria->columns($query->columns);
-        }
-        if (isset($query->wheres)) {
-            $criteria->wheres($query->wheres);
-        }
-        if (isset($query->groups)) {
-            $criteria->groups($query->groups);
-        }
-        if (isset($query->havings)) {
-            $criteria->havings($query->havings);
-        }
-        if (isset($query->orders)) {
-            $criteria->orders($query->orders);
-        }
-        if (isset($query->joins)) {
-            $criteria->joins($query->joins);
-        }
-        $criteria->bindings($query->bindings);
+        $this->columns($this->columns);
+        $this->groups($this->groups);
+        $this->wheres($this->wheres);
+        $this->havings($this->havings);
+        $this->orders($this->orders);
+        $this->bindings($this->bindings);
 //        print_r('==============================x' . PHP_EOL);
-//        print_r($query->grammar->compileSelect($query) . PHP_EOL);
-//        print_r($query->getBindings());
+//        print_r($this->grammar->compileSelect($this) . PHP_EOL);
+//        print_r($this->getBindings());
+        parent::applyBeforeQueryCallbacks();
     }
 
     public function get($columns = ['*'])
     {
         $criteria = $this;
 
-        $this->beforeQuery(function ($query) use ($criteria) {
-            $criteria->parseCriteria($query, $criteria);
-        });
+//        $this->beforeQuery(function ($query) use ($criteria) {
+//            $criteria->parseCriteria($query, $criteria);
+//        });
         return parent::get($columns);
     }
 
@@ -118,9 +84,9 @@ class Criteria extends \Illuminate\Database\Query\Builder
         parent::update($values);
     }
 
-    public function columns(array &$columns)
+    public function columns(?array &$columns)
     {
-        foreach ($columns as $i => $column) {
+        foreach ($columns ?? [] as $i => $column) {
             if ($column == '*') {
                 $allColumns = array_keys($this->maps[$this->model]->attributeMaps);
                 foreach ($allColumns as $j => $aColumn) {
@@ -139,7 +105,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
 
     public function wheres(array &$wheres)
     {
-        foreach ($wheres as $i => $where) {
+        foreach ($wheres ?? [] as $i => $where) {
             if ($where['type'] == 'Column') {
                 $wheres[$i]['first'] = $this->resolveField('where', $where['first']);
                 $wheres[$i]['second'] = $this->resolveField('where', $where['second']);
@@ -155,10 +121,10 @@ class Criteria extends \Illuminate\Database\Query\Builder
         }
     }
 
-    public function groups(array &$groups)
+    public function groups(?array &$groups)
     {
 //        print_r($groups);
-        foreach ($groups as $i => $group) {
+        foreach ($groups ?? [] as $i => $group) {
             if (str_contains($group, ',')) {
                 $parser = new Parser("groupBy " . $group);
                 foreach ($parser->statements[0]->expr as $j => $exp) {
@@ -170,24 +136,17 @@ class Criteria extends \Illuminate\Database\Query\Builder
         }
     }
 
-    public function havings(array &$havings)
+    public function havings(?array &$havings)
     {
-        foreach ($havings as $i => $having) {
+        foreach ($havings ?? [] as $i => $having) {
             $havings[$i]['column'] = $this->resolveField('having', $having['column']);
         }
     }
 
-    public function joins(array &$joins)
-    {
-//        print_r($joins);
-        foreach ($joins as $i => $join) {
-        }
-    }
-
-    public function orders(array &$orders)
+    public function orders(?array &$orders)
     {
 //        print_r($orders);
-        foreach ($orders as $i => $order) {
+        foreach ($orders ?? [] as $i => $order) {
             if ($order['column'] == 'id') {
                 $orders[$i]['column'] = $this->resolveField('order', $this->maps[$this->model]->keyAttributeName);
             } else {
@@ -196,9 +155,9 @@ class Criteria extends \Illuminate\Database\Query\Builder
         }
     }
 
-    public function upserts(array &$values)
+    public function upserts(?array &$values)
     {
-        foreach ($values as $name => $value) {
+        foreach ($values ?? [] as $name => $value) {
             $fieldName = $this->resolveField('upsert', $name);
             if ($fieldName != $name) {
                 unset($values[$name]);
@@ -281,7 +240,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
         return $attributeMap;
     }
 
-    public function getAssociationMap($associationName, $className = ''): object
+    public function getAssociationMap($associationName, $className = ''): ?AssociationMap
     {
 //        mdump('getAssociationMap  className: ' . ($className != '' ? $className : $this->model) . '.' . $associationName . PHP_EOL);
         if ($className != '') {
@@ -374,7 +333,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
     {
         $tableName = $this->tableName($className);
         $this->aliases[$alias] = $tableName;
-        $this->processQuery = $this;
+//        $this->processQuery = $this;
         $fromField = $this->resolveField('where', $first);
         $toField = $this->resolveField('where', $second);
         $this->join($tableName . ' as ' . $alias, $fromField, $operator, $toField, $type, $where);
@@ -391,7 +350,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
 //        $alias = $criteria->alias;
 //        $this->alias($alias, $criteria->model);
         $expression = '(' . $query . ') as ' . $as;
-        $this->processQuery = $this;
+//        $this->processQuery = $this;
         $this->addBinding($bindings, 'join');
         $fromField = $this->resolveField('where', $first);
         $toField = $this->resolveField('where', $second);
@@ -432,17 +391,25 @@ class Criteria extends \Illuminate\Database\Query\Builder
         return $this;
     }
 
-    public function dump()
+    public function toSql(): string
     {
-        $sql = $this->toSql();
-
+        $sql = parent::toSql();
+        $sqlLog = $sql;
         foreach ($this->getBindings() as $binding) {
-            $sql = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('"%s"', $binding)), $sql);
+            $sqlLog = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('"%s"', $binding)), $sqlLog);
         }
-        $this->logger->info($sql);
-//        print_r($this->toSql());
-//        print_r($this->getBindings());
-        return $this;
+        $this->logger->info($sqlLog);
+        return $sql;
+    }
+
+    public function beginTransaction()
+    {
+        $this->connection->beginTransaction();
+    }
+
+    public function commit()
+    {
+        $this->connection->commit();
     }
 
 }

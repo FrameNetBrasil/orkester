@@ -46,7 +46,7 @@ class SelectionSetParser
                 $associatedName = $selectionNode->alias?->value ?? $name;
                 $this->associatedQueries[] = new AssociatedQueryOperation($associatedName, $query, $associationMap);
                 $fromKey = $associationMap->fromKey;
-                $this->forcedSelection[$fromKey] = ($this->forcedSelection[$fromKey] ?? 0) + 1;
+                $this->forcedSelection[] = $fromKey;
                 $operator = new FieldSelection($fromKey);
             }
         }
@@ -66,6 +66,12 @@ class SelectionSetParser
                 $fragment = $this->context->getFragment($selectionNode->name->value);
                 $this->parse($fragment->selectionSet);
             }
+        }
+        $key = $this->model->getKeyAttributeName();
+        if (!empty($this->associatedQueries) && !array_key_exists($key, $this->selectionSet)) {
+            $operator = new FieldSelection($key, $this->model->getKeyAttributeName());
+            $this->forcedSelection[] = $key;
+            $this->selectionSet[$key] = $operator;
         }
         return new SelectionSet(
             $this->selectionSet ?? [],

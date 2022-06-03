@@ -225,7 +225,9 @@ class Manager
 
         self::$log->log(Logger::INFO, "INIT");
 
-        Model::init(self::getConf('db'));
+        $dbConf = self::getConf('db');
+        $fetchStyle = self::getOptions('fetchStyle');
+        Model::init($dbConf, $fetchStyle);
         register_shutdown_function("shutdown");
     }
 

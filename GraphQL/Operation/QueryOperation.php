@@ -51,8 +51,6 @@ class QueryOperation implements \JsonSerializable
 
         $associationMap->toKey = $toKey;
         $associationMap->fromKey = $fromKey;
-//        $associationMap->setKeysAttributes();
-//        mdump($fromClassMap->name);
         $fromClassMap->addAssociationMap($associationMap);
         return $associationMap;
     }
@@ -63,21 +61,20 @@ class QueryOperation implements \JsonSerializable
             $associationMap = $associatedQuery->getAssociationMap();
             $classMap = $associationMap->fromClassMap;
             $fromKey = $associationMap->fromKey;
+            $fromIds = array_map(fn($row) => $row[$fromKey], $rows);
+
             $fk = $associationMap->toKey;
-            $this::setupForSubQuery($criteria);
-            $criteria->select($fromKey);
             $toClassMap = $associationMap->toClassMap;
             $associatedCriteria = $toClassMap->getCriteria();
-//            $associatedCriteria->parameters($criteria->getParameters());
             $cardinality = $associationMap->cardinality;
 
             if ($cardinality == Association::ONE) {
                 $newAssociation = $this::createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey);
                 $joinField = $newAssociation->name . "." . $associationMap->fromKey;
-                $associatedCriteria->where($joinField, 'IN', $criteria);
+                $associatedCriteria->where($joinField, 'IN', $fromIds);
                 $associatedCriteria->select($joinField);
             } else if ($cardinality == Association::MANY) {
-                $associatedCriteria->where($fk, 'IN', $criteria);
+                $associatedCriteria->where($fk, 'IN', $fromIds);
                 $associatedCriteria->select($fk);
             } else {
                 throw new EGraphQLException([$cardinality->value => 'Unhandled cardinality']);
@@ -85,16 +82,26 @@ class QueryOperation implements \JsonSerializable
 
             $queryResult = $associatedQuery->getOperation()->executeFrom($associatedCriteria, $result, false);
             $isFKSelected = $associatedQuery->getOperation()->selectionSet->isSelected($fk);
+            mdump($queryResult);
             $subRows = group_by($queryResult, $fk, !$isFKSelected);
             $associatedName = $associatedQuery->getName();
-            $shouldRemove = --$this->selectionSet->forcedSelection[$fromKey] == 0;
             foreach ($rows as &$row) {
                 $value = $subRows[$row[$fromKey] ?? ''] ?? [];
                 if ($cardinality == Association::ONE) {
                     $value = $value[0] ?? null;
                 }
                 $row[$associatedName] = $value;
-                if ($shouldRemove) unset($row[$fromKey]);
+            }
+        }
+    }
+
+    public function clearForcedSelection(array &$rows)
+    {
+        if (!empty($this->selectionSet->forcedSelection)) {
+            foreach ($rows as &$row) {
+                foreach ($this->selectionSet->forcedSelection as $key) {
+                    unset($row[$key]);
+                }
             }
         }
     }
@@ -103,8 +110,9 @@ class QueryOperation implements \JsonSerializable
     {
         $this->selectionSet->apply($criteria);
         $this->operatorSet->apply($criteria, $result);
-        $rows = $criteria->dump()->get()->toArray();
+        $rows = $criteria->get()->toArray();
         $this->executeAssociatedQueries($criteria, $rows, $result);
+        $this->clearForcedSelection($rows);
         if ($addToResult) {
             $result->addCriteria($this->getName(), $criteria);
         }
