@@ -583,11 +583,11 @@ class Manager
     {
         self::$session = $session;
     }
-//
-//    public static function getSession(): MSession|null
-//    {
-//        return self::$session;
-//    }
+
+    public static function getSession(): MSession|null
+    {
+        return self::$session;
+    }
 //
 //    public static function isAjaxCall(): bool
 //    {

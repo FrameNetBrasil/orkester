@@ -404,6 +404,69 @@ class Model
         return static::getConnection($databaseName)->transaction($cb);
     }
 
+    public static function criteriaByFilter(object|null $params, string|null $select = null): RetrieveCriteria
+    {
+        $criteria = static::getCriteria();
+        if (!empty($select)) {
+            $criteria->select($select);
+        }
+        if (!is_null($params)) {
+            if (!empty($params->pagination->rows)) {
+                $page = $params->pagination->page ?? 1;
+                //mdump('rows = ' . $params->pagination->rows);
+                //mdump('offset = ' . $offset);
+                $criteria->range($page, $params->pagination->rows);
+            }
+            if (!empty($params->pagination->sort)) {
+                $criteria->orderBy(
+                    $params->pagination->sort . ' ' .
+                    $params->pagination->order
+                );
+            }
+        }
+        return static::filter($params->filter, $criteria);
+    }
+
+    public static function listByFilter(object|null $params, string|null $select = null): array
+    {
+        return self::criteriaByFilter($params, $select)->get()->toArray();
+    }
+
+    public static function filter(array|null $filters, RetrieveCriteria|null $criteria = null): RetrieveCriteria
+    {
+        $criteria = $criteria ?? static::getCriteria();
+        if (!empty($filters)) {
+            $filters = is_string($filters[0]) ? [$filters] : $filters;
+            foreach ($filters as [$field, $op, $value]) {
+                $criteria->where($field, $op, $value);
+            }
+        }
+        return $criteria;
+    }
+
+    public static function list(object|array|null $filter = null, string|null $select = null): array
+    {
+        $criteria = static::filter($filter);
+        if (is_string($select)) {
+            $criteria->select($select);
+        }
+        return $criteria->asResult();
+    }
+
+    public static function one($conditions, ?string $select = null): object|null
+    {
+        $criteria = static::getCriteria()->range(1, 1);
+        if ($select) $criteria->select($select);
+        $result = static::filter($conditions, $criteria)->asResult();
+        return empty($result) ? null : (object)$result[0];
+    }
+
+    public static function exists(array $conditions): bool
+    {
+        return !is_null(static::one($conditions));
+    }
+
+
     /*
     public IAuthorization $authorization;
     public static RetrieveCriteria $criteria;
