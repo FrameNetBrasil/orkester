@@ -27,14 +27,16 @@ class Model
     public static Psr16Adapter $cachedClassMaps;
     public static Capsule $capsule;
     private static array $classMaps = [];
+    private static int $fetchStyle;
 
-    public static function init(array $dbConfigurations): void
+    public static function init(array $dbConfigurations, int $fetchStyle): void
     {
         self::$cachedClassMaps = Manager::getCache();
         self::$capsule = new Capsule();
         self::$capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
         self::$capsule->setAsGlobal();
-        self::$capsule->setFetchMode(\PDO::FETCH_ASSOC);
+        self::$fetchStyle = $fetchStyle;
+        self::$capsule->setFetchMode($fetchStyle);
         foreach ($dbConfigurations as $name => $conf) {
             self::$capsule->addConnection([
                 'driver' => $conf['db'] ?? 'mysql',
@@ -269,6 +271,9 @@ class Model
     {
         $databaseName ??= Manager::getOptions('db');
         $connection = self::$capsule->getConnection($databaseName);
+        (new \ReflectionClass(get_class($connection)))
+            ->getProperty('fetchMode')->setValue($connection, self::$fetchStyle);
+
         $classMap = self::getClassMap(get_called_class());
 
         $container = Manager::getContainer();
@@ -286,7 +291,7 @@ class Model
             ->toArray();
     }
 
-    public static function find(int $id): ?object
+    public static function find(int $id): object|array|null
     {
         return static::getCriteria()->find($id);
     }
@@ -298,6 +303,7 @@ class Model
         $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
         $key = $classMap->keyAttributeName;
         $criteria = self::getCriteria();
+        $criteria->upserts($fields);
         $criteria->upsert([$fields], [$key], array_keys($fields));
         $lastInsertId = $criteria->getConnection()->getPdo()->lastInsertId();
         return $lastInsertId;
@@ -331,7 +337,7 @@ class Model
     public static function insertUsingCriteria(array $fields, Criteria $usingCriteria): ?int
     {
         $classMap = static::getClassMap(get_called_class());
-        $usingCriteria->parseSelf();
+        $usingCriteria->applyBeforeQueryCallbacks();
         $criteria = static::getCriteria();
         $criteria->insertUsing($fields, $usingCriteria);
         $lastInsertId = $criteria->getConnection()->getPdo()->lastInsertId();
@@ -366,6 +372,36 @@ class Model
         $parts = explode('\\', static::class);
         $className = $parts[count($parts) - 1];
         return substr($className, 0, strlen($className) - 5);
+    }
+
+    public static function getConnection(?string $databaseName = null): Connection
+    {
+        $databaseName ??= Manager::getOptions('db');
+        return self::$capsule->getConnection($databaseName);
+    }
+
+    public static function beginTransaction(?string $databaseName = null)
+    {
+        static::getConnection($databaseName)->beginTransaction();
+    }
+
+    public static function commit(?string $databaseName = null)
+    {
+        static::getConnection($databaseName)->commit();
+    }
+
+    public static function rollback(?string $databaseName = null)
+    {
+        static::getConnection($databaseName)->rollBack();
+    }
+
+    public static function transaction(callable $closure, ?string $databaseName = null): mixed
+    {
+        $cb = fn(Connection $connection) => $closure(
+            static::getCriteria($databaseName),
+            $connection
+        );
+        return static::getConnection($databaseName)->transaction($cb);
     }
 
     /*

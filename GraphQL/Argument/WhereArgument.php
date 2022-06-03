@@ -2,6 +2,7 @@
 
 namespace Orkester\GraphQL\Argument;
 
+use Cassandra\Cluster\Builder;
 use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\VariableNode;
 use Orkester\GraphQL\Context;
@@ -43,20 +44,23 @@ class WhereArgument extends AbstractArgument implements \JsonSerializable
         }
     }
 
+    public function applyConditionGroup(array $conditionGroup, Criteria $criteria)
+    {
+        foreach ($this->getConditions($conditionGroup, $criteria) as $condition) {
+            $this->applyCondition($criteria, true, ...$condition);
+        }
+    }
+
     public function getConditions(array $conditionGroup, Criteria $criteria): array
     {
         $items = [];
         foreach ($conditionGroup as $field => $conditions) {
             if ($field == 'and') {
-                foreach ($this->getConditions($conditions, $criteria) as $condition) {
-                    $this->applyCondition($criteria, true, ...$condition);
-                }
+                $this->applyConditionGroup($conditions, $criteria);
             } else if ($field == 'or') {
-                $nested = new Criteria($criteria->classMap, null);
-                foreach ($this->getConditions($conditions, $nested) as $condition) {
-                    $this->applyCondition($nested, false, ...$condition);
-                }
-                $criteria->addNestedWhereQuery($nested);
+                $criteria->orWhere(function (Criteria $c) use ($conditions) {
+                    $this->applyConditionGroup($conditions, $c);
+                });
             } else if ($field == '__condition') {
                 $cs = array_key_exists(0, $conditions) ? $conditions : [$conditions];
                 foreach ($cs as $c) {
@@ -80,9 +84,7 @@ class WhereArgument extends AbstractArgument implements \JsonSerializable
     public function __invoke(Criteria $criteria, Result $result): Criteria
     {
         $conditions = ($this->value)($result);
-        foreach ($this->getConditions($conditions, $criteria) as $condition) {
-            $this->applyCondition($criteria, true, ...$condition);
-        }
+        $this->applyConditionGroup($conditions, $criteria);
         return $criteria;
     }
 

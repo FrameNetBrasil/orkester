@@ -125,7 +125,7 @@ class ClassMap
         $this->associationMaps[$associationMap->name] = $associationMap;
     }
 
-    public function getAssociationMap(string $name): object|null
+    public function getAssociationMap(string $name): ?AssociationMap
     {
         $associationMap = $this->associationMaps[$name] ?? NULL;
         if ($associationMap != NULL) {

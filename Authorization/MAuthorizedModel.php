@@ -71,7 +71,7 @@ class MAuthorizedModel
 
     public function getKeyAttributeName()
     {
-        return $this->model::getClassMap()->getKeyAttributeName();
+        return $this->model::getClassMap()->keyAttributeName;
     }
 
     /**
