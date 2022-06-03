@@ -193,11 +193,11 @@ function errorHandler($errno, $errstr, $errfile, $errline)
 //    if (Manager::supressWarning($errno, $errstr)) {
 //        return;
 //    }
-    if (in_array($errno, $codes)) {
+//    if (in_array($errno, $codes)) {
         if (Manager::getLog()) {
             Manager::logMessage("[ERROR] [Code] $errno [Error] $errstr [File] $errfile [Line] $errline");
         }
-    }
+//    }
 }
 
 function shutdown()

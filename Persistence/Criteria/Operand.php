@@ -82,6 +82,7 @@ class Operand
             $field = $parts[0] . '.' . $this->criteria->columnName($baseClass, $parts[1]);
         } else {
             $chain = implode('.', array_slice($parts, 0, -1));
+//            mdump($chain);
             $associationJoinType = $this->criteria->associationJoin[$chain] ?? null;
             $alias = $tableName;
             $joinIndex = '';
@@ -122,9 +123,17 @@ class Operand
                     $this->criteria->listJoin[$joinIndex] = $alias;
                 }
                 $baseClass = $associationMap->toClassName;
+//                mdump('baseClass = ' . $baseClass);
                 $alias = $toAlias;
             }
-            $field = $alias . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
+            $attributeMap = $this->criteria->getAttributeMap($parts[$n], $baseClass);
+            if ($attributeMap->reference != '') {
+                $this->field = str_replace($parts[$n], $attributeMap->reference, $this->field);
+//                mdump('*** ' . $this->field);
+                $field = $this->resolveOperand();
+            } else {
+                $field = $alias . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
+            }
         }
         return $field;
     }
