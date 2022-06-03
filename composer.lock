@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2c10578cf786cf86f8b0caa6ebd9339f",
+    "content-hash": "fc5a4eb133711174f13ac159de2a0b00",
     "packages": [
         {
             "name": "aura/session",
@@ -1982,53 +1982,65 @@
         },
         {
             "name": "phpfastcache/phpfastcache",
-            "version": "8.0.0",
+            "version": "9.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPSocialNetwork/phpfastcache.git",
-                "reference": "7a55eedda16a53c1a97161354718e690e2b6067e"
+                "reference": "517741c800f8d44d2aade1c4228d679bd5c5e7f9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPSocialNetwork/phpfastcache/zipball/7a55eedda16a53c1a97161354718e690e2b6067e",
-                "reference": "7a55eedda16a53c1a97161354718e690e2b6067e",
+                "url": "https://api.github.com/repos/PHPSocialNetwork/phpfastcache/zipball/517741c800f8d44d2aade1c4228d679bd5c5e7f9",
+                "reference": "517741c800f8d44d2aade1c4228d679bd5c5e7f9",
                 "shasum": ""
             },
             "require": {
                 "ext-json": "*",
                 "ext-mbstring": "*",
-                "php": ">=7.3",
-                "psr/cache": "~1.0.0",
-                "psr/simple-cache": "~1.0.0"
+                "php": ">=8.0",
+                "psr/cache": "^2.0||^3.0",
+                "psr/simple-cache": "^2.0||^3.0"
             },
             "conflict": {
-                "basho/riak": "*",
-                "doctrine/couchdb": "*"
+                "doctrine/couchdb": "<dev-master#9eeb9e5",
+                "solarium/solarium": "<6.1"
             },
             "require-dev": {
-                "league/climate": "^3.5"
+                "ext-gettext": "*",
+                "jetbrains/phpstorm-stubs": "dev-master",
+                "league/climate": "^3.8",
+                "phpmd/phpmd": "@stable",
+                "phpstan/phpstan": "^1.5",
+                "squizlabs/php_codesniffer": "@stable"
             },
             "suggest": {
-                "ext-apc": "*",
+                "aws/aws-sdk-php": "~3.0",
+                "doctrine/couchdb": "^dev-master#9eeb9e5",
+                "ext-apcu": "*",
+                "ext-cassandra": "*",
                 "ext-couchbase": "*",
+                "ext-couchbase_v3": "*",
                 "ext-intl": "*",
                 "ext-leveldb": "*",
                 "ext-memcache": "*",
                 "ext-memcached": "*",
+                "ext-mongodb": "*",
                 "ext-redis": "*",
                 "ext-sqlite": "*",
                 "ext-wincache": "*",
                 "ext-xcache": "*",
-                "mongodb/mongodb": "^1.1",
-                "phpfastcache/couchdb": "~1.0.0",
-                "phpfastcache/phpssdb": "~1.0.0",
-                "phpfastcache/riak-client": "~1.4.4",
-                "predis/predis": "~1.1.0"
+                "google/cloud-firestore": "^1.20",
+                "mongodb/mongodb": "^1.9",
+                "phpfastcache/phpssdb": "~1.1.0",
+                "predis/predis": "^1.1",
+                "solarium/solarium": "~6.1",
+                "triagens/arangodb": "^3.8"
             },
             "type": "library",
             "autoload": {
                 "psr-4": {
-                    "Phpfastcache\\": "lib/Phpfastcache/"
+                    "Phpfastcache\\": "lib/Phpfastcache/",
+                    "Phpfastcache\\Tests\\": "tests/lib/"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -2043,15 +2055,14 @@
                     "role": "Actual Project Manager/Developer"
                 },
                 {
-                    "name": "Khoa Bui",
-                    "email": "khoaofgod@gmail.com",
-                    "homepage": "https://www.phpfastcache.com",
-                    "role": "Former Project Developer/Original Creator"
+                    "name": "Contributors",
+                    "homepage": "https://github.com/PHPSocialNetwork/phpfastcache/graphs/contributors"
                 }
             ],
-            "description": "PHP Abstract Cache Class - Reduce your database call using cache system. PhpFastCache handles a lot of drivers such as Apc(u), Cassandra, CouchBase, Couchdb, Mongodb, Files, (P)redis, Leveldb, Memcache(d), Ssdb, Sqlite, Wincache, Xcache, Zend Data Cache.",
+            "description": "PHP Abstract Cache Class - Reduce your database call using cache system. Phpfastcache handles a lot of drivers such as Apc(u), Cassandra, CouchBase, Couchdb, Mongodb, Files, (P)redis, Leveldb, Memcache(d), Ssdb, Sqlite, Wincache, Xcache, Zend Data Cache.",
             "homepage": "https://www.phpfastcache.com",
             "keywords": [
+                "ArangoDb",
                 "LevelDb",
                 "abstract",
                 "apc",
@@ -2063,6 +2074,7 @@
                 "cookie",
                 "couchbase",
                 "couchdb",
+                "dynamodb",
                 "files cache",
                 "memcache",
                 "memcached",
@@ -2072,6 +2084,7 @@
                 "php cache",
                 "predis",
                 "redis",
+                "solr",
                 "ssdb",
                 "wincache",
                 "xcache",
@@ -2083,19 +2096,16 @@
             ],
             "support": {
                 "issues": "https://github.com/PHPSocialNetwork/phpfastcache/issues",
-                "source": "https://github.com/PHPSocialNetwork/phpfastcache/tree/8.0.0"
+                "source": "https://github.com/PHPSocialNetwork/phpfastcache",
+                "wiki": "https://github.com/PHPSocialNetwork/phpfastcache/wiki"
             },
             "funding": [
-                {
-                    "url": "https://github.com/geolim4",
-                    "type": "github"
-                },
                 {
                     "url": "https://www.patreon.com/geolim4",
                     "type": "patreon"
                 }
             ],
-            "time": "2020-03-22T22:36:21+00:00"
+            "time": "2022-04-15T21:25:40+00:00"
         },
         {
             "name": "phpmyadmin/sql-parser",
@@ -2172,20 +2182,20 @@
         },
         {
             "name": "psr/cache",
-            "version": "1.0.1",
+            "version": "3.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/php-fig/cache.git",
-                "reference": "d11b50ad223250cf17b86e38383413f5a6764bf8"
+                "reference": "aa5030cfa5405eccfdcb1083ce040c2cb8d253bf"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/cache/zipball/d11b50ad223250cf17b86e38383413f5a6764bf8",
-                "reference": "d11b50ad223250cf17b86e38383413f5a6764bf8",
+                "url": "https://api.github.com/repos/php-fig/cache/zipball/aa5030cfa5405eccfdcb1083ce040c2cb8d253bf",
+                "reference": "aa5030cfa5405eccfdcb1083ce040c2cb8d253bf",
                 "shasum": ""
             },
             "require": {
-                "php": ">=5.3.0"
+                "php": ">=8.0.0"
             },
             "type": "library",
             "extra": {
@@ -2205,7 +2215,7 @@
             "authors": [
                 {
                     "name": "PHP-FIG",
-                    "homepage": "http://www.php-fig.org/"
+                    "homepage": "https://www.php-fig.org/"
                 }
             ],
             "description": "Common interface for caching libraries",
@@ -2215,9 +2225,9 @@
                 "psr-6"
             ],
             "support": {
-                "source": "https://github.com/php-fig/cache/tree/master"
+                "source": "https://github.com/php-fig/cache/tree/3.0.0"
             },
-            "time": "2016-08-06T20:24:11+00:00"
+            "time": "2021-02-03T23:26:27+00:00"
         },
         {
             "name": "psr/container",
@@ -2541,25 +2551,25 @@
         },
         {
             "name": "psr/simple-cache",
-            "version": "1.0.1",
+            "version": "3.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/php-fig/simple-cache.git",
-                "reference": "408d5eafb83c57f6365a3ca330ff23aa4a5fa39b"
+                "reference": "764e0b3939f5ca87cb904f570ef9be2d78a07865"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/simple-cache/zipball/408d5eafb83c57f6365a3ca330ff23aa4a5fa39b",
-                "reference": "408d5eafb83c57f6365a3ca330ff23aa4a5fa39b",
+                "url": "https://api.github.com/repos/php-fig/simple-cache/zipball/764e0b3939f5ca87cb904f570ef9be2d78a07865",
+                "reference": "764e0b3939f5ca87cb904f570ef9be2d78a07865",
                 "shasum": ""
             },
             "require": {
-                "php": ">=5.3.0"
+                "php": ">=8.0.0"
             },
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "1.0.x-dev"
+                    "dev-master": "3.0.x-dev"
                 }
             },
             "autoload": {
@@ -2574,7 +2584,7 @@
             "authors": [
                 {
                     "name": "PHP-FIG",
-                    "homepage": "http://www.php-fig.org/"
+                    "homepage": "https://www.php-fig.org/"
                 }
             ],
             "description": "Common interfaces for simple caching",
@@ -2586,9 +2596,9 @@
                 "simple-cache"
             ],
             "support": {
-                "source": "https://github.com/php-fig/simple-cache/tree/master"
+                "source": "https://github.com/php-fig/simple-cache/tree/3.0.0"
             },
-            "time": "2017-10-23T01:57:42+00:00"
+            "time": "2021-10-29T13:26:27+00:00"
         },
         {
             "name": "ralouphie/getallheaders",
