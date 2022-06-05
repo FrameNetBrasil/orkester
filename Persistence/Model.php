@@ -285,7 +285,7 @@ class Model
     public static function getAssociation(string $associationChain, int $id): array
     {
         return static::getCriteria()
-            ->select($associationChain)
+            ->select($associationChain . '.*')
             ->where('id', '=', $id)
             ->get()
             ->toArray();
