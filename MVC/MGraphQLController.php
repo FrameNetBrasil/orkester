@@ -31,8 +31,9 @@ class MGraphQLController
     public function execute(): array
     {
         $executor = new Executor($this->query, $this->variables);
-        ['data' => $data, 'errors' => $errors] = $executor->execute();
-        return empty($errors) ? ['data' => $data] : ['errors' => $errors];
+        $result = $executor->execute();
+        $data =  $result->getResults();
+        return empty($errors ?? null) ? ['data' => $data] : ['errors' => $errors];
     }
 
     public function send(mixed $content, int $httpCode): Response

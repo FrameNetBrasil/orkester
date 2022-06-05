@@ -44,9 +44,9 @@ class WhereArgument extends AbstractArgument implements \JsonSerializable
         }
     }
 
-    public function applyConditionGroup(array $conditionGroup, Criteria $criteria)
+    public function applyConditionGroup(?array $conditionGroup, Criteria $criteria)
     {
-        foreach ($this->getConditions($conditionGroup, $criteria) as $condition) {
+        foreach ($this->getConditions($conditionGroup ?? [], $criteria) as $condition) {
             $this->applyCondition($criteria, true, ...$condition);
         }
     }
