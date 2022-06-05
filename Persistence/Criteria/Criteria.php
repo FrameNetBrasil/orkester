@@ -372,6 +372,10 @@ class Criteria extends \Illuminate\Database\Query\Builder
         }
     }
     */
+    public function range(int $page, $rows) {
+        $offset = ($page - 1) * $rows;
+        $this->offset($offset)->limit($rows);
+    }
 
     public function addParameter(string $name)
     {
