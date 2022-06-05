@@ -404,7 +404,7 @@ class Model
         return static::getConnection($databaseName)->transaction($cb);
     }
 
-    public static function criteriaByFilter(object|null $params, string|null $select = null): RetrieveCriteria
+    public static function criteriaByFilter(object|null $params, string|null $select = null): Criteria
     {
         $criteria = static::getCriteria();
         if (!empty($select)) {
@@ -427,12 +427,12 @@ class Model
         return static::filter($params->filter, $criteria);
     }
 
-    public static function listByFilter(object|null $params, string|null $select = null): array
-    {
-        return self::criteriaByFilter($params, $select)->get()->toArray();
-    }
+//    public static function listByFilter(object|null $params, string|null $select = null): array
+//    {
+//        return self::criteriaByFilter($params, $select)->get()->toArray();
+//    }
 
-    public static function filter(array|null $filters, RetrieveCriteria|null $criteria = null): RetrieveCriteria
+    public static function filter(array|null $filters, Criteria|null $criteria = null): Criteria
     {
         $criteria = $criteria ?? static::getCriteria();
         if (!empty($filters)) {
@@ -450,14 +450,14 @@ class Model
         if (is_string($select)) {
             $criteria->select($select);
         }
-        return $criteria->asResult();
+        return $criteria->get()->toArray();
     }
 
     public static function one($conditions, ?string $select = null): object|null
     {
         $criteria = static::getCriteria()->range(1, 1);
         if ($select) $criteria->select($select);
-        $result = static::filter($conditions, $criteria)->asResult();
+        $result = static::filter($conditions, $criteria)->get()->toArray();
         return empty($result) ? null : (object)$result[0];
     }
 
