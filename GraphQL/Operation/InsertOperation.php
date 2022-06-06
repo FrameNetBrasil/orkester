@@ -39,9 +39,10 @@ class InsertOperation extends AbstractWriteOperation
      * @throws EValidationException
      * @throws EGraphQLNotFoundException
      */
-    public function insertSingle(MAuthorizedModel $model, ObjectValueNode|VariableNode $node): ?object
+    public function insertSingle(MAuthorizedModel $model, ObjectValueNode|VariableNode|array $node): ?object
     {
-        $value = $this->context->getNodeValue($node);
+
+        $value = is_array($node) ? $node : $this->context->getNodeValue($node);
         $isUpdate = $this->isUpdateOperation($value, $model);
         $data = $this->createEntityArray($value, $model, $isUpdate);
         $object = (object)$data;
@@ -86,9 +87,9 @@ class InsertOperation extends AbstractWriteOperation
                 if (is_null($objectListNode)) {
                     throw new EGraphQLException(['missing_key' => 'object_or_objects']);
                 } else {
-                    /** @var ObjectValueNode $objectValueNode */
-                    foreach ($objectListNode->values as $objectValueNode) {
-                        $objects[] = $this->insertSingle($model, $objectValueNode);
+                    $values = $this->context->getNodeValue($objectListNode);
+                    foreach ($values as $value) {
+                        $objects[] = $this->insertSingle($model, $value);
                     }
                 }
                 $ids = array_map(fn($o) => $o->$pk, $objects);
