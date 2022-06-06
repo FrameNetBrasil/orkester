@@ -26,7 +26,7 @@ class SelectionSet implements \JsonSerializable
 
     public function apply(Criteria $criteria): Criteria
     {
-        $old = $criteria->columns;
+        $old = $criteria->columns($criteria->columns);
         $criteria->select(implode(',', array_map(fn(FieldSelection $f) => $f->getSQL(), $this->fields)));
         $new = $criteria->columns;
         $criteria->columns = array_merge($old ?? [], $new ?? []);

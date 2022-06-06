@@ -41,7 +41,8 @@ class QueryOperation implements \JsonSerializable
     public static function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap, int|string $fromKey, int|string $toKey): AssociationMap
     {
         $name = '_gql';
-        $associationMap = new AssociationMap($name, $fromClassMap);
+//        $associationMap = new AssociationMap($name, $fromClassMap);
+        $associationMap = new AssociationMap($name);
         $associationMap->toClassName = $toClassMap->model;
         $associationMap->toClassMap = $toClassMap;
         $associationMap->fromClassMap = $fromClassMap;
