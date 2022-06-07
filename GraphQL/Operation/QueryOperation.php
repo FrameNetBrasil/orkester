@@ -62,7 +62,8 @@ class QueryOperation implements \JsonSerializable
             $associationMap = $associatedQuery->getAssociationMap();
             $classMap = $associationMap->fromClassMap;
             $fromKey = $associationMap->fromKey;
-            $fromIds = array_map(fn($row) => $row[$fromKey], $rows);
+//            $fromIds = array_map(fn($row) => $row[$fromKey], $rows);
+            $fromIds = array_map(fn($row) => $row[$classMap->keyAttributeName], $rows);
 
             $fk = $associationMap->toKey;
             $toClassMap = $associationMap->toClassMap;
@@ -70,8 +71,10 @@ class QueryOperation implements \JsonSerializable
             $cardinality = $associationMap->cardinality;
 
             if ($cardinality == Association::ONE) {
-                $newAssociation = $this::createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey);
-                $joinField = $newAssociation->name . "." . $associationMap->fromKey;
+//                $newAssociation = $this::createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey);
+//                $joinField = $newAssociation->name . "." . $associationMap->fromKey;
+                $joinField = '_gql' . '.' . $classMap->keyAttributeName;
+                $associatedCriteria->joinClass($classMap->model, '_gql',$fromKey, '=', '_gql' . '.' . $fk);
                 $associatedCriteria->where($joinField, 'IN', $fromIds);
                 $associatedCriteria->select($joinField);
             } else if ($cardinality == Association::MANY) {

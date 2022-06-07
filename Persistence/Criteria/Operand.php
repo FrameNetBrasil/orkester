@@ -78,7 +78,11 @@ class Operand
         $n = count($parts) - 1;
         $baseClass = '';
         $tableName = $this->criteria->tableName($baseClass);
-        if (isset($this->criteria->aliases[$parts[0]]) || ($parts[0] == $tableName)) {
+        if ($parts[0] == $tableName) {
+            $field = $parts[0] . '.' . $this->criteria->columnName($baseClass, $parts[1]);
+        } else if (isset($this->criteria->classAlias[$parts[0]])) {
+            $field = $parts[0] . '.' . $this->criteria->columnName($this->criteria->classAlias[$parts[0]], $parts[1]);
+        } else if (isset($this->criteria->aliases[$parts[0]])) {
             $field = $parts[0] . '.' . $this->criteria->columnName($baseClass, $parts[1]);
         } else {
             $chain = implode('.', array_slice($parts, 0, -1));
