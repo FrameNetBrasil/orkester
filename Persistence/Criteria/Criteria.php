@@ -26,6 +26,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
     public $aliases = [];
     public $fieldAlias = [];
     public $tableAlias = [];
+    public $classAlias = [];
     public $listJoin = [];
     public $associationJoin = [];
     public $aliasCount = 0;
@@ -283,6 +284,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
     {
         $this->alias = $alias;
         $this->aliases[$alias] = $this->tableName($className);
+        $this->classAliases[$alias] = $className;
         if ($className != $this->model) {
             $this->from($this->tableName($className), $alias);
         }
@@ -331,8 +333,10 @@ class Criteria extends \Illuminate\Database\Query\Builder
 
     public function joinClass(string $className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
     {
+        $this->registerJoinModel($className);
         $tableName = $this->tableName($className);
         $this->aliases[$alias] = $tableName;
+        $this->classAlias[$alias] = $className;
 //        $this->processQuery = $this;
         $fromField = $this->resolveField('where', $first);
         $toField = $this->resolveField('where', $second);
