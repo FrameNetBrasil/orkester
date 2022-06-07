@@ -278,7 +278,11 @@ class Model
 
         $container = Manager::getContainer();
         return $container->call(
-            fn(Logger $logger) => new Criteria($classMap, $connection, $logger->withName('criteria'))
+            //fn(Logger $logger) => new Criteria($classMap, $connection, $logger->withName('criteria'))
+            function(Logger $logger) use ($connection, $classMap){
+                $criteria = new Criteria($connection, $logger->withName('criteria'));
+                return $criteria->setClassMap($classMap);
+            }
         );
     }
 
@@ -426,11 +430,6 @@ class Model
         }
         return static::filter($params->filter, $criteria);
     }
-
-//    public static function listByFilter(object|null $params, string|null $select = null): array
-//    {
-//        return self::criteriaByFilter($params, $select)->get()->toArray();
-//    }
 
     public static function filter(array|null $filters, Criteria|null $criteria = null): Criteria
     {

@@ -76,7 +76,7 @@ class QueryOperation implements \JsonSerializable
                 $joinField = '_gql' . '.' . $classMap->keyAttributeName;
                 $associatedCriteria->joinClass($classMap->model, '_gql',$fromKey, '=', '_gql' . '.' . $fk);
                 $associatedCriteria->where($joinField, 'IN', $fromIds);
-                $associatedCriteria->select($joinField);
+                $associatedCriteria->select($fk);
             } else if ($cardinality == Association::MANY) {
                 $associatedCriteria->where($fk, 'IN', $fromIds);
                 $associatedCriteria->select($fk);

@@ -329,11 +329,11 @@ class Criteria
         return $this->where($attribute, $operator, $value, $boolean = 'or');
     }
 
-    public function whereExists(Criteria $criteria)
-    {
-        $this->query->addWhereExistsQuery($criteria->query, 'and', false);
-        return $this;
-    }
+//    public function whereExists(Criteria $criteria)
+//    {
+//        $this->query->addWhereExistsQuery($criteria->query, 'and', false);
+//        return $this;
+//    }
 
     public function join(string $className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
     {
@@ -346,23 +346,20 @@ class Criteria
         return $this;
     }
 
-    public function joinSub(Criteria $criteria, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
-    {
-        $criteria->alias = $alias;
-        $criteria->aliases[$alias] = $criteria->query;
-        $this->aliases[$alias] = $criteria->query;
-        [$query, $bindings] = $this->parseSub($criteria->query);
-//        $expression = '('.$query.') as '.$this->query->grammar->wrapTable($as);
-//        $alias = $criteria->alias;
-//        $this->alias($alias, $criteria->model);
-        $expression = '(' . $query . ') as ' . $alias;
-        $this->processQuery = $this->query;
-        $this->query->addBinding($bindings, 'join');
-        $fromField = $this->resolveField('where', $first);
-        $toField = $this->resolveField('where', $second);
-        $this->query->join(new Expression($expression), $fromField, $operator, $toField, $type, $where);
-        return $this;
-    }
+//    public function joinSub(Criteria $criteria, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
+//    {
+//        $criteria->alias = $alias;
+//        $criteria->aliases[$alias] = $criteria->query;
+//        $this->aliases[$alias] = $criteria->query;
+//        [$query, $bindings] = $this->parseSub($criteria->query);
+//        $expression = '(' . $query . ') as ' . $alias;
+//        $this->processQuery = $this->query;
+//        $this->query->addBinding($bindings, 'join');
+//        $fromField = $this->resolveField('where', $first);
+//        $toField = $this->resolveField('where', $second);
+//        $this->query->join(new Expression($expression), $fromField, $operator, $toField, $type, $where);
+//        return $this;
+//    }
 
     protected function parseSub($query)
     {

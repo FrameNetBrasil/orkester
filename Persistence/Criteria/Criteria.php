@@ -3,6 +3,7 @@
 namespace Orkester\Persistence\Criteria;
 
 use Illuminate\Database\Connection;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Str;
 use Monolog\Logger;
@@ -13,35 +14,57 @@ use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
 use PhpMyAdmin\SqlParser\Parser;
 
-class Criteria extends \Illuminate\Database\Query\Builder
+class Criteria extends Builder
 {
+    public $connection;
     private string|Model $model;
     /**
      * @var ClassMap[] $maps
      */
     private array $maps;
     protected Logger $logger;
-    public string $alias;
     public ClassMap $classMap;
-    public $aliases = [];
+//    public string $alias;
+//    public $aliases = [];
     public $fieldAlias = [];
     public $tableAlias = [];
     public $classAlias = [];
+    public $criteriaAlias = [];
     public $listJoin = [];
     public $associationJoin = [];
     public $aliasCount = 0;
     public $parameters = [];
     public $originalBindings = null;
 
-    public function __construct(ClassMap $classMap, Connection $connection, Logger $logger)
+    public function __construct(Connection $connection, Logger $logger)
     {
         $this->logger = $logger;
+        parent::__construct($connection);
+    }
+
+    public function setClassMap(ClassMap $classMap)
+    {
         $this->classMap = $classMap;
         $this->model = $classMap->model;
         $this->maps[$this->model] = $classMap;
-        $connection->table($this->tableName());
-        parent::__construct($connection);
+        $this->connection->table($this->tableName());
         $this->from($this->tableName());
+        return $this;
+    }
+
+    public function setModel(string $model)
+    {
+        $this->classMap = Model::getClassMap($model);
+        $this->model = $model;
+        $this->maps[$this->model] = $this->classMap;
+        $this->connection->table($this->tableName());
+        $this->from($this->tableName());
+        return $this;
+    }
+
+    public function newQuery()
+    {
+        return new static($this->connection, $this->logger);
     }
 
     public function applyBeforeQueryCallbacks()
@@ -60,7 +83,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
 
     public function get($columns = ['*'])
     {
-        $criteria = $this;
+//        $criteria = $this;
 
 //        $this->beforeQuery(function ($query) use ($criteria) {
 //            $criteria->parseCriteria($query, $criteria);
@@ -174,15 +197,10 @@ class Criteria extends \Illuminate\Database\Query\Builder
         } else {
             $bindings = $this->originalBindings;
         }
-//        print_r($bindings);
-//        print_r($this->parameters);
         foreach ($bindings as $type => $bindingType) {
-//            print_r($type . PHP_EOL);
             foreach ($bindingType as $i => $binding) {
-//                print_r($i . ' - ' . $binding . PHP_EOL);
                 if (str_starts_with($binding, ':')) {
                     $parameter = substr($binding, 1);
-//                    print_r('parameter ' . $parameter . PHP_EOL);
                     if (isset($this->parameters[$parameter])) {
                         $bindings[$type][$i] = $this->parameters[$parameter];
                     }
@@ -191,24 +209,15 @@ class Criteria extends \Illuminate\Database\Query\Builder
         }
     }
 
-//    public function __call(string $name, array $arguments)
-//    {
-//        $result = $this->query->$name(...$arguments);
-//        return ($result instanceof Builder) ? $this : $result;
-//    }
-
-
     public function addMapFor(string $className)
     {
         $classMap = Model::getClassMap($className);
         $this->maps[$className] = $classMap;
     }
 
-
-    protected function registerJoinModel($className)
+    protected function registerClass($className)
     {
-        if (!isset($this->joinCache[$className])) {
-//            $this->joinCache[$className] = $className;
+        if (!isset($this->maps[$className])) {
             $this->addMapFor($className);
         }
     }
@@ -216,7 +225,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
     public function tableName(string $className = '')
     {
         if ($className != '') {
-            $this->registerJoinModel($className);
+            $this->registerClass($className);
             $tableName = $this->maps[$className]->tableName;
         } else {
             $tableName = $this->maps[$this->model]->tableName;
@@ -233,7 +242,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
     public function getAttributeMap(string $attributeName, $className = ''): ?AttributeMap
     {
         if ($className != '') {
-            $this->registerJoinModel($className);
+            $this->registerClass($className);
             $attributeMap = $this->maps[$className]->getAttributeMap($attributeName);
         } else {
             $attributeMap = $this->maps[$this->model]->getAttributeMap($attributeName);
@@ -245,7 +254,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
     {
 //        mdump('getAssociationMap  className: ' . ($className != '' ? $className : $this->model) . '.' . $associationName . PHP_EOL);
         if ($className != '') {
-            $this->registerJoinModel($className);
+            $this->registerClass($className);
             $associationMap = $this->maps[$className]->getAssociationMap($associationName);
         } else {
             $associationMap = $this->maps[$this->model]->getAssociationMap($associationName);
@@ -253,9 +262,9 @@ class Criteria extends \Illuminate\Database\Query\Builder
         return $associationMap;
     }
 
-    public function setAssociationType(string $association, Join $type): Criteria
+    public function setAssociationType(string $associationName, Join $type): Criteria
     {
-        $this->associationJoin[$association] = $type;
+        $this->associationJoin[$associationName] = $type;
         return $this;
     }
 
@@ -280,12 +289,15 @@ class Criteria extends \Illuminate\Database\Query\Builder
         return $operand->resolve();
     }
 
-    public function alias($alias, $className = '')
+    public function alias($alias, string|Criteria $className = '')
     {
-        $this->alias = $alias;
-        $this->aliases[$alias] = $this->tableName($className);
-        $this->classAliases[$alias] = $className;
-        if ($className != $this->model) {
+        if (is_string($className)) {
+            $this->classAlias[$alias] = $className;
+            $this->tableAlias[$alias] = $this->tableName($className);
+        } else if ($className instanceof Criteria) {
+            $this->criteriaAlias[$alias] = $className;
+        }
+        if ($className == '') {
             $this->from($this->tableName($className), $alias);
         }
         return $this;
@@ -294,7 +306,6 @@ class Criteria extends \Illuminate\Database\Query\Builder
     public function where($attribute, $operator = null, $value = null, $boolean = 'and')
     {
         $uOp = strtoupper($operator);
-        $uValue = is_string($value) ? strtoupper($value) : $value;
         if ($value instanceof Criteria) {
             $type = 'Sub';
             $column = $attribute;
@@ -305,6 +316,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
             );
             $this->addBinding($value->getBindings(), 'where');
         } else {
+            $uValue = is_string($value) ? strtoupper($value) : $value;
             if (($uValue === 'NULL') || is_null($value)) {
                 $this->whereNull($attribute);
             } else if ($uValue === 'NOT NULL') {
@@ -325,42 +337,52 @@ class Criteria extends \Illuminate\Database\Query\Builder
         return $this->where($attribute, $operator, $value, $boolean = 'or');
     }
 
-    public function whereExistsCriteria(Criteria $criteria, $boolean = 'and', $not = false)
-    {
-        $this->addWhereExistsQuery($criteria, 'and', false);
-        return $this;
-    }
+//    public function whereExists(Criteria $criteria, $boolean = 'and', $not = false)
+//    {
+//        $this->addWhereExistsQuery($criteria, $boolean, $not);
+//        return $this;
+//    }
 
-    public function joinClass(string $className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
-    {
-        $this->registerJoinModel($className);
+//    public function joinClass(string $className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
+//    {
+//        $this->registerClass($className);
+//        $tableName = $this->tableName($className);
+//        $this->alias($alias, $className);
+//        $fromField = $this->resolveField('where', $first);
+//        $toField = $this->resolveField('where', $second);
+//        $this->join($tableName . ' as ' . $alias, $fromField, $operator, $toField, $type, $where);
+//        return $this;
+//    }
+
+    public function joinClass($className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false) {
+        $this->registerClass($className);
         $tableName = $this->tableName($className);
-        $this->aliases[$alias] = $tableName;
-        $this->classAlias[$alias] = $className;
-//        $this->processQuery = $this;
+        $this->alias($alias, $className);
         $fromField = $this->resolveField('where', $first);
         $toField = $this->resolveField('where', $second);
         $this->join($tableName . ' as ' . $alias, $fromField, $operator, $toField, $type, $where);
         return $this;
     }
 
-    public function joinSubCriteria(Criteria $criteria, $as, $first, $operator = null, $second = null, $type = 'inner', $where = false)
+    public function joinSub($query, $as, $first, $operator = null, $second = null, $type = 'inner', $where = false)
     {
-        $criteria->alias = $as;
-        $criteria->aliases[$as] = $criteria;
-        $this->aliases[$as] = $criteria;
-        [$query, $bindings] = $this->parseSub($criteria);
-//        $expression = '('.$query.') as '.$this->query->grammar->wrapTable($as);
-//        $alias = $criteria->alias;
-//        $this->alias($alias, $criteria->model);
-        $expression = '(' . $query . ') as ' . $as;
-//        $this->processQuery = $this;
-        $this->addBinding($bindings, 'join');
+        $this->criteriaAlias[$as] = $query;
         $fromField = $this->resolveField('where', $first);
         $toField = $this->resolveField('where', $second);
-        $this->join(new Expression($expression), $fromField, $operator, $toField, $type, $where);
-        return $this;
+        return parent::joinSub($query, $as, $fromField, $operator, $toField, $type, $where);
     }
+
+//    public function joinSubCriteria(Criteria $criteria, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
+//    {
+//        $this->alias($alias, $criteria);
+//        [$query, $bindings] = $this->parseSub($criteria);
+//        $expression = '(' . $query . ') as ' . $alias;
+//        $this->addBinding($bindings, 'join');
+//        $fromField = $this->resolveField('where', $first);
+//        $toField = $this->resolveField('where', $second);
+//        $this->join(new Expression($expression), $fromField, $operator, $toField, $type, $where);
+//        return $this;
+//    }
 
     /*
     protected function parseSub($query)
@@ -379,6 +401,7 @@ class Criteria extends \Illuminate\Database\Query\Builder
     public function range(int $page, $rows) {
         $offset = ($page - 1) * $rows;
         $this->offset($offset)->limit($rows);
+        return $this;
     }
 
     public function addParameter(string $name)
@@ -410,14 +433,18 @@ class Criteria extends \Illuminate\Database\Query\Builder
         return $sql;
     }
 
-    public function beginTransaction()
-    {
-        $this->connection->beginTransaction();
-    }
-
-    public function commit()
-    {
-        $this->connection->commit();
-    }
-
+//    public function beginTransaction()
+//    {
+//        $this->connection->beginTransaction();
+//    }
+//
+//    public function commit()
+//    {
+//        $this->connection->commit();
+//    }
+//
+//    public function rollback()
+//    {
+//        $this->connection->rollback();
+//    }
 }

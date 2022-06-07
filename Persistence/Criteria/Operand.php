@@ -74,6 +74,7 @@ class Operand
 
     public function resolveOperandPath()
     {
+        $field = '';
         $parts = explode('.', $this->field);
         $n = count($parts) - 1;
         $baseClass = '';
@@ -82,9 +83,14 @@ class Operand
             $field = $parts[0] . '.' . $this->criteria->columnName($baseClass, $parts[1]);
         } else if (isset($this->criteria->classAlias[$parts[0]])) {
             $field = $parts[0] . '.' . $this->criteria->columnName($this->criteria->classAlias[$parts[0]], $parts[1]);
-        } else if (isset($this->criteria->aliases[$parts[0]])) {
-            $field = $parts[0] . '.' . $this->criteria->columnName($baseClass, $parts[1]);
-        } else {
+        } else if (isset($this->criteria->criteriaAlias[$parts[0]])) {
+            $field = $parts[0] . '.' . $parts[1];
+        } else if (isset($this->criteria->tableAlias[$parts[0]])) {
+            if ($this->criteria->tableAlias[$parts[0]] == $parts[0]) {
+                $field = $parts[0] . '.' . $this->criteria->columnName($baseClass, $parts[1]);
+            }
+        }
+        if ($field == '') {
             $chain = implode('.', array_slice($parts, 0, -1));
 //            mdump($chain);
             $associationJoinType = $this->criteria->associationJoin[$chain] ?? null;
@@ -110,7 +116,7 @@ class Operand
                         match ($joinType) {
                             Join::INNER => $this->criteria->join($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
                             Join::LEFT => $this->criteria->leftJoin($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
-                            Join::RIGHT =>$this->criteria->rigthJoin($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
+                            Join::RIGHT => $this->criteria->rigthJoin($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
                         };
                         $this->criteria
                             ->join($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $toField, '=', $toAlias . '.' . $toField);
