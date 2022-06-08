@@ -53,7 +53,11 @@ class SelectionSet implements \JsonSerializable
 
     public function isSelected(string $key): bool
     {
-        return array_key_exists($key, $this->fields);
+        return !in_array($key, $this->forcedSelection) && array_key_exists($key, $this->fields);
+    }
+
+    public function fields() {
+        return array_map(fn(FieldSelection $f) => $f->getSQL(), $this->fields);
     }
 
     public function jsonSerialize()
