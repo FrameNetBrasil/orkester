@@ -1,6 +1,7 @@
 <?php
 
 use Monolog\Logger;
+use Orkester\GraphQL\Set\SelectionSet;
 use Orkester\Manager;
 use Orkester\Services\MTrace;
 
@@ -77,12 +78,12 @@ function array_pop_key(mixed $key, array &$array)
     return $value;
 }
 
-function group_by(array $data, mixed $key, bool $unset_key = true): array
+function group_by(array $data, $key, SelectionSet $selectionSet): array
 {
-    return array_reduce($data, function (array $accumulator, array $element) use ($key, $unset_key) {
+    return array_reduce($data, function (array $accumulator, array $element) use ($selectionSet, $key) {
         $groupKey = $element[$key];
-        if ($unset_key) unset($element[$key]);
-        $accumulator[$groupKey][] = $element;
+        $cols = array_filter($element, fn ($k) => is_array($element[$k]) || $selectionSet->isSelected($k), ARRAY_FILTER_USE_KEY);
+        $accumulator[$groupKey][] = $cols;// $element;
         return $accumulator;
     }, []);
 }

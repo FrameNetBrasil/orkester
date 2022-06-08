@@ -38,66 +38,34 @@ class QueryOperation implements \JsonSerializable
         $criteria->columns = [];
     }
 
-    public static function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap, int|string $fromKey, int|string $toKey): AssociationMap
-    {
-        $name = '_gql';
-//        $associationMap = new AssociationMap($name, $fromClassMap);
-        $associationMap = new AssociationMap($name);
-        $associationMap->toClassName = $toClassMap->model;
-        $associationMap->toClassMap = $toClassMap;
-        $associationMap->fromClassMap = $fromClassMap;
-        $associationMap->fromClassName = $fromClassMap->model;
-
-        $associationMap->cardinality = Association::ONE;
-
-        $associationMap->toKey = $toKey;
-        $associationMap->fromKey = $fromKey;
-        $fromClassMap->addAssociationMap($associationMap);
-        return $associationMap;
-    }
-
     protected function executeAssociatedQueries(Criteria $criteria, array &$rows, Result $result)
     {
         foreach ($this->selectionSet->getAssociatedQueries() as $associatedQuery) {
             $associationMap = $associatedQuery->getAssociationMap();
             $fromClassMap = $associationMap->fromClassMap;
             $fromKey = $associationMap->fromKey;
-//            $fromIds = array_map(fn($row) => $row[$fromKey], $rows);
             $fromIds = array_map(fn($row) => $row[$fromClassMap->keyAttributeName], $rows);
-
             $toKey = $associationMap->toKey;
             $toClassMap = $associationMap->toClassMap;
             $associatedCriteria = $toClassMap->getCriteria();
             $cardinality = $associationMap->cardinality;
-
-            $whereField = '_gql' . "." . $fromClassMap->keyAttributeName;
-            $associatedCriteria->joinClass($fromClassMap->model, '_gql',$toKey, '=', '_gql' . '.' . $fromKey);
-            $associatedCriteria->where($whereField, 'IN', $fromIds);
-            $associatedCriteria->select('_gql' . '.' . $fromKey);
-
-
-            /*
-
             if ($cardinality == Association::ONE) {
-//                $newAssociation = $this::createTemporaryAssociation($toClassMap, $fromClassMap, $toKey, $fromKey);
-//                $joinField = $newAssociation->name . "." . $associationMap->fromKey;
-//                $joinField = '_gql' . '.' . $classMap->keyAttributeName;
-                $whereField = $newAssociation->name . "." . $fromClassMap->keyAttributeName;
-                $associatedCriteria->joinClass($classMap->model, '_gql',$fromKey, '=', '_gql' . '.' . $fk);
+                $whereField = '_gql' . "." . $fromClassMap->keyAttributeName;
+                $associatedCriteria->joinClass($fromClassMap->model, '_gql', $toKey, '=', '_gql' . '.' . $fromKey);
                 $associatedCriteria->where($whereField, 'IN', $fromIds);
-                $associatedCriteria->select($newAssociation->name . "." . $associationMap->toKey);
+                $associatedCriteria->select($fromKey);
             } else if ($cardinality == Association::MANY) {
-                $associatedCriteria->where($fk, 'IN', $fromIds);
-                $associatedCriteria->select($fk);
+                $associatedCriteria->where($fromKey, 'IN', $fromIds);
+                $associatedCriteria->select($fromKey);
+            } else if ($cardinality == Association::ASSOCIATIVE) {
+                $model = $toClassMap->model;
+                $model::associationMany('_gql',model: $fromClassMap->model,associativeTable: $associationMap->associativeTable);
+                $associatedCriteria->select('_gql' . '.' . $fromKey);
             } else {
                 throw new EGraphQLException([$cardinality->value => 'Unhandled cardinality']);
             }
-            */
-
             $queryResult = $associatedQuery->getOperation()->executeFrom($associatedCriteria, $result, false);
-            $isFKSelected = $associatedQuery->getOperation()->selectionSet->isSelected($toKey);
-            mdump($queryResult);
-            $subRows = group_by($queryResult, $toKey, !$isFKSelected);
+            $subRows = group_by($queryResult, $fromKey, $associatedQuery->getOperation()->selectionSet);
             $associatedName = $associatedQuery->getName();
             foreach ($rows as &$row) {
                 $value = $subRows[$row[$fromKey] ?? ''] ?? [];
@@ -126,7 +94,6 @@ class QueryOperation implements \JsonSerializable
         $this->operatorSet->apply($criteria, $result);
         $rows = $criteria->get()->toArray();
         $this->executeAssociatedQueries($criteria, $rows, $result);
-//        $this->clearForcedSelection($rows);
         if ($addToResult) {
             $result->addCriteria($this->getName(), $criteria);
         }
@@ -137,6 +104,7 @@ class QueryOperation implements \JsonSerializable
     {
         $criteria = $this->model->getCriteria();
         $rows = $this->executeFrom($criteria, $result);
+        $this->clearForcedSelection($rows);
         $this->selectionSet->format($rows);
         $this::setupForSubQuery($criteria);
         $result->addResult($this->getName(), $rows);
