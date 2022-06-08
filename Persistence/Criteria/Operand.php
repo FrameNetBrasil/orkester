@@ -49,6 +49,10 @@ class Operand
             if (str_starts_with($this->field, ':')) {
                 return $this->resolveOperandParameter();
             }
+            if (str_contains($this->field, ' as ')) {
+                [$this->field, $this->alias] = explode(' as ', $this->field);
+                return $this->resolveOperandField();
+            }
             return $this->resolveOperandField();
         } else {
             return $this->field;
