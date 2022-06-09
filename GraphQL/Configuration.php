@@ -63,8 +63,12 @@ class Configuration
 
     public function getService(string $name): callable
     {
-        if ($service = $this->namedServices[$name] ?? false) {
-            return $service;
+        if ($name[0] == '_') {
+            $name = substr($name,1);
+        }
+        if ([$class, $name] = $this->namedServices[$name] ?? false) {
+            $service = Manager::getContainer()->get($class);
+            return fn(...$args) => $service->$name(...$args);
         }
         if ($service = ($this->serviceResolver)($name)) {
             return $service;

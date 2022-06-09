@@ -140,13 +140,17 @@ class Operand
 //                mdump('baseClass = ' . $baseClass);
                 $alias = $toAlias;
             }
-            $attributeMap = $this->criteria->getAttributeMap($parts[$n], $baseClass);
-            if ($attributeMap->reference != '') {
-                $this->field = str_replace($parts[$n], $attributeMap->reference, $this->field);
-//                mdump('*** ' . $this->field);
-                $field = $this->resolveOperand();
+            if ($parts[$n] == '*') {
+                $field = $alias . '.' . $parts[$n];
             } else {
-                $field = $alias . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
+                $attributeMap = $this->criteria->getAttributeMap($parts[$n], $baseClass);
+                if ($attributeMap->reference != '') {
+                    $this->field = str_replace($parts[$n], $attributeMap->reference, $this->field);
+//                mdump('*** ' . $this->field);
+                    $field = $this->resolveOperand();
+                } else {
+                    $field = $alias . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
+                }
             }
         }
         return $field;

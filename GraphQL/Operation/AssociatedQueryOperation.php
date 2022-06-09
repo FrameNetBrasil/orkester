@@ -36,7 +36,7 @@ class AssociatedQueryOperation
         return $this->operation;
     }
 
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         return [
             "name" => $this->name,

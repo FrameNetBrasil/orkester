@@ -22,7 +22,7 @@ class TotalOperation implements \JsonSerializable
         $result->addResult($name, $criteria->count());
     }
 
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         return [
             'name' => '__total',

@@ -16,7 +16,7 @@ class PrimitiveValue implements GraphQLValue, \JsonSerializable
         return $this->value;
     }
 
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         return $this->value;
     }

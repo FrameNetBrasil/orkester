@@ -56,11 +56,12 @@ class SelectionSet implements \JsonSerializable
         return !in_array($key, $this->forcedSelection) && array_key_exists($key, $this->fields);
     }
 
-    public function fields() {
+    public function fields()
+    {
         return array_map(fn(FieldSelection $f) => $f->getSQL(), $this->fields);
     }
 
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         return [
             "fields" => $this->fields,

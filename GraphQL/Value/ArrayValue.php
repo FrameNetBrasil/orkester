@@ -18,7 +18,7 @@ class ArrayValue implements GraphQLValue, \JsonSerializable
         return array_map(fn($v) => ($v)($result), $this->values);
     }
 
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         return array_map(fn($v) => $v->jsonSerialize(), $this->values);
     }

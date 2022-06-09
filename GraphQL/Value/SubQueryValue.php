@@ -21,7 +21,7 @@ class SubQueryValue implements GraphQLValue, \JsonSerializable
         return $criteria->select(($this->field)($result));
     }
 
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         return "subquery::{$this->key->jsonSerialize()}";
     }
