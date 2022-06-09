@@ -14,11 +14,13 @@ class Result
 
     }
 
-    public function addResult(string $name, mixed $result)
+    public function addResult(string $name, mixed $result,bool $isAlias = false)
     {
-        $result = $this->configuration->isSingular($name) ?
-            (array_key_exists(0, $result) ? $result[0] : null) :
-            $result;
+        if (!$isAlias) {
+            $result = $this->configuration->isSingular($name) ?
+                (array_key_exists(0, $result) ? $result[0] : null) :
+                $result;
+        }
         $this->results[$name] = $result;
     }
 

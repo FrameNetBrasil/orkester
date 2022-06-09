@@ -8,5 +8,5 @@ interface GraphQLValue
 {
     public function __invoke(?Result $result);
 
-    public function jsonSerialize();
+    public function jsonSerialize(): mixed;
 }
