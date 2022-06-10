@@ -79,10 +79,13 @@ class QueryOperation implements \JsonSerializable
 
     public function clearForcedSelection(array &$rows)
     {
+        $fields = $this->selectionSet->fields();
         if (!empty($this->selectionSet->forcedSelection)) {
             foreach ($rows as &$row) {
                 foreach ($this->selectionSet->forcedSelection as $key) {
-                    unset($row[$key]);
+                    if (!in_array($key, $fields)) {
+                        unset($row[$key]);
+                    }
                 }
             }
         }
