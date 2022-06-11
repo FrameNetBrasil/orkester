@@ -67,12 +67,12 @@ class SelectionSetParser
                 $this->parse($fragment->selectionSet);
             }
         }
-//        $key = $this->model->getKeyAttributeName();
-//        if (!empty($this->associatedQueries) && !array_key_exists($key, $this->selectionSet)) {
-//            $operator = new FieldSelection($key, $this->model->getKeyAttributeName());
-//            $this->forcedSelection[] = $key;
-//            $this->selectionSet[$key] = $operator;
-//        }
+        $key = $this->model->getKeyAttributeName();
+        if (!empty($this->associatedQueries) && !array_key_exists($key, $this->selectionSet)) {
+            $operator = new FieldSelection($key, $this->model->getKeyAttributeName());
+            $this->forcedSelection[] = $key;
+            $this->selectionSet[$key] = $operator;
+        }
         return new SelectionSet(
             $this->selectionSet ?? [],
             $this->forcedSelection ?? [],

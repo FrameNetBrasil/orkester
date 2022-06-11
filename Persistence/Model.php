@@ -222,6 +222,7 @@ class Model
 //            $associationMap->setIndexAttribute($association['index']);
 //        }
 
+        $key = '';
         if ($keys != '') {
             if (str_contains($keys, ':')) {
                 $k = explode(':', $keys);
