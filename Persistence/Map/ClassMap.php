@@ -127,7 +127,7 @@ class ClassMap
 
     public function getAssociationMap(string $name): ?AssociationMap
     {
-        $associationMap = $this->associationMaps[$name] ?? NULL;
+        $associationMap = $this->associationMaps[trim($name)] ?: NULL;
         if ($associationMap != NULL) {
 //            $associationMap->setKeysAttributes();
         }
