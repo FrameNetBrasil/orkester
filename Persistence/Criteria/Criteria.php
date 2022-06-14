@@ -119,7 +119,7 @@ class Criteria extends Builder
             } elseif (str_contains($column, ',')) {
                 $parser = new Parser("select " . $column);
                 foreach ($parser->statements[0]->expr as $j => $exp) {
-                    $columns[$j] = $this->resolveField('select', $exp->expr, $exp->alias);
+                    $columns[$i] = $this->resolveField('select', $exp->expr, $exp->alias);
                 }
             } else {
                 $columns[$i] = $this->resolveField('select', $column);
