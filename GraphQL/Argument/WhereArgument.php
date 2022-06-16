@@ -66,7 +66,10 @@ class WhereArgument extends AbstractArgument implements \JsonSerializable
                 foreach ($cs as $c) {
                     array_push($items, ...$this->processComposedCondition($c));
                 }
-            } else if (array_key_exists(0, $conditions)) {
+            } else if ($conditions instanceof Criteria) {
+                $criteria->where($field, 'IN', $conditions);
+            }
+            else if (array_key_exists(0, $conditions)) {
                 foreach ($conditions as $condition) {
                     $op = array_key_first($condition);
                     $value = $condition[$op];

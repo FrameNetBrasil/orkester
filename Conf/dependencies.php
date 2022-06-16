@@ -57,7 +57,7 @@ return function (ContainerBuilder $containerBuilder) {
                     $socketHandler =
                         (new SocketHandler("tcp://$peer:$port"))
                             ->setFormatter(new OTraceFormatter())
-                            ->setPersistent(true);
+                            ->setPersistent(false);
                     $handlers[] = $socketHandler;
                 }
             }
