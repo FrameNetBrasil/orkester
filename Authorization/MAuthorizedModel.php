@@ -98,7 +98,7 @@ class MAuthorizedModel
             ->limit(1)->asResult()[0];
     }
 
-    public function getById(int $id): ?object
+    public function getById(int $id): ?array
     {
         if ($this->canUpdateEntity($id)) {
             return $this->model->find($id);

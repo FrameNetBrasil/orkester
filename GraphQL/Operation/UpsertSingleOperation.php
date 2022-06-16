@@ -9,6 +9,7 @@ use Orkester\GraphQL\Result;
 use Orkester\GraphQL\Value\GraphQLValue;
 use Orkester\Authorization\MAuthorizedModel;
 use Orkester\MVC\MModel;
+use Orkester\Persistence\Criteria\Criteria;
 
 class UpsertSingleOperation implements \JsonSerializable
 {
@@ -26,10 +27,16 @@ class UpsertSingleOperation implements \JsonSerializable
     public function execute(Result $result)
     {
         $values = ($this->object)($result);
+        foreach($values as $key => $value) {
+            if ($value instanceof Criteria) {
+                $a = $value->first();
+                $values[$key] = array_shift($a);
+            }
+        }
         $key = $this->model->getKeyAttributeName();
         if ($this->forceInsert) unset($values[$key]);
         try {
-            if (array_key_exists($key, $values)) {
+            if (array_key_exists($key, $values) && $values[$key]) {
                 $pk = UpdateSingleOperation::update($this->model, $values[$key], $values);
             } else {
                 foreach (array_keys($values) as $attribute) {

@@ -48,6 +48,12 @@ class UpdateSingleOperation implements \JsonSerializable
     public function execute(Result $result)
     {
         $values = ($this->set)($result);
+        foreach($values as $key => $value) {
+            if ($value instanceof Criteria) {
+                $a = $value->first();
+                $values[$key] = array_shift($a);
+            }
+        }
         $pk = ($this->id)($result);
         $key = $this->model->getKeyAttributeName();
         $values[$key] = $pk;
