@@ -122,7 +122,12 @@ class Criteria extends Builder
                     $columns[$i] = $this->resolveField('select', $exp->expr, $exp->alias);
                 }
             } else {
-                $columns[$i] = $this->resolveField('select', $column);
+                $alias = '';
+                if (str_contains($column, ' ')) {
+                    $column = str_replace(' as ', ' ', $column);
+                    list($column, $alias) = explode(' ', $column);
+                }
+                $columns[$i] = $this->resolveField('select', $column, $alias);
             }
         }
     }
