@@ -198,7 +198,7 @@ class QueryOperation extends AbstractOperation
         $authorization = $container->get($associatedModel::$authorizationClass);
         $operation->prepare(new MAuthorizedModel($associatedModel, $authorization));
         $name = $node->alias ? $node->alias->value : $node->name->value;
-        $this->subOperations[$name] = $operation;
+        $this->subOperations[$name] = [$operation, $node->name->value];
         $this->requiredSelections->add($associationMap->getFromKey());
     }
 
@@ -337,7 +337,7 @@ class QueryOperation extends AbstractOperation
         }
         $removedParameters = $this->prepareForSubCriteria($criteria);
 
-        foreach ($this->subOperations as $associationName => $operation) {
+        foreach ($this->subOperations as $alias => [$operation, $associationName]) {
 //            $operation->parameters = &$this->parameters;
             $associationMap = $classMap->getAssociationMap($associationName);
             $fromKey = $associationMap->getFromKey();
@@ -373,7 +373,7 @@ class QueryOperation extends AbstractOperation
 //                if (in_array($fromKey, $columnsToExclude)) {
 //                    unset($row[$fromKey]);
 //                }
-                $row[$associationName] = $value;
+                $row[$alias] = $value;
                 $updatedRows[] = $row;
             }
             $rows = $updatedRows;

@@ -118,6 +118,7 @@ class PHPConfigLoader extends PersistentConfigLoader
         $attributeMap->setIdGenerator($attr['idgenerator'] ?? null);
         $attributeMap->setDefault($attr['default'] ?? null);
         $attributeMap->setNullable($attr['nullable'] ?? true);
+        $attributeMap->setVirtual($attr['virtual'] ?? false);
         $attributeMap->setValidator($attr['validator'] ?? null);
         $this->classMap->addAttributeMap($attributeMap);
     }

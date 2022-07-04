@@ -16,6 +16,7 @@ class AttributeMap
     private mixed $default;
     private bool $nullable = false;
     private $reference = '';
+    private $virtual;
     private $index = NULL;
     private $type = NULL;
     private $converter = NULL;
@@ -296,5 +297,15 @@ class AttributeMap
     public function setNullable(bool $nullable): void
     {
         $this->nullable = $nullable;
+    }
+
+    public function isVirtual(): bool
+    {
+        return (bool) $this->virtual;
+    }
+
+    public function setVirtual($value): void
+    {
+        $this->virtual = (bool) $value;
     }
 }

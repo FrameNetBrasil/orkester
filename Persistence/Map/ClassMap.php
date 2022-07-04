@@ -161,10 +161,10 @@ class ClassMap
             $this->fieldMaps[strtoupper($columnName)] = $attributeMap;
             if ($attributeMap->getKeyType() == 'primary') {
                 $this->keyAttributeMap = $attributeMap;
-            } else {
+            } else if (!$attributeMap->isVirtual()) {
                 $this->updateAttributeMaps[$attributeName] = $attributeMap;
             }
-            if ($attributeMap->getIdGenerator() != 'identity') {
+            if (!$attributeMap->isVirtual() && $attributeMap->getIdGenerator() != 'identity') {
                 $this->insertAttributeMaps[$attributeName] = $attributeMap;
             }
             if ($attributeMap->getReference() != NULL) {
