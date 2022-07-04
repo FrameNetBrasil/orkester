@@ -93,10 +93,10 @@ abstract class AbstractConditionOperator extends AbstractOperation
             $value = $var[$op];
         } else {
             $entry = $node->value->fields->offsetGet(0);
-            $value = $this->context->getNodeValue($entry->value);;
+            $value = $this->context->getNodeValue($entry->value);
             $op = $entry->name->value;
         }
-        if (!($value == null && $op != 'is_null')) {
+        if (!(is_null($value) && $op != 'is_null')) {
             $operator = $this->getCriteriaOperator($op, $value, $parameters);
             return [[$field, $operator, $value]];
         }

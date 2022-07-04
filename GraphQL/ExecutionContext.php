@@ -64,7 +64,7 @@ class ExecutionContext
                 if (array_key_exists(0, $subResult)) {
                     $result = array_map(fn($row) => $row[$key], $subResult);
                 } else {
-                    $result = $subResult[$key] ?? null;
+                    $result = $subResult[$key] ?? [];
                 }
             } else {
                 $result = $this->results[$parts[0]]['criteria'];
