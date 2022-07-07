@@ -2,9 +2,12 @@
 
 namespace Orkester\Persistence\Criteria;
 
+use Closure;
 use Illuminate\Database\Connection;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Monolog\Logger;
 use Orkester\Persistence\Enum\Join;
@@ -16,6 +19,7 @@ use PhpMyAdmin\SqlParser\Parser;
 
 class Criteria extends Builder
 {
+    /** @var Connection */
     public $connection;
     private string|Model $model;
     /**
@@ -36,7 +40,7 @@ class Criteria extends Builder
     public $parameters = [];
     public $originalBindings = null;
 
-    public function __construct(Connection $connection, Logger $logger)
+    public function __construct(ConnectionInterface $connection, Logger $logger)
     {
         $this->logger = $logger;
         parent::__construct($connection);
@@ -88,7 +92,21 @@ class Criteria extends Builder
 //        $this->beforeQuery(function ($query) use ($criteria) {
 //            $criteria->parseCriteria($query, $criteria);
 //        });
-        return parent::get($columns);
+        $result = parent::get($columns);
+        $this->writeQueryLog();
+        return $result;
+    }
+
+    public function writeQueryLog()
+    {
+        foreach ($this->connection->getQueryLog() as $event) {
+            $query = $event['query'];
+            foreach ($event['bindings'] as $binding) {
+                $query = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('"%s"', $binding)), $query);
+            }
+            $this->logger->info($query);
+        }
+        $this->connection->flushQueryLog();
     }
 
     public function insert(array $values)
@@ -96,7 +114,9 @@ class Criteria extends Builder
         foreach ($values as $i => $row) {
             $this->upserts($values[$i]);
         }
-        return parent::insert($values);
+        $result = parent::insert($values);
+        $this->writeQueryLog();
+        return $result;
     }
 
     public function update(array|object $values)
@@ -105,7 +125,23 @@ class Criteria extends Builder
             $values = (array)$values;
         }
         $this->upserts($values);
-        parent::update($values);
+        $result = parent::update($values);
+        $this->writeQueryLog();
+        return $result;
+    }
+
+    public function upsert(array $values, $uniqueBy, $update = null): int
+    {
+        $result = parent::upsert($values, $uniqueBy, $update);
+        $this->writeQueryLog();
+        return $result;
+    }
+
+    public function delete($id = null): int
+    {
+        $result = parent::delete($id);;
+        $this->writeQueryLog();
+        return  $result;
     }
 
     public function columns(?array &$columns)
@@ -135,7 +171,11 @@ class Criteria extends Builder
     public function wheres(array &$wheres)
     {
         foreach ($wheres ?? [] as $i => $where) {
-            if ($where['type'] == 'Column') {
+            if ($where['type'] == "Nested") {
+                $where['query']->setModel($this->model);
+//                $where['query']->wheres($where['query']->wheres);
+                $where['query']->applyBeforeQueryCallbacks();
+            } else if ($where['type'] == 'Column') {
                 $wheres[$i]['first'] = $this->resolveField('where', $where['first']);
                 $wheres[$i]['second'] = $this->resolveField('where', $where['second']);
             } else if ($where['type'] == 'Exists') {
@@ -275,6 +315,9 @@ class Criteria extends Builder
 
     private function resolveField($context, $field, $alias = '')
     {
+        if ($field instanceof Closure) {
+            return $field;
+        }
         $alias ??= '';
         if ($alias != '') {
             if (isset($this->fieldAlias[$alias])) {
@@ -310,7 +353,9 @@ class Criteria extends Builder
 
     public function where($attribute, $operator = null, $value = null, $boolean = 'and')
     {
-        $uOp = strtoupper($operator);
+        if ($attribute instanceof Closure) {
+            return parent::where($attribute, $operator, $value, $boolean);
+        }
         if ($value instanceof Criteria) {
             $type = 'Sub';
             $column = $attribute;
@@ -321,6 +366,7 @@ class Criteria extends Builder
             );
             $this->addBinding($value->getBindings(), 'where');
         } else {
+            $uOp = strtoupper($operator ?? "");
             $uValue = is_string($value) ? strtoupper($value) : $value;
             if (($uValue === 'NULL') || is_null($value)) {
                 $this->whereNull($attribute);
@@ -337,10 +383,10 @@ class Criteria extends Builder
         return $this;
     }
 
-    public function orWhere($attribute, $operator = null, $value = null)
-    {
-        return $this->where($attribute, $operator, $value, $boolean = 'or');
-    }
+//    public function orWhere($attribute, $operator = null, $value = null)
+//    {
+//        return $this->where($attribute, $operator, $value, $boolean = 'or');
+//    }
 
 //    public function whereExists(Criteria $criteria, $boolean = 'and', $not = false)
 //    {
@@ -359,7 +405,8 @@ class Criteria extends Builder
 //        return $this;
 //    }
 
-    public function joinClass($className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false) {
+    public function joinClass($className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
+    {
         $this->registerClass($className);
         $tableName = $this->tableName($className);
         $this->alias($alias, $className);
@@ -403,7 +450,8 @@ class Criteria extends Builder
         }
     }
     */
-    public function range(int $page, $rows) {
+    public function range(int $page, $rows)
+    {
         $offset = ($page - 1) * $rows;
         $this->offset($offset)->limit($rows);
         return $this;
@@ -425,17 +473,6 @@ class Criteria extends Builder
             $this->setParameter($p, $v);
         }
         return $this;
-    }
-
-    public function toSql(): string
-    {
-        $sql = parent::toSql();
-        $sqlLog = $sql;
-        foreach ($this->getBindings() as $binding) {
-            $sqlLog = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('"%s"', $binding)), $sqlLog);
-        }
-        $this->logger->info($sqlLog);
-        return $sql;
     }
 
 //    public function beginTransaction()
