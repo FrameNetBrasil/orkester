@@ -94,7 +94,7 @@ class ClassMap
                 $this->updateAttributeMaps[$attributeName] = $attributeMap;
             }
             //if (($attributeMap->idGenerator != 'identity') && ($attributeMap->reference == '')){
-            if ($attributeMap->reference == '') {
+            if (!$attributeMap->virtual && $attributeMap->reference == '') {
                 $this->insertAttributeMaps[$attributeName] = $attributeMap;
             }
             if ($attributeMap->reference != '') {
