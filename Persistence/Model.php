@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Container\Container as LaravelContainer;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Arr;
 use Monolog\Logger;
@@ -82,6 +83,11 @@ class Model
         return self::$classMaps[$className];
     }
 
+    public static function getKeyAttributeName(): string
+    {
+        return self::getClassMap()->keyAttributeName;
+    }
+
     public static function map(): void
     {
     }
@@ -105,6 +111,7 @@ class Model
         string              $alias = '',
         string              $default = null,
         bool                $nullable = true,
+        bool                $virtual = false,
         string|Closure|null $validator = null,
     ): void
     {
@@ -136,6 +143,7 @@ class Model
         $attributeMap->default = $default;
         $attributeMap->nullable = $nullable;
         $attributeMap->validator = $validator;
+        $attributeMap->virtual = $virtual;
         self::$classMaps[get_called_class()]->addAttributeMap($attributeMap);
 
     }
@@ -266,12 +274,28 @@ class Model
 
         $associationMap->joinType = $join;
         $fromClassMap->addAssociationMap($associationMap);
+        if ($cardinality == Association::ASSOCIATIVE) {
+            static::createAssociativeClassMap($associationMap);
+        }
+    }
+
+    protected static function createAssociativeClassMap(AssociationMap $associationMap): void
+    {
+        $a1 = new AttributeMap($associationMap->fromKey);
+        $a2 = new AttributeMap($associationMap->toKey);
+        $name = "{$associationMap->fromClassName}_$associationMap->associativeTable";
+        $classMap = new ClassMap($name);
+        $classMap->addAttributeMap($a1);
+        $classMap->addAttributeMap($a2);
+        self::$classMaps[$name] = $classMap;
+        $classMap->tableName = $associationMap->associativeTable;
     }
 
     public static function getCriteria(string $databaseName = null): Criteria
     {
         $databaseName ??= Manager::getOptions('db');
         $connection = self::$capsule->getConnection($databaseName);
+        $connection->enableQueryLog();
         (new \ReflectionClass(get_class($connection)))
             ->getProperty('fetchMode')->setValue($connection, self::$fetchStyle);
 
@@ -279,8 +303,8 @@ class Model
 
         $container = Manager::getContainer();
         return $container->call(
-            //fn(Logger $logger) => new Criteria($classMap, $connection, $logger->withName('criteria'))
-            function(Logger $logger) use ($connection, $classMap){
+        //fn(Logger $logger) => new Criteria($classMap, $connection, $logger->withName('criteria'))
+            function (Logger $logger) use ($connection, $classMap) {
                 $criteria = new Criteria($connection, $logger->withName('criteria'));
                 return $criteria->setClassMap($classMap);
             }
@@ -466,6 +490,52 @@ class Model
         return !is_null(static::one($conditions));
     }
 
+    protected static function getManyToManyAssociation(string $associationName): AssociationMap
+    {
+        $classMap = static::getClassMap();
+        $association = $classMap->getAssociationMap($associationName);
+        if (empty($association)) {
+            throw new \InvalidArgumentException("Unknown association: $associationName");
+        }
+        if (empty($association->associativeTable)) {
+            throw new \InvalidArgumentException("append association requires associative table");
+        }
+        return $association;
+    }
+
+    public static function appendAssociation(string $associationName, mixed $id, array $associatedIds): void
+    {
+        $association = static::getManyToManyAssociation($associationName);
+        $columns = array_map(fn($aId) => [
+            $association->toKey => $aId,
+            $association->fromKey => $id
+        ],
+            $associatedIds
+        );
+        static::getCriteria()
+            ->setClassMap(self::$classMaps["{$association->fromClassName}_$association->associativeTable"])
+            ->upsert($columns, [$association->toKey, $association->fromKey]);
+    }
+
+    public static function removeAssociation(string $associationName, mixed $id, ?array $associatedIds): void
+    {
+        $association = static::getManyToManyAssociation($associationName);
+        $criteria = static::getCriteria()
+            ->setClassMap(self::$classMaps["{$association->fromClassName}_$association->associativeTable"])
+            ->where($association->fromKey, '=', $id);
+        if (is_array($associatedIds)) {
+            $criteria->where($association->toKey, 'IN', $associatedIds);
+        }
+        $criteria->delete();
+    }
+
+    public static function replaceAssociation(string $associationName, mixed $id, array $associatedIds): void
+    {
+        self::beginTransaction();
+        self::removeAssociation($associationName, $id, null);
+        self::appendAssociation($associationName, $id, $associatedIds);
+        self::commit();
+    }
 
     /*
     public IAuthorization $authorization;
