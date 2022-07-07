@@ -37,12 +37,14 @@ use Orkester\Services\MLog;
 return function (ContainerBuilder $containerBuilder) {
     $containerBuilder->addDefinitions([
         Logger::class => function (ContainerInterface $c) {
-            $lineFormat = "[%datetime%] %channel%.[%level_name%]%context.tag%: %message%";
+            $lineFormat = "[%datetime%] %channel%[%level_name%]%context.tag%: %message%" . PHP_EOL;
             $dateFormat = "Y/m/d H:i:s";
             $conf = Manager::getConf("logs");
             $handlers = [];
 
-            $logger = new Logger($conf['channel'] ?? null);
+            if ($conf['level'] == 0) {
+                return new Logger($conf['channel'] ?? null);
+            }
 
             if ($conf['stdout'] ?? false) {
                 $stdoutHandler = new StreamHandler('php://stdout');
@@ -57,7 +59,7 @@ return function (ContainerBuilder $containerBuilder) {
                     $socketHandler =
                         (new SocketHandler("tcp://$peer:$port"))
                             ->setFormatter(new OTraceFormatter())
-                            ->setPersistent(false);
+                            ->setPersistent(true);
                     $handlers[] = $socketHandler;
                 }
             }
@@ -67,15 +69,15 @@ return function (ContainerBuilder $containerBuilder) {
                 mkdir($dir, recursive: true);
             }
             $file = $dir . DIRECTORY_SEPARATOR .
-                ($conf['channel'] ?? '') . '_' .
+                (empty($conf['channel']) ? '' : "{$conf['channel']}_") .
                 Carbon::now()->format('Y_m_d_H') . '.log';
-
             $fileHandler =
                 (new StreamHandler($file, filePermission: 644))
                     ->setFormatter(new LineFormatter($lineFormat, $dateFormat));
             $handlers[] = $fileHandler;
 
             $groupHandler = new WhatFailureGroupHandler($handlers);
+            $logger = new Logger($conf['channel'] ?? null);
             $logger->pushHandler($groupHandler);
             return $logger;
         },
