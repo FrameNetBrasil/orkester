@@ -20,6 +20,7 @@ use DI\Container;
 //use Orkester\Security\MSSL;
 //use Orkester\Services\Cache\MCacheFast;
 //use Orkester\Services\Http\MAjax;
+use Illuminate\Support\Facades\Facade;
 use Monolog\Logger;
 use Orkester\Handlers\HttpErrorHandler;
 use Orkester\Handlers\ShutdownHandler;
@@ -168,8 +169,9 @@ class Manager
             $containerBuilder->enableCompilation($tmpPath);
         }
         // Set up settings
-//        $baseSettings = require self::$classPath . '/Conf/settings.php';
-//        $baseSettings($containerBuilder);
+        $baseSettings = require self::$classPath . '/Conf/settings.php';
+        $baseSettings($containerBuilder);
+
         if (file_exists(self::$confPath . '/settings.php')) {
             $settings = require self::$confPath . '/settings.php';
             $settings($containerBuilder);
@@ -314,9 +316,11 @@ class Manager
 //        return self::$basePath;
 //    }
 //
-    public static function getAppPath(): string
+    public static function getAppPath(string $path = null): string
     {
-        return self::$appPath;
+        return is_null($path) ?
+            self::$appPath :
+            self::$appPath . "/$path";
     }
 
     public static function getConfPath(): string
