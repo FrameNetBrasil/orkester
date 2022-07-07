@@ -8,13 +8,14 @@ use Orkester\Exception\EValidationException;
 use Orkester\GraphQL\Result;
 use Orkester\GraphQL\Value\GraphQLValue;
 use Orkester\Authorization\MAuthorizedModel;
+use Orkester\Persistence\Model;
 
 class DeleteSingleOperation implements \JsonSerializable
 {
     public function __construct(
         protected string           $name,
         protected ?string          $alias,
-        protected MAuthorizedModel $model,
+        protected Model|string $model,
         protected GraphQLValue     $id
     )
     {
@@ -23,11 +24,8 @@ class DeleteSingleOperation implements \JsonSerializable
     public function execute(Result $result)
     {
         $id = ($this->id)($result);
-        if (!$this->model->canDelete($id)) {
-            throw new EGraphQLForbiddenException($this->model->getName(), 'delete');
-        }
         try {
-            $this->model->delete($id);
+            $this->model::delete($id);
         } catch (EValidationException $e) {
             throw new EGraphQLValidationException($e->errors);
         }
@@ -39,7 +37,7 @@ class DeleteSingleOperation implements \JsonSerializable
             'name' => $this->name,
             'alias' => $this->alias,
             'type' => 'mutation',
-            'model' => $this->model->getName(),
+            'model' => $this->model::getName(),
             'id' => $this->id->jsonSerialize()
         ];
     }

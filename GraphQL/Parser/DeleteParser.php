@@ -7,11 +7,12 @@ use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\GraphQL\Context;
 use Orkester\GraphQL\Operation\DeleteSingleOperation;
 use Orkester\Authorization\MAuthorizedModel;
+use Orkester\Persistence\Model;
 
 class DeleteParser
 {
 
-    public static function fromNode(FieldNode $root, MAuthorizedModel $model, Context $context): DeleteSingleOperation
+    public static function fromNode(FieldNode $root, Model|string $model, Context $context): DeleteSingleOperation
     {
         $alias = $root->alias?->value;
         $name = $root->name->value;

@@ -6,21 +6,19 @@ use Orkester\Exception\EGraphQLException;
 use Orkester\GraphQL\Set\OperatorSet;
 use Orkester\GraphQL\Set\SelectionSet;
 use Orkester\GraphQL\Result;
-use Orkester\Authorization\MAuthorizedModel;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
-use Orkester\Persistence\Map\AssociationMap;
-use Orkester\Persistence\Map\ClassMap;
+use Orkester\Persistence\Model;
 
 class QueryOperation implements \JsonSerializable
 {
 
     public function __construct(
-        protected string           $name,
-        protected MAuthorizedModel $model,
-        protected SelectionSet     $selectionSet,
-        protected OperatorSet      $operatorSet,
-        protected ?string          $alias = null,
+        protected string       $name,
+        protected Model|string $model,
+        protected SelectionSet $selectionSet,
+        protected OperatorSet  $operatorSet,
+        protected ?string      $alias = null,
 
     )
     {
@@ -79,13 +77,10 @@ class QueryOperation implements \JsonSerializable
 
     public function clearForcedSelection(array &$rows)
     {
-        $fields = $this->selectionSet->fields();
         if (!empty($this->selectionSet->forcedSelection)) {
             foreach ($rows as &$row) {
                 foreach ($this->selectionSet->forcedSelection as $key) {
-                    if (!in_array($key, $fields)) {
-                        unset($row[$key]);
-                    }
+                    unset($row[$key]);
                 }
             }
         }
@@ -93,6 +88,7 @@ class QueryOperation implements \JsonSerializable
 
     public function executeFrom(Criteria $criteria, Result $result, bool $addToResult = true): array
     {
+        if (empty($this->selectionSet->fields())) return [];
         $this->selectionSet->apply($criteria);
         $this->operatorSet->apply($criteria, $result);
         $rows = $criteria->get()->toArray();
@@ -100,14 +96,14 @@ class QueryOperation implements \JsonSerializable
         if ($addToResult) {
             $result->addCriteria($this->getName(), $criteria);
         }
+        $this->clearForcedSelection($rows);
         return $rows;
     }
 
     public function execute(Result $result)
     {
-        $criteria = $this->model->getCriteria();
+        $criteria = $this->model::getCriteria();
         $rows = $this->executeFrom($criteria, $result);
-        $this->clearForcedSelection($rows);
         $this->selectionSet->format($rows);
         $this::setupForSubQuery($criteria);
         $result->addResult($this->getName(), $rows);
@@ -119,7 +115,7 @@ class QueryOperation implements \JsonSerializable
             "name" => $this->name,
             "alias" => $this->alias,
             "type" => "query",
-            "model" => $this->model->getName(),
+            "model" => $this->model::getName(),
             "selection" => $this->selectionSet->jsonSerialize(),
             "operators" => $this->operatorSet->jsonSerialize()
         ];
