@@ -12,11 +12,13 @@ use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\GraphQL\Operation\QueryOperation;
 use Orkester\GraphQL\Operation\TotalOperation;
-use Orkester\GraphQL\Operation\UpsertSingleOperation;
+use Orkester\GraphQL\Operation\UpsertOperation;
 use Orkester\GraphQL\Parser\DeleteParser;
+use Orkester\GraphQL\Parser\InsertParser;
 use Orkester\GraphQL\Parser\QueryParser;
 use Orkester\GraphQL\Parser\ServiceParser;
 use Orkester\GraphQL\Parser\TotalParser;
+use Orkester\GraphQL\Parser\UpdateAssociationParser;
 use Orkester\GraphQL\Parser\UpdateParser;
 use Orkester\GraphQL\Parser\UpsertParser;
 use Orkester\Manager;
@@ -90,19 +92,22 @@ class Executor
 
     protected function parseMutation(FieldNode $root, Context $context)
     {
-        if (preg_match("/insert([\w\d]+)/", $root->name->value, $matches)) {
-            $model = $this->configuration->getModel(lcfirst($matches[1]));
-            $operation = UpsertParser::fromNode($root, $model, $context, true);
-        } else if (preg_match("/update([\w\d]+)/", $root->name->value, $matches)) {
-            $model = $this->configuration->getModel(lcfirst($matches[1]));
+        if (preg_match("/insert_([\w\d_]+)/", $root->name->value, $matches)) {
+            $model = $this->configuration->getModel($matches[1]);
+            $operation = InsertParser::fromNode($root, $model, $context);
+        } else if (preg_match("/upsert_([\w\d_]+)/", $root->name->value, $matches)) {
+            $model = $this->configuration->getModel($matches[1]);
+            $operation = UpsertParser::fromNode($root, $model, $context);
+        } else if (preg_match("/update_([\w\d_]+)_([\w\d]+)/", $root->name->value, $matches)) {
+            $model = $this->configuration->getModel($matches[1]);
+            $operation = UpdateAssociationParser::fromNode($root, $model, $matches[2], $context);
+        } else if (preg_match("/update_([\w\d_]+)/", $root->name->value, $matches)) {
+            $model = $this->configuration->getModel($matches[1]);
             $operation = UpdateParser::fromNode($root, $model, $context);
-        } else if (preg_match("/upsert([\w\d]+)/", $root->name->value, $matches)) {
-            $model = $this->configuration->getModel(lcfirst($matches[1]));
-            $operation = UpsertParser::fromNode($root, $model, $context, false);
-        } else if (preg_match("/delete([\w\d]+)/", $root->name->value, $matches)) {
-            $model = $this->configuration->getModel(lcfirst($matches[1]));
+        } else if (preg_match("/delete_([\w\d_]+)/", $root->name->value, $matches)) {
+            $model = $this->configuration->getModel($matches[1]);
             $operation = DeleteParser::fromNode($root, $model, $context);
-        } else if (preg_match("/service([\w\d]+)/", $root->name->value, $matches)) {
+        } else if (preg_match("/service_([\w\d_]+)/", $root->name->value, $matches)) {
             $service = $this->configuration->getService($matches[1]);
             $operation = ServiceParser::fromNode($root, $context, $service);
         } else {

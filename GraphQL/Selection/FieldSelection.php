@@ -10,6 +10,7 @@ use Orkester\GraphQL\Formatter\IFormatter;
 use Orkester\GraphQL\Parser\Parser;
 use Orkester\Authorization\MAuthorizedModel;
 use Orkester\Persistence\Map\AttributeMap;
+use Orkester\Persistence\Model;
 
 class FieldSelection implements \JsonSerializable
 {
@@ -40,7 +41,7 @@ class FieldSelection implements \JsonSerializable
         return $v;
     }
 
-    public static function fromNode(FieldNode $node, MAuthorizedModel $model, Context $context): ?FieldSelection
+    public static function fromNode(FieldNode $node, Model|string $model, Context $context): ?FieldSelection
     {
         $arguments = Parser::toAssociativeArray($node->arguments, null);
         $skipExistCheck = false;
@@ -56,7 +57,7 @@ class FieldSelection implements \JsonSerializable
             $field = $node->name->value;
             $alias = $node->alias?->value ?? null;
         }
-        $attributeMap = $model->getClassMap()->getAttributeMapChain($field);
+        $attributeMap = $model::getClassMap()->getAttributeMapChain($field);
         if (!$skipExistCheck && !$attributeMap) {
             return null;
         }

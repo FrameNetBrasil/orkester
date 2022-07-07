@@ -20,7 +20,7 @@ class SelectionSetParser
     protected array $selectionSet = [];
 
     public function __construct(
-        protected MAuthorizedModel $model,
+        protected Model|string $model,
         protected Context          $context
     )
     {
@@ -30,16 +30,16 @@ class SelectionSetParser
     {
         $name = $selectionNode->name->value;
         if ($name == '__typename') {
-            $operator = new FieldSelection("'{$this->model->getName()}'", "__typename");
+            $operator = new FieldSelection("'{$this->model::getName()}'", "__typename");
         } else if ($name == 'id') {
-            $operator = new FieldSelection($this->model->getKeyAttributeName(), 'id');
+            $operator = new FieldSelection($this->model::getKeyAttributeName(), 'id');
         } else {
             $operator = FieldSelection::fromNode($selectionNode, $this->model, $this->context);
             /** @var AssociationMap $associationMap */
-            if (!$operator && $associationMap = $this->model->getClassMap()->getAssociationMap($name)) {
+            if (!$operator && $associationMap = $this->model::getClassMap()->getAssociationMap($name)) {
                 $query = QueryParser::fromNode(
                     $selectionNode,
-                    $this->context->getConfiguration()->getAuthorizedModel($associationMap->toClassName),
+                    $associationMap->toClassName,
                     QueryParser::$associationOperations,
                     $this->context
                 );
@@ -67,9 +67,9 @@ class SelectionSetParser
                 $this->parse($fragment->selectionSet);
             }
         }
-        $key = $this->model->getKeyAttributeName();
+        $key = $this->model::getKeyAttributeName();
         if (!empty($this->associatedQueries) && !array_key_exists($key, $this->selectionSet)) {
-            $operator = new FieldSelection($key, $this->model->getKeyAttributeName());
+            $operator = new FieldSelection($key, $this->model::getKeyAttributeName());
             $this->forcedSelection[] = $key;
             $this->selectionSet[$key] = $operator;
         }
