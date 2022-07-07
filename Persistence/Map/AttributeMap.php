@@ -15,6 +15,7 @@ class AttributeMap
     public string $alias;
     public mixed $default;
     public bool $nullable = false;
+    public bool $virtual = false;
     public string $reference = '';
     public string $idGenerator = '';
     public Type $type = Type::STRING;
@@ -24,6 +25,7 @@ class AttributeMap
     public function __construct(string $name)
     {
         $this->name = $name;
+        $this->columnName = $name;
     }
 
 }
