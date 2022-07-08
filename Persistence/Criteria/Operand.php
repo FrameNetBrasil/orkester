@@ -8,72 +8,35 @@ use Orkester\Persistence\Enum\Join;
 
 class Operand
 {
+    public string $context = '';
+
     public function __construct(
         public Criteria $criteria,
         public string   $field,
-        public string   $alias = '',
-        public string   $context = 'select'
+        public string   $alias = ''
     )
     {
     }
 
-    public function resolve(): string|Expression
+    public function resolveOperand(string $context): string|Expression
     {
-        $originalField = $this->field;
-        $operand = $this->resolveOperand();
-        if ($this->context == 'select') {
-            if ($this->alias != '') {
-                $this->criteria->fieldAlias[$this->alias] = $originalField;
-                if ($operand instanceof Expression) {
-                    $operand = new Expression($operand->getValue() . " as {$this->alias}");
-                } else {
-                    $operand .= " as {$this->alias}";
-                }
-            }
+        $this->context = $context;
+        if ($this->field instanceof Expression) {
+            $operand = $this->field;
+        } else if (str_contains($this->field, '.')) {
+            $operand = $this->resolveOperandPath();
+        } else {
+            $operand = $this->resolveOperandField();
+        }
+        if ($this->context == 'select' && !empty($this->alias)) {
+            $originalField = $this->field;
+            $this->criteria->fieldAlias[$this->alias] = $originalField;
+            $alias = " as {$this->alias}";
+            $operand = $operand instanceof Expression ?
+                new Expression("{$operand->getValue()}$alias") :
+                "$operand$alias";
         }
         return $operand;
-    }
-
-    public function resolveOperand(): string|Expression
-    {
-        if (is_string($this->field)) {
-            if (is_numeric($this->field)) {
-                return $this->field;
-            }
-            if (str_contains($this->field, '(')) {
-                return $this->resolveOperandFunction();
-            }
-            if (str_contains($this->field, '.')) {
-                return $this->resolveOperandPath();
-            }
-            if (str_starts_with($this->field, ':')) {
-                return $this->resolveOperandParameter();
-            }
-            if (str_contains($this->field, ' as ')) {
-                [$this->field, $this->alias] = explode(' as ', $this->field);
-                return $this->resolveOperandField();
-            }
-            return $this->resolveOperandField();
-        } else {
-            return $this->field;
-        }
-    }
-
-    public function resolveOperandFunction(): Expression
-    {
-        $field = $this->field;
-        $output = preg_replace_callback('/(\()(.+)(\))/',
-            function ($matches) {
-                $arguments = [];
-                $fields = explode(',', $matches[2]);
-                foreach ($fields as $argument) {
-                    $this->field = $argument;
-                    $arguments[] = $this->resolveOperand();
-                }
-                return "(" . implode(',', $arguments) . ")";
-            },
-            $field);
-        return new Expression($output);
     }
 
     public function resolveOperandPath()
@@ -93,6 +56,8 @@ class Operand
             if ($this->criteria->tableAlias[$parts[0]] == $parts[0]) {
                 $field = $parts[0] . '.' . $this->criteria->columnName($baseClass, $parts[1]);
             }
+        } else if ($this->criteria->generatedAliases->contains($parts[0])) {
+            $field = "$parts[0].$parts[1]";
         }
         if ($field == '') {
             $chain = implode('.', array_slice($parts, 0, -1));
@@ -108,6 +73,7 @@ class Operand
                 $toTableName = $this->criteria->tableName($associationMap->toClassName);
                 if (!isset($this->criteria->tableAlias[$joinIndex])) {
                     $this->criteria->tableAlias[$joinIndex] = 'a' . ++$this->criteria->aliasCount;
+                    $this->criteria->generatedAliases[] = $this->criteria->tableAlias[$joinIndex];
                 }
                 $toAlias = $this->criteria->tableAlias[$joinIndex];
                 if (!isset($this->criteria->listJoin[$joinIndex])) {
@@ -128,6 +94,7 @@ class Operand
                         $toField = $toAlias . '.' . $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
                         $fromField = $alias . '.' . $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
                         $joinType = ($i == $last) ? ($associationJoinType ?: $associationMap->joinType) : $associationMap->joinType;
+                        //mdump([$joinType, $toTableName . ' as ' . $toAlias, $fromField, '=', $toField]);
                         match ($joinType) {
                             Join::INNER => $this->criteria->join($toTableName . ' as ' . $toAlias, $fromField, '=', $toField),
                             Join::LEFT => $this->criteria->leftJoin($toTableName . ' as ' . $toAlias, $fromField, '=', $toField),
@@ -146,8 +113,7 @@ class Operand
                 $attributeMap = $this->criteria->getAttributeMap($parts[$n], $baseClass);
                 if ($attributeMap->reference != '') {
                     $this->field = str_replace($parts[$n], $attributeMap->reference, $this->field);
-//                mdump('*** ' . $this->field);
-                    $field = $this->resolveOperand();
+                    $field = $this->resolveOperand($this->context);
                 } else {
                     $field = $alias . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
                 }
@@ -174,18 +140,18 @@ class Operand
         if (is_null($attributeMap)) {
             return $this->field;
         } else if ($attributeMap->reference != '') {
-            if (($this->context == 'select') && ($this->alias == '')) {
-                $this->alias = $this->field;
-            }
+            $this->alias = $this->field;
             $this->field = $attributeMap->reference;
-            return $this->resolveOperand();
+            return $this->resolveOperand($this->context);
         } else {
             if ($attributeMap->name != $attributeMap->columnName) {
                 $this->alias = $attributeMap->name;
             }
-            if ($this->context == 'upsert') {
-                return $attributeMap->columnName;
-            }
+//            if ($this->context == 'upsert') {
+//                mdump('aaa');
+//                return $attributeMap->columnName;
+//            }
+//            mdump($this->criteria->tableName() . '.' . $attributeMap->columnName);
             return $this->criteria->tableName() . '.' . $attributeMap->columnName;
         }
     }
