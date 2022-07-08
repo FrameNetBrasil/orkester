@@ -40,7 +40,7 @@ void ReadTraceSocket(Socket socket)
             var read = socket.Receive(buffer);
             if (read == 0) break;
 
-            using var reader = new StringReader(Encoding.UTF8.GetString(buffer.Slice(0, read)));
+            using var reader = new StringReader(Encoding.UTF8.GetString(buffer[..read]));
             string? line;
             while ((line = reader.ReadLine()) != null)
             {
@@ -60,6 +60,7 @@ void ReadTraceSocket(Socket socket)
     finally
     {
         Flush();
+        socket.Dispose();
     }
 }
 
