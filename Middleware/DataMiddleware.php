@@ -27,25 +27,6 @@ class DataMiddleware implements Middleware
         return $response;
     }
 
-    public function setPrimeVueFilters($data, $filters): bool
-    {
-        $data->filter = [];
-        foreach ($filters as $field => $condition) {
-            ['value' => $value, 'matchMode' => $matchMode] = $condition;
-            if (empty($value)) continue;
-            array_push($data->filter,
-                match ($matchMode) {
-                    'startsWith' => [$field, 'LIKE', "$value%"],
-                    'contains' => [$field, 'LIKE', "%$value%"],
-                    'endsWith' => [$field, 'LIKE', "%$value"],
-                    'notContains' => [$field, 'NOT LIKE', "%$value%"],
-                    'notEquals' => [$field, '<>', $value],
-                    default => [$field, '=', $value]
-                });
-        }
-        return true;
-    }
-
     private function setData($values)
     {
         $data = new \stdClass;;
@@ -65,7 +46,6 @@ class DataMiddleware implements Middleware
                         '_end' => $data->pagination->end = $value,
                         '_embed' => $data->relationship->embed = $value,
                         '_expand' => $data->relationship->expand = $value,
-                        '_filter' => $this->setPrimeVueFilters($data, $value), // primevue
                         default => '',
                     };
                 } else {
