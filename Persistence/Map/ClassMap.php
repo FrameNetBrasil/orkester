@@ -39,7 +39,7 @@ class ClassMap
 //    private $superClassMap = NULL;
 //    private $superAssociationMap = NULL;
     public AttributeMap $keyAttributeMap;
-    public string $keyAttributeName;
+    public string $keyAttributeName = '';
 //    private ?HookMap $hookMap = NULL;
 //    private array $hashedAttributeMaps = [];
 //    private array $handledAttributeMaps = [];
@@ -127,7 +127,7 @@ class ClassMap
 
     public function getAssociationMap(string $name): ?AssociationMap
     {
-        $associationMap = $this->associationMaps[trim($name)] ?: NULL;
+        $associationMap = $this->associationMaps[trim($name)] ?? NULL;
         if ($associationMap != NULL) {
 //            $associationMap->setKeysAttributes();
         }
