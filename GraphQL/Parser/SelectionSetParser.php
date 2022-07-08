@@ -12,6 +12,7 @@ use Orkester\GraphQL\Operation\AssociatedQueryOperation;
 use Orkester\GraphQL\Selection\FieldSelection;
 use Orkester\Authorization\MAuthorizedModel;
 use Orkester\Persistence\Map\AssociationMap;
+use Orkester\Persistence\Model;
 
 class SelectionSetParser
 {
@@ -60,7 +61,7 @@ class SelectionSetParser
     {
         foreach ($selectionSetNode->selections ?? [] as $selectionNode) {
             if ($selectionNode instanceof FieldNode) {
-                $operator = self::parseFieldNode($selectionNode);
+                $operator = $this->parseFieldNode($selectionNode);
                 $this->selectionSet[$operator->getName()] = $operator;
             } else if ($selectionNode instanceof FragmentSpreadNode) {
                 $fragment = $this->context->getFragment($selectionNode->name->value);

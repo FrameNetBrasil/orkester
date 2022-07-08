@@ -28,10 +28,7 @@ class SelectionSet implements \JsonSerializable
     {
         $old = $criteria->columns;
         $new = array_map(fn(FieldSelection $f) => $f->getSQL(), $this->fields);
-        //$criteria->select(implode(',', array_map(fn(FieldSelection $f) => $f->getSQL(), $this->fields)));
-        //$new = $criteria->columns;
         $criteria->columns = array_merge($old ?? [], $new ?? []);
-//        $criteria->columns = array_merge($criteria->columns ?? [], $columns ?? []);
         return $criteria;
     }
 
