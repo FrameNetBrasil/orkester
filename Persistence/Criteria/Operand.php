@@ -22,21 +22,40 @@ class Operand
     {
         $this->context = $context;
         if ($this->field instanceof Expression) {
-            $operand = $this->field;
+            return $this->field;
+        } else if (str_contains($this->field, '(')) {
+            return $this->resolveOperandFunction();
         } else if (str_contains($this->field, '.')) {
-            $operand = $this->resolveOperandPath();
+            return $this->resolveOperandPath();
         } else {
-            $operand = $this->resolveOperandField();
+            return $this->resolveOperandField();
         }
-        if ($this->context == 'select' && !empty($this->alias)) {
-            $originalField = $this->field;
-            $this->criteria->fieldAlias[$this->alias] = $originalField;
-            $alias = " as {$this->alias}";
-            $operand = $operand instanceof Expression ?
-                new Expression("{$operand->getValue()}$alias") :
-                "$operand$alias";
-        }
-        return $operand;
+//        if ($this->context == 'select' && !empty($this->alias)) {
+//            $originalField = $this->field;
+//            $this->criteria->fieldAlias[$this->alias] = $originalField;
+//            $alias = " as {$this->alias}";
+//            $operand = $operand instanceof Expression ?
+//                new Expression("{$operand->getValue()}$alias") :
+//                "$operand$alias";
+//        }
+//        return $operand;
+    }
+
+    public function resolveOperandFunction(): Expression
+    {
+        $field = $this->field;
+        $output = preg_replace_callback('/(\()(.+)(\))/',
+            function ($matches) {
+                $arguments = [];
+                $fields = explode(',', $matches[2]);
+                foreach ($fields as $argument) {
+                    $this->field = $argument;
+                    $arguments[] = $this->resolveOperand($this->context);
+                }
+                return "(" . implode(',', $arguments) . ")";
+            },
+            $field);
+        return new Expression($output);
     }
 
     public function resolveOperandPath()
@@ -111,6 +130,9 @@ class Operand
                 $field = $alias . '.' . $parts[$n];
             } else {
                 $attributeMap = $this->criteria->getAttributeMap($parts[$n], $baseClass);
+                if ($parts[$n] == 'id') {
+                    $this->field = $attributeMap->columnName;
+                }
                 if ($attributeMap->reference != '') {
                     $this->field = str_replace($parts[$n], $attributeMap->reference, $this->field);
                     $field = $this->resolveOperand($this->context);
@@ -139,7 +161,11 @@ class Operand
         $attributeMap = $this->criteria->getAttributeMap($this->field);
         if (is_null($attributeMap)) {
             return $this->field;
-        } else if ($attributeMap->reference != '') {
+        }
+        if ($this->field == 'id') {
+            $this->field = $attributeMap->columnName;
+        }
+        if ($attributeMap->reference != '') {
             $this->alias = $this->field;
             $this->field = $attributeMap->reference;
             return $this->resolveOperand($this->context);
