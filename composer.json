@@ -28,7 +28,9 @@
         "phpmyadmin/sql-parser": "^5.5",
         "illuminate/database": "^9",
         "illuminate/events": "^9",
-        "ext-apcu": "^5"
+        "ext-apcu": "^5",
+        "ext-pdo": "*",
+        "greenlion/php-sql-parser": "^4.5"
     },
     "autoload": {
         "files": [

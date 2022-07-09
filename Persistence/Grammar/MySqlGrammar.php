@@ -3,14 +3,13 @@
 namespace Orkester\Persistence\Grammar;
 
 use Illuminate\Database\Query\Builder;
-use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Monolog\Logger;
 use Orkester\Manager;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Criteria\Operand;
-use PhpMyAdmin\SqlParser\Parser;
+use PHPSQLParser\PHPSQLParser;
 
 class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
 {
@@ -55,31 +54,57 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
     }
     */
 
+    public function parseNode(array $node, string $raw = ''): string
+    {
+        if (!isset($node['expr_type']) || $node['expr_type'] == 'colref') {
+            $op = new Operand($this->criteria, $node['base_expr'] ?? $raw, ($node['alias'] ?? false) ? $node['alias']['name'] : '');
+            $resolved = $op->resolveOperand($this->context);
+            if ($resolved == '*') {
+                $result = $resolved;
+            }
+            else {
+                $parts = explode('.', $resolved);
+                $column = count($parts) > 1 ? $parts[1] : $parts[0];
+                $column = $column == '*' ? '*' : "`$column`";
+                $result = count($parts) > 1 ?
+                    "`$parts[0]`.$column" :
+                    "$column";
+            }
+            $defaultAlias = $op->alias;
+            if ($this->context == 'select' && !empty($operand->alias)) {
+                $this->criteria->fieldAlias[$operand->alias] = $resolved;
+            }
+        }
+        else if ($node['expr_type'] == 'expression') {
+            $args = array_map(
+                fn($sub) => $this->parseNode($sub),
+                $node['sub_tree']
+            );
+            $result = implode(' ', $args);
+        } else if ($node['expr_type'] == 'function' || $node['expr_type'] == 'aggregate_function') {
+            $args = array_map(
+                fn($sub) => $this->parseNode($sub),
+                $node['sub_tree']
+            );
+            $argList = implode(',', $args);
+            $result = "{$node['base_expr']}($argList)";
+        } else {
+            $result = $node['base_expr'] ?? $raw;
+        }
+        $alias = false;
+        if ($this->context == 'select') {
+            $alias = $node['alias'] ?? false ?
+                $node['alias']['name'] : $defaultAlias ?? false;
+        }
+        return $result . ($alias ? " as `$alias`" : '');
+    }
+
     public function wrap($value, $prefixAlias = false)
     {
         if ($prefixAlias) return parent::wrap($value, $prefixAlias);
-        $parser = new Parser("select " . $value);
-        $exp = $parser->statements[0]->expr[0];
-        $operand = new Operand($this->criteria, $exp->expr, $exp->alias ?? '');
-
-        $x = $operand->resolveOperand($this->context);
-        if ($this->context == 'select' && !empty($operand->alias)) {
-            $originalField = $x;
-            $this->criteria->fieldAlias[$operand->alias] = $originalField;
-            $alias = " as {$operand->alias}";
-            return $x instanceof Expression ?
-                new Expression("{$x->getValue()}$alias") :
-                "{$x}$alias";
-        }
-        return parent::wrap($x);
-
-
-        //                $parser = new Parser("select " . $column);
-//                foreach ($parser->statements[0]->expr as $j => $exp) {
-//                    $columns[$i] = $this->resolveField('select', $exp->expr, $exp->alias);
-//                }
-
-//        return parent::wrap($this->resolve($value), $prefixAlias);
+        $parser = new PHPSQLParser();
+        $parsed = $parser->parse("select " . $value);
+        return $this->parseNode($parsed['SELECT'][0], $value);
     }
 
     public function columnize(array $columns): string
@@ -92,7 +117,7 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
             ),
         );
         $this->context = '';
-        return $cols;
+        return trim($cols, ',');
     }
 
     public function logSql(string $query, $values): string
