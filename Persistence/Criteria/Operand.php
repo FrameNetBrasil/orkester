@@ -23,8 +23,13 @@ class Operand
         $this->context = $context;
         if ($this->field instanceof Expression) {
             return $this->field;
-        } else if (str_contains($this->field, '(')) {
-            return $this->resolveOperandFunction();
+        }
+
+        $segments = preg_split('/\s+as\s+/i', $this->field);
+        if (count($segments) > 1) {
+            $this->field = $segments[0];
+            $this->alias = $segments[1];
+            return $this->resolveOperand($context);
         } else if (str_contains($this->field, '.')) {
             return $this->resolveOperandPath();
         } else {
@@ -41,22 +46,28 @@ class Operand
 //        return $operand;
     }
 
-    public function resolveOperandFunction(): Expression
-    {
-        $field = $this->field;
-        $output = preg_replace_callback('/(\()(.+)(\))/',
-            function ($matches) {
-                $arguments = [];
-                $fields = explode(',', $matches[2]);
-                foreach ($fields as $argument) {
-                    $this->field = $argument;
-                    $arguments[] = $this->resolveOperand($this->context);
-                }
-                return "(" . implode(',', $arguments) . ")";
-            },
-            $field);
-        return new Expression($output);
-    }
+//    public function resolveOperandFunction(): Expression
+//    {
+//        $output = preg_replace_callback("/([\w]+)\((.+)\)/",
+//            function ($matches) {
+//                $args = preg_replace_callback("/[\s]?((\'.*\')|([\w\. ]+))[,\s]?/",
+//                    function ($arguments) {
+//                        if (str_starts_with($arguments[1], "'")) {
+//                            $arg = $arguments[1];
+//                        }
+//                        else {
+//                            $op = new Operand($this->criteria, $arguments[1]);
+//                            $arg = $op->resolveOperand("");
+//                        }
+//                        $comma = str_ends_with($arguments[0], ',') ? ',' : '';
+//                        return $arg . $comma;
+//                    }, $matches[2]
+//                );
+//                return "$matches[1]($args)";
+//            },
+//            $this->field, -1);
+//        return new Expression($output);
+//    }
 
     public function resolveOperandPath()
     {
