@@ -16,7 +16,7 @@ void StartWebSocketServer(IPAddress ip, int port)
     Console.WriteLine($"WebSocket Server started at {ws.Address}:{ws.Port}");
 }
 
-const int BufferSize = 8192;
+const int BufferSize = 1024;
 
 void ReadTraceSocket(Socket socket)
 {
@@ -26,6 +26,7 @@ void ReadTraceSocket(Socket socket)
     {
         if (builder.Length > 14)
         {
+            builder.Append("<record_end>");
             TraceSocketBehavior.Broadcast(builder.Remove(0, 14).ToString());
         }
 
