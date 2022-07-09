@@ -290,13 +290,15 @@ class Criteria extends Builder
 
     public function getAttributeMap(string $attributeName, $className = ''): ?AttributeMap
     {
+        $mapName = $this->model;
         if ($className != '') {
             $this->registerClass($className);
-            $attributeMap = $this->maps[$className]->getAttributeMap($attributeName);
-        } else {
-            $attributeMap = $this->maps[$this->model]->getAttributeMap($attributeName);
+            $mapName = $className;
         }
-        return $attributeMap;
+        if ($attributeName == 'id') {
+            $attributeName = $this->maps[$mapName]->keyAttributeName;
+        }
+        return $this->maps[$mapName]->getAttributeMap($attributeName);
     }
 
     public function getAssociationMap($associationName, $className = ''): ?AssociationMap
