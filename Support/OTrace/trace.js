@@ -10,6 +10,8 @@ function getLogger(level) {
     }
 }
 
+let message = ''
+
 function connect(
     wsHost,
     wsPort,
@@ -25,7 +27,12 @@ function connect(
             console.debug("Trace connection opened");
         };
         socket.onmessage = event => {
-            const data = JSON.parse(event.data)
+            message += event.data;
+            if(!message.endsWith("<record_end>")) {
+                return;
+            }
+            const data = JSON.parse(event.data.substring(0, event.data.length - 12))
+            message = ''
             if (blacklist.includes(data.level_name) || blacklist.includes(data.context.tag)) {
                 return;
             }
