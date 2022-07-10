@@ -185,7 +185,7 @@ class Model
         if (is_null($keyAttributeMap)) {
             self::attribute(name: $key, key: Key::FOREIGN, type: Type::INTEGER, nullable: false);
         } else {
-            if ($key != $fromClassMap->keyAttributeMap->name) {
+            if (isset($fromClassMap->keyAttributeMap) && $key != $fromClassMap->keyAttributeMap->name) {
                 $keyAttributeMap->keyType = Key::FOREIGN;
             }
         }
