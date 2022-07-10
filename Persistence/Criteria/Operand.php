@@ -8,8 +8,6 @@ use Orkester\Persistence\Enum\Join;
 
 class Operand
 {
-    public string $context = '';
-
     public function __construct(
         public Criteria $criteria,
         public string   $field,
@@ -18,9 +16,8 @@ class Operand
     {
     }
 
-    public function resolveOperand(string $context): string|Expression
+    public function resolveOperand(): string|Expression
     {
-        $this->context = $context;
         if ($this->field instanceof Expression) {
             return $this->field;
         }
@@ -29,7 +26,7 @@ class Operand
         if (count($segments) > 1) {
             $this->field = $segments[0];
             $this->alias = $segments[1];
-            return $this->resolveOperand($context);
+            return $this->resolveOperand();
         } else if (str_contains($this->field, '.')) {
             return $this->resolveOperandPath();
         } else {
@@ -77,7 +74,7 @@ class Operand
         $baseClass = '';
         $tableName = $this->criteria->tableName($baseClass);
         if ($parts[0] == $tableName) {
-            $field = $parts[0] . '.' . $this->criteria->columnName($baseClass, $parts[1]);
+            $field = $parts[0] . '.' . ($this->criteria->columnName($baseClass, $parts[1]) ?? $parts[1]);
         } else if (isset($this->criteria->classAlias[$parts[0]])) {
             $field = $parts[0] . '.' . $this->criteria->columnName($this->criteria->classAlias[$parts[0]], $parts[1]);
         } else if (isset($this->criteria->criteriaAlias[$parts[0]])) {
@@ -100,6 +97,9 @@ class Operand
                 $associationName = $parts[$i];
                 $joinIndex .= $associationName;
                 $associationMap = $this->criteria->getAssociationMap($associationName, $baseClass);
+                if (is_null($associationMap)) {
+                    throw new \InvalidArgumentException("Association not found: $chain");
+                }
                 $toTableName = $this->criteria->tableName($associationMap->toClassName);
                 if (!isset($this->criteria->tableAlias[$joinIndex])) {
                     $this->criteria->tableAlias[$joinIndex] = 'a' . ++$this->criteria->aliasCount;
@@ -124,7 +124,7 @@ class Operand
                         $toField = $toAlias . '.' . $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
                         $fromField = $alias . '.' . $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
                         $joinType = ($i == $last) ? ($associationJoinType ?: $associationMap->joinType) : $associationMap->joinType;
-                        //mdump([$joinType, $toTableName . ' as ' . $toAlias, $fromField, '=', $toField]);
+//                        mdump([$joinType, $toTableName . ' as ' . $toAlias, $fromField, '=', $toField]);
                         match ($joinType) {
                             Join::INNER => $this->criteria->join($toTableName . ' as ' . $toAlias, $fromField, '=', $toField),
                             Join::LEFT => $this->criteria->leftJoin($toTableName . ' as ' . $toAlias, $fromField, '=', $toField),
@@ -146,7 +146,7 @@ class Operand
                 }
                 if ($attributeMap->reference != '') {
                     $this->field = str_replace($parts[$n], $attributeMap->reference, $this->field);
-                    $field = $this->resolveOperand($this->context);
+                    $field = $this->resolveOperand();
                 } else {
                     $field = $alias . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
                 }
@@ -179,7 +179,7 @@ class Operand
         if ($attributeMap->reference != '') {
             $this->alias = $this->field;
             $this->field = $attributeMap->reference;
-            return $this->resolveOperand($this->context);
+            return $this->resolveOperand();
         } else {
             if ($attributeMap->name != $attributeMap->columnName) {
                 $this->alias = $attributeMap->name;
