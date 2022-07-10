@@ -26,7 +26,6 @@ void ReadTraceSocket(Socket socket)
     {
         if (builder.Length > 14)
         {
-            builder.Append("<record_end>");
             TraceSocketBehavior.Broadcast(builder.Remove(0, 14).ToString());
         }
 

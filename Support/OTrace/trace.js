@@ -27,12 +27,7 @@ function connect(
             console.debug("Trace connection opened");
         };
         socket.onmessage = event => {
-            message += event.data;
-            if(!message.endsWith("<record_end>")) {
-                return;
-            }
-            const data = JSON.parse(event.data.substring(0, event.data.length - 12))
-            message = ''
+            const data = JSON.parse(event.data)
             if (blacklist.includes(data.level_name) || blacklist.includes(data.context.tag)) {
                 return;
             }
