@@ -54,11 +54,11 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
     }
     */
 
-    public function parseNode(array $node, string $raw = ''): string
+    public function parseNode(array $node, string $raw = '', bool $ignoreAlias = false): string
     {
         if (!isset($node['expr_type']) || $node['expr_type'] == 'colref') {
             $op = new Operand($this->criteria, $node['base_expr'] ?? $raw, ($node['alias'] ?? false) ? $node['alias']['name'] : '');
-            $resolved = $op->resolveOperand($this->context);
+            $resolved = $op->resolveOperand();
             if ($resolved == '*') {
                 $result = $resolved;
             }
@@ -77,13 +77,13 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
         }
         else if ($node['expr_type'] == 'expression') {
             $args = array_map(
-                fn($sub) => $this->parseNode($sub),
+                fn($sub) => $this->parseNode($sub, ignoreAlias: true),
                 $node['sub_tree']
             );
             $result = implode(' ', $args);
         } else if ($node['expr_type'] == 'function' || $node['expr_type'] == 'aggregate_function') {
             $args = array_map(
-                fn($sub) => $this->parseNode($sub),
+                fn($sub) => $this->parseNode($sub, ignoreAlias: true),
                 $node['sub_tree']
             );
             $argList = implode(',', $args);
@@ -92,32 +92,29 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
             $result = $node['base_expr'] ?? $raw;
         }
         $alias = false;
-        if ($this->context == 'select') {
+        if (!$ignoreAlias && $this->context == 'columns') {
             $alias = $node['alias'] ?? false ?
                 $node['alias']['name'] : $defaultAlias ?? false;
         }
         return $result . ($alias ? " as `$alias`" : '');
     }
 
-    public function wrap($value, $prefixAlias = false)
+    public function wrap($value, $prefixAlias = false): string
     {
         if ($prefixAlias) return parent::wrap($value, $prefixAlias);
         $parser = new PHPSQLParser();
         $parsed = $parser->parse("select " . $value);
-        return $this->parseNode($parsed['SELECT'][0], $value);
+        return $this->parseNode($parsed['SELECT'][0], $value, $this->context != 'columns' && $this->context != 'from');
     }
 
     public function columnize(array $columns): string
     {
-        $this->context = 'select';
-        $cols = implode(',',
+        return implode(',',
             array_map(
                 fn($col) => $this->wrap($col),
                 $columns
             ),
         );
-        $this->context = '';
-        return trim($cols, ',');
     }
 
     public function logSql(string $query, $values): string
@@ -141,9 +138,14 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
     protected function compileComponents(Builder $query)
     {
         $sqlOrkester = [];
+        if ($query instanceof Criteria && $query->model != $this->criteria->model) {
+            $originalModel = $this->criteria->model;
+            $this->criteria->setModel($query->model);
+        }
 
         foreach ($this->selectComponentsOrkester as $component) {
             if (isset($query->$component)) {
+                $this->context = $component;
                 $method = 'compile' . ucfirst($component);
 
                 $sqlOrkester[$component] = $this->$method($query, $query->$component);
@@ -155,6 +157,10 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
             if (isset($sqlOrkester[$component])) {
                 $sql[$component] = $sqlOrkester[$component];
             }
+        }
+
+        if (isset($originalModel)) {
+            $this->criteria->setModel($originalModel);
         }
 
         return $sql;
