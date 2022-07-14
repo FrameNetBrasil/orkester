@@ -54,15 +54,14 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
     }
     */
 
-    public function parseNode(array $node, string $raw = '', bool $ignoreAlias = false): string
+    public function parseNode(Criteria $criteria, array $node, string $raw = '', bool $ignoreAlias = false): string
     {
         if (!isset($node['expr_type']) || $node['expr_type'] == 'colref') {
-            $op = new Operand($this->criteria, $node['base_expr'] ?? $raw, ($node['alias'] ?? false) ? $node['alias']['name'] : '');
+            $op = new Operand($criteria, $node['base_expr'] ?? $raw, ($node['alias'] ?? false) ? $node['alias']['name'] : '');
             $resolved = $op->resolveOperand();
             if ($resolved == '*') {
                 $result = $resolved;
-            }
-            else {
+            } else {
                 $parts = explode('.', $resolved);
                 $column = count($parts) > 1 ? $parts[1] : $parts[0];
                 $column = $column == '*' ? '*' : "`$column`";
@@ -72,18 +71,17 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
             }
             $defaultAlias = $op->alias;
             if ($this->context == 'select' && !empty($operand->alias)) {
-                $this->criteria->fieldAlias[$operand->alias] = $resolved;
+                $criteria->fieldAlias[$operand->alias] = $resolved;
             }
-        }
-        else if ($node['expr_type'] == 'expression') {
+        } else if ($node['expr_type'] == 'expression') {
             $args = array_map(
-                fn($sub) => $this->parseNode($sub, ignoreAlias: true),
+                fn($sub) => static::parseNode($criteria, $sub, ignoreAlias: true),
                 $node['sub_tree']
             );
             $result = implode(' ', $args);
         } else if ($node['expr_type'] == 'function' || $node['expr_type'] == 'aggregate_function') {
             $args = array_map(
-                fn($sub) => $this->parseNode($sub, ignoreAlias: true),
+                fn($sub) => static::parseNode($criteria, $sub, ignoreAlias: true),
                 $node['sub_tree']
             );
             $argList = implode(',', $args);
@@ -94,7 +92,7 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
         $alias = false;
         if (!$ignoreAlias && $this->context == 'columns') {
             $alias = $node['alias'] ?? false ?
-                $node['alias']['name'] : $defaultAlias ?? false;
+                    $node['alias']['name'] : $defaultAlias ?? false;
         }
         return $result . ($alias ? " as `$alias`" : '');
     }
@@ -104,7 +102,7 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
         if ($prefixAlias) return parent::wrap($value, $prefixAlias);
         $parser = new PHPSQLParser();
         $parsed = $parser->parse("select " . $value);
-        return $this->parseNode($parsed['SELECT'][0], $value, $this->context != 'columns' && $this->context != 'from');
+        return $this->parseNode($this->criteria, $parsed['SELECT'][0], $value, $this->context != 'columns' && $this->context != 'from');
     }
 
     public function columnize(array $columns): string
@@ -138,10 +136,6 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
     protected function compileComponents(Builder $query)
     {
         $sqlOrkester = [];
-        if ($query instanceof Criteria && $query->model != $this->criteria->model) {
-            $originalModel = $this->criteria->model;
-            $this->criteria->setModel($query->model);
-        }
 
         foreach ($this->selectComponentsOrkester as $component) {
             if (isset($query->$component)) {
@@ -159,11 +153,29 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
             }
         }
 
-        if (isset($originalModel)) {
-            $this->criteria->setModel($originalModel);
-        }
-
         return $sql;
+    }
+
+    public function compileWheres(Builder $query): string
+    {
+        $original = $this->criteria;
+        if ($query instanceof Criteria) {
+            $this->criteria = $query;
+        }
+        $result = parent::compileWheres($query);
+        $this->criteria = $original;
+        return $result;
+    }
+
+    public function compileHavings(Builder $query): string
+    {
+        $original = $this->criteria;
+        if ($query instanceof Criteria) {
+            $this->criteria = $query;
+        }
+        $result = parent::compileHavings($query);
+        $this->criteria = $original;
+        return $result;
     }
 
 

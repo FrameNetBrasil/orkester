@@ -150,13 +150,18 @@ class Model
 
     public static function associationOne(
         string $name,
-        string $model,
+        string $model = '',
         string $key = '',
+        string $base = '',
+        array  $conditions = [],
         Join   $join = Join::INNER,
     ): void
     {
+
+        /** @var ClassMap $fromClassMap */
         $fromClassMap = self::$classMaps[get_called_class()];
         $fromClassName = $fromClassMap->model;
+        $model = $base ? $fromClassMap->getAssociationMap($base)->fromClassName : $model;
         $toClassName = $model;
         $toClassMap = self::getClassMap($toClassName);
         $associationMap = new AssociationMap($name);
@@ -179,7 +184,7 @@ class Model
             $key = $toClassMap->keyAttributeMap->name;
         }
         $associationMap->fromKey = $key;
-        $associationMap->toKey = $toClassMap->keyAttributeMap->name;
+        $associationMap->toKey = $toClassMap->keyAttributeMap?->name ?? $key;
 
         $keyAttributeMap = $fromClassMap->getAttributeMap($key);
         if (is_null($keyAttributeMap)) {
@@ -189,7 +194,8 @@ class Model
                 $keyAttributeMap->keyType = Key::FOREIGN;
             }
         }
-
+        $associationMap->base = $base;
+        $associationMap->conditions = $conditions;
         $associationMap->joinType = $join;
         $fromClassMap->addAssociationMap($associationMap);
     }
@@ -275,20 +281,13 @@ class Model
         $associationMap->joinType = $join;
         $fromClassMap->addAssociationMap($associationMap);
         if ($cardinality == Association::ASSOCIATIVE) {
-            static::createAssociativeClassMap($associationMap);
+            $name = "{$associationMap->fromClassName}_$associationMap->associativeTable";
+            $classMap = new ClassMap($name);
+            $classMap->addAttributeMap($toClassMap->getAttributeMap($associationMap->toKey));
+            $classMap->addAttributeMap($fromClassMap->getAttributeMap($associationMap->fromKey));
+            self::$classMaps[$name] = $classMap;
+            $classMap->tableName = $associationMap->associativeTable;
         }
-    }
-
-    protected static function createAssociativeClassMap(AssociationMap $associationMap): void
-    {
-        $a1 = new AttributeMap($associationMap->fromKey);
-        $a2 = new AttributeMap($associationMap->toKey);
-        $name = "{$associationMap->fromClassName}_$associationMap->associativeTable";
-        $classMap = new ClassMap($name);
-        $classMap->addAttributeMap($a1);
-        $classMap->addAttributeMap($a2);
-        self::$classMaps[$name] = $classMap;
-        $classMap->tableName = $associationMap->associativeTable;
     }
 
     public static function getCriteria(string $databaseName = null): Criteria

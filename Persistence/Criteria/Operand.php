@@ -5,6 +5,8 @@ namespace Orkester\Persistence\Criteria;
 use Illuminate\Database\Query\Expression;
 use Orkester\Persistence\Enum\Association;
 use Orkester\Persistence\Enum\Join;
+use Orkester\Persistence\Map\AssociationMap;
+use Orkester\Persistence\Model;
 
 class Operand
 {
@@ -66,6 +68,17 @@ class Operand
 //        return new Expression($output);
 //    }
 
+    protected function resolveSubsetAssociation(AssociationMap $associationMap, array &$chain): string|bool
+    {
+        if (!$associationMap->base) return false;
+        foreach($associationMap->conditions as $condition) {
+            $this->criteria->where(...$condition);
+        }
+        $chain[0] = $associationMap->base;
+        $this->field = implode('.', $chain);
+        return $this->resolveOperandPath();
+    }
+
     public function resolveOperandPath()
     {
         $field = '';
@@ -100,6 +113,9 @@ class Operand
                 if (is_null($associationMap)) {
                     throw new \InvalidArgumentException("Association not found: $chain");
                 }
+                if ($resolvedSubset = $this->resolveSubsetAssociation($associationMap, $parts)) {
+                    return $resolvedSubset;
+                }
                 $toTableName = $this->criteria->tableName($associationMap->toClassName);
                 if (!isset($this->criteria->tableAlias[$joinIndex])) {
                     $this->criteria->tableAlias[$joinIndex] = 'a' . ++$this->criteria->aliasCount;
@@ -112,6 +128,8 @@ class Operand
                         $fromField = $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
                         $associativeTableName = $associationMap->associativeTable;
                         $associativeTableAlias = 'a' . ++$this->criteria->aliasCount;
+                        $this->criteria->tableAlias[$associativeTableName] = $associativeTableAlias;
+                        $this->criteria->generatedAliases->add($associativeTableAlias);
                         $joinType = ($i == $last) ? ($associationJoinType ?: $associationMap->joinType) : $associationMap->joinType;
                         match ($joinType) {
                             Join::INNER => $this->criteria->join($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
@@ -134,7 +152,6 @@ class Operand
                     $this->criteria->listJoin[$joinIndex] = $alias;
                 }
                 $baseClass = $associationMap->toClassName;
-//                mdump('baseClass = ' . $baseClass);
                 $alias = $toAlias;
             }
             if ($parts[$n] == '*') {
@@ -158,8 +175,6 @@ class Operand
     public function resolveOperandParameter()
     {
         $parameter = substr($this->field, 1);
-//        print_r(PHP_EOL. 'parameter ' . $parameter . PHP_EOL);
-//        print_r($this->criteria->parameters);
         if (isset($this->criteria->parameters[$parameter])) {
             return $this->criteria->parameters[$parameter];
         }
