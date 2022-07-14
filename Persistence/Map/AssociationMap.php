@@ -23,6 +23,8 @@ class AssociationMap
     public bool $autoAssociation = FALSE;
     public string $fromKey = '';
     public string $toKey = '';
+    public string $base = '';
+    public array $conditions = [];
 
     public function __construct(string $name)
     {
