@@ -19,9 +19,7 @@ class ServiceOperation implements \JsonSerializable
     public function execute(Result $result)
     {
         $arguments = array_map(fn($arg) => $arg($result), $this->arguments);
-        $isAlias = ($this->alias != '');
-        $name = $this->alias ?? $this->name;
-        $result->addResult($name, ($this->service)(...$arguments), $isAlias);
+        $result->addResult($this->name, $this->alias, ($this->service)(...$arguments));
     }
 
     public function jsonSerialize(): mixed

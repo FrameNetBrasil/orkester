@@ -40,7 +40,7 @@ class UpdateAssociationOperation implements JsonSerializable
             $this->model::getCriteria()
                 ->where($this->model::getKeyAttributeName(), "=", $id);
         $rows = $this->query->executeFrom($criteria, $result);
-        $result->addResult($this->alias ?? $this->name, $rows);
+        $result->addResult($this->name, $this->alias, $rows);
     }
 
     public function jsonSerialize(): array

@@ -18,7 +18,8 @@ class QueryParser
         'group_by',
         'join',
         'order_by',
-        'having'
+        'having',
+        'distinct'
     ];
 
     public static array $rootOperations = [
@@ -30,12 +31,13 @@ class QueryParser
         'having',
         'limit',
         'offset',
+        'distinct'
     ];
 
     public static function fromNode(FieldNode $root, Model|string $model, ?array $validArguments, Context $context): QueryOperation
     {
         $selection = (new SelectionSetParser($model, $context))->parse($root->selectionSet);
-        $operators = OperatorSet::fromNode($root->arguments, $validArguments, $context);
+        $operators = OperatorSet::fromNode($root->arguments, static::$rootOperations, $context);
         return new QueryOperation($root->name->value, $model, $selection, $operators, $root->alias?->value);
     }
 }

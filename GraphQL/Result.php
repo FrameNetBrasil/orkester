@@ -14,14 +14,13 @@ class Result
 
     }
 
-    public function addResult(string $name, mixed $result,bool $isAlias = false)
+    public function addResult(string $name, ?string $alias, mixed $result)
     {
-        if (!$isAlias) {
-            $result = $this->configuration->isSingular($name) ?
-                (array_key_exists(0, $result) ? $result[0] : null) :
-                $result;
-        }
-        $this->results[$name] = $result;
+        $result = $this->configuration->isSingular($name) ?
+            (array_key_exists(0, $result) ? $result[0] : null) :
+            $result;
+
+        $this->results[$alias ?? $name] = $result;
     }
 
     public function addCriteria(string $name, Criteria $criteria)

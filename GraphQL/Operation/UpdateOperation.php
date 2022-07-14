@@ -46,7 +46,7 @@ class UpdateOperation implements JsonSerializable
         $queryCriteria = $this->model::getCriteria()
             ->where($this->model::getKeyAttributeName(), "IN", $affectedIds);
         $rows = $this->query->executeFrom($queryCriteria, $result);
-        $result->addResult($this->alias ?? $this->name, $rows);
+        $result->addResult($this->name, $this->alias, $rows);
     }
 
     public function jsonSerialize(): array
