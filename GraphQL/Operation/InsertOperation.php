@@ -31,7 +31,7 @@ class InsertOperation implements \JsonSerializable
             }
             $criteria = $this->model::getCriteria()->where($this->model::getKeyAttributeName(), 'IN', $ids);
             $rows = $this->query->executeFrom($criteria, $result);
-            $result->addResult($this->alias ?? $this->name, $rows);
+            $result->addResult($this->name, $this->alias, $rows);
         } catch (EValidationException $e) {
             throw new EGraphQLValidationException($e->errors);
         }

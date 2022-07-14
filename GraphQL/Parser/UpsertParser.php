@@ -18,8 +18,8 @@ class UpsertParser
         $alias = $root->alias?->value;
         $name = $root->name->value;
         $arguments = Parser::toAssociativeArray($root->arguments, ['objects', 'unique']);
-        if ($objects = $arguments['objects']) {
-            return new UpsertOperation($name, $alias, $model, $query, $context->getNodeValue($objects), $context->getNodeValue($arguments['unique'] ?? null));
+        if ($object = $arguments['object'] ?? $arguments['objects'] ?? false) {
+            return new UpsertOperation($name, $alias, $model, $query, $context->getNodeValue($object), $context->getNodeValue($arguments['unique'] ?? null));
         }
         throw new EGraphQLNotFoundException('object', 'argument');
     }

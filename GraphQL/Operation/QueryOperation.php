@@ -8,6 +8,7 @@ use Orkester\GraphQL\Set\SelectionSet;
 use Orkester\GraphQL\Result;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
+use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Model;
 
 class QueryOperation implements \JsonSerializable
@@ -36,6 +37,17 @@ class QueryOperation implements \JsonSerializable
         $criteria->columns = [];
     }
 
+    protected function applyJoinConditions(Criteria $criteria, AssociationMap $associationMap, Model|string $referenceModel)
+    {
+        $criteria->setModel($referenceModel);
+        $criteria->where(function($sub) use ($associationMap, $referenceModel) {
+//            $sub->setModel($referenceModel);
+            foreach ($associationMap->conditions ?? [] as $condition) {
+                $sub->where(...$condition);
+            }
+        });
+    }
+
     protected function executeAssociatedQueries(Criteria $criteria, array &$rows, Result $result)
     {
         foreach ($this->selectionSet->getAssociatedQueries() as $associatedQuery) {
@@ -46,7 +58,9 @@ class QueryOperation implements \JsonSerializable
             $toKey = $associationMap->toKey;
             $toClassMap = $associationMap->toClassMap;
             $associatedCriteria = $toClassMap->getCriteria();
+            //$this->applyJoinConditions($associatedCriteria, $associationMap, $fromClassMap->model);
             $cardinality = $associationMap->cardinality;
+            $groupKey = $fromKey;
             if ($cardinality == Association::ONE) {
                 $whereField = '_gql' . "." . $fromClassMap->keyAttributeName;
                 $associatedCriteria->joinClass($fromClassMap->model, '_gql', $toKey, '=', '_gql' . '.' . $fromKey);
@@ -59,11 +73,12 @@ class QueryOperation implements \JsonSerializable
                 $model = $toClassMap->model;
                 $model::associationMany('_gql', model: $fromClassMap->model, associativeTable: $associationMap->associativeTable);
                 $associatedCriteria->select('_gql' . '.' . $fromKey);
+                $groupKey = $associationMap->fromClassMap->keyAttributeMap->columnName;
             } else {
                 throw new EGraphQLException([$cardinality->value => 'Unhandled cardinality']);
             }
             $queryResult = $associatedQuery->getOperation()->executeFrom($associatedCriteria, $result, false);
-            $subRows = group_by($queryResult, $fromKey, $associatedQuery->getOperation()->selectionSet);
+            $subRows = group_by($queryResult, $groupKey, $associatedQuery->getOperation()->selectionSet);
             $associatedName = $associatedQuery->getName();
             foreach ($rows as &$row) {
                 $value = $subRows[$row[$fromKey] ?? ''] ?? [];
@@ -106,7 +121,7 @@ class QueryOperation implements \JsonSerializable
         $rows = $this->executeFrom($criteria, $result);
         $this->selectionSet->format($rows);
         $this::setupForSubQuery($criteria);
-        $result->addResult($this->getName(), $rows);
+        $result->addResult($this->name, $this->alias, $rows);
     }
 
     public function jsonSerialize(): mixed

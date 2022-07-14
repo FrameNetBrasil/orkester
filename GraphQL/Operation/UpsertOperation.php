@@ -31,6 +31,7 @@ class UpsertOperation implements JsonSerializable
         foreach ($objects as $value) {
             $criteria->orWhere(
                 function (Criteria $c) use ($uniqueBy, $value) {
+                    $c->setModel($this->model);
                     foreach ($uniqueBy ?? [] as $uq) {
                         $c->where($uq, '=', $value[$uq]);
                     }
@@ -39,7 +40,7 @@ class UpsertOperation implements JsonSerializable
             );
         }
         $rows = $this->query->executeFrom($criteria, $result);
-        $result->addResult($this->alias ?? $this->name, $rows);
+        $result->addResult($this->name, $this->alias, $rows);
     }
 
     public function jsonSerialize(): array
