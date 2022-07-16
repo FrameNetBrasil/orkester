@@ -4,6 +4,7 @@ namespace Orkester\GraphQL\Set;
 
 use GraphQL\Language\AST\NodeList;
 use Orkester\GraphQL\Argument\DistinctArgument;
+use Orkester\GraphQL\Argument\HavingArgument;
 use Orkester\GraphQL\Context;
 use Orkester\GraphQL\Argument\AbstractArgument;
 use Orkester\GraphQL\Argument\GroupByArgument;
@@ -65,6 +66,9 @@ class OperatorSet implements \IteratorAggregate, \JsonSerializable
         }
         if ($node = $nodes['distinct'] ?? false) {
             $operators[] = DistinctArgument::fromNode($node, $context);
+        }
+        if ($node = $nodes['having'] ?? false) {
+            $operators[] = HavingArgument::fromNode($node, $context);
         }
         return new OperatorSet(...$operators ?? []);
     }
