@@ -71,7 +71,7 @@ class Operand
     protected function resolveSubsetAssociation(AssociationMap $associationMap, array &$chain): string|bool
     {
         if (!$associationMap->base) return false;
-        foreach($associationMap->conditions as $condition) {
+        foreach ($associationMap->conditions as $condition) {
             $this->criteria->where(...$condition);
         }
         $chain[0] = $associationMap->base;
@@ -109,6 +109,7 @@ class Operand
             for ($i = 0; $i < $n; $i++) {
                 $associationName = $parts[$i];
                 $joinIndex .= $associationName;
+
                 $associationMap = $this->criteria->getAssociationMap($associationName, $baseClass);
                 if (is_null($associationMap)) {
                     throw new \InvalidArgumentException("Association not found: $chain");
@@ -136,8 +137,11 @@ class Operand
                             Join::LEFT => $this->criteria->leftJoin($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
                             Join::RIGHT => $this->criteria->rigthJoin($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
                         };
-                        $this->criteria
-                            ->join($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $toField, '=', $toAlias . '.' . $toField);
+                        match ($joinType) {
+                            Join::INNER => $this->criteria->join($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $toField, '=', $toAlias . '.' . $toField),
+                            Join::LEFT => $this->criteria->leftJoin($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $toField, '=', $toAlias . '.' . $toField),
+                            Join::RIGHT => $this->criteria->rigthJoin($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $toField, '=', $toAlias . '.' . $toField)
+                        };
                     } else {
                         $toField = $toAlias . '.' . $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
                         $fromField = $alias . '.' . $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);

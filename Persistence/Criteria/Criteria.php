@@ -476,15 +476,4 @@ class Criteria extends Builder
         }
         return $this;
     }
-
-    public function toSql(bool $replaceParameters = false)
-    {
-        $sql = parent::toSql();
-        if ($replaceParameters) {
-            foreach ($this->getBindings() as $binding) {
-                $sql = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('"%s"', $binding)), $sql);
-            }
-        }
-        return $sql;
-    }
 }
