@@ -84,7 +84,7 @@ class Executor
             $operation = TotalParser::fromNode($root, $context);
         } else {
             $model = $this->configuration->getModel($root->name->value);
-            $operation = QueryParser::fromNode($root, $model, QueryParser::$rootOperations, $context);
+            $operation = QueryParser::fromNode($root, $model, $context);
         }
         $this->logger->info(json_encode($operation->jsonSerialize()));
         return $operation;

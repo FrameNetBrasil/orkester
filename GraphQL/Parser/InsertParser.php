@@ -16,7 +16,7 @@ class InsertParser
 
     public static function fromNode(FieldNode $root, Model|string $model, Context $context): InsertOperation
     {
-        $query = QueryParser::fromNode($root, $model, [], $context);
+        $query = QueryParser::fromNode($root, $model, $context);
         $alias = $root->alias?->value;
         $name = $root->name->value;
         $arguments = Parser::toAssociativeArray($root->arguments, ['object', 'objects']);

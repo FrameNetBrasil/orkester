@@ -15,7 +15,7 @@ class UpdateAssociationParser
 
     public static function fromNode(FieldNode $root, string|Model $model, string $association, Context $context): UpdateAssociationOperation
     {
-        $query = QueryParser::fromNode($root, $model, [], $context);
+        $query = QueryParser::fromNode($root, $model, $context);
         $alias = $root->alias?->value;
         $name = $root->name->value;
         $arguments = Parser::toAssociativeArray($root->arguments, ['id', 'replace', 'remove', 'append', 'clear']);
