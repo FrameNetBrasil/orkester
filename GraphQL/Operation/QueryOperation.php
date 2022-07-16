@@ -2,6 +2,7 @@
 
 namespace Orkester\GraphQL\Operation;
 
+use Illuminate\Support\Arr;
 use Orkester\Exception\EGraphQLException;
 use Orkester\GraphQL\Set\OperatorSet;
 use Orkester\GraphQL\Set\SelectionSet;
@@ -40,12 +41,19 @@ class QueryOperation implements \JsonSerializable
     protected function applyJoinConditions(Criteria $criteria, AssociationMap $associationMap, Model|string $referenceModel)
     {
         $criteria->setModel($referenceModel);
-        $criteria->where(function($sub) use ($associationMap, $referenceModel) {
+        $criteria->where(function ($sub) use ($associationMap, $referenceModel) {
 //            $sub->setModel($referenceModel);
             foreach ($associationMap->conditions ?? [] as $condition) {
                 $sub->where(...$condition);
             }
         });
+    }
+
+    protected function getFinalValue(array $row, Result $result): array
+    {
+        return $this->operatorSet->pluckArgument ?
+            Arr::pluck($row, ($this->operatorSet->pluckArgument->value)($result)) :
+            $row;
     }
 
     protected function executeAssociatedQueries(Criteria $criteria, array &$rows, Result $result)
@@ -85,7 +93,7 @@ class QueryOperation implements \JsonSerializable
                 if ($cardinality == Association::ONE) {
                     $value = $value[0] ?? null;
                 }
-                $row[$associatedName] = $value;
+                $row[$associatedName] = $associatedQuery->getOperation()->getFinalValue($value, $result);
             }
         }
     }
@@ -118,7 +126,7 @@ class QueryOperation implements \JsonSerializable
     public function execute(Result $result)
     {
         $criteria = $this->model::getCriteria();
-        $rows = $this->executeFrom($criteria, $result);
+        $rows = $this->getFinalValue($this->executeFrom($criteria, $result), $result);
         $this->selectionSet->format($rows);
         $this::setupForSubQuery($criteria);
         $result->addResult($this->name, $this->alias, $rows);

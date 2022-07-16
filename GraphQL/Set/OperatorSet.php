@@ -4,6 +4,7 @@ namespace Orkester\GraphQL\Set;
 
 use GraphQL\Language\AST\NodeList;
 use Orkester\GraphQL\Argument\DistinctArgument;
+use Orkester\GraphQL\Argument\PluckArgument;
 use Orkester\GraphQL\Argument\HavingArgument;
 use Orkester\GraphQL\Context;
 use Orkester\GraphQL\Argument\AbstractArgument;
@@ -21,9 +22,11 @@ use Orkester\Persistence\Criteria\Criteria;
 class OperatorSet implements \IteratorAggregate, \JsonSerializable
 {
     protected array $operators;
+    public ?PluckArgument $pluckArgument;
 
-    public function __construct(AbstractArgument ...$operators)
+    public function __construct(?PluckArgument $pluckArgument, AbstractArgument ...$operators)
     {
+        $this->pluckArgument = $pluckArgument;
         $this->operators = $operators;
     }
 
@@ -70,7 +73,10 @@ class OperatorSet implements \IteratorAggregate, \JsonSerializable
         if ($node = $nodes['having'] ?? false) {
             $operators[] = HavingArgument::fromNode($node, $context);
         }
-        return new OperatorSet(...$operators ?? []);
+        if ($node = $nodes['pluck'] ?? false) {
+            $pluck = PluckArgument::fromNode($node, $context);
+        }
+        return new OperatorSet($pluck ?? null,...$operators ?? []);
     }
 
     public function jsonSerialize(): array
