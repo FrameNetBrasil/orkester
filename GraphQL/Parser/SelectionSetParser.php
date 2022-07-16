@@ -22,7 +22,7 @@ class SelectionSetParser
 
     public function __construct(
         protected Model|string $model,
-        protected Context          $context
+        protected Context      $context
     )
     {
     }
@@ -32,7 +32,7 @@ class SelectionSetParser
         $name = $selectionNode->name->value;
         if ($name == '__typename') {
             $operator = new FieldSelection("'{$this->model::getName()}'", "__typename");
-        } else if ($name == 'id') {
+        } else if ($name == 'id' && $selectionNode->alias == null && $selectionNode->arguments->count() == 0) {
             $operator = new FieldSelection($this->model::getKeyAttributeName(), 'id');
         } else {
             $operator = FieldSelection::fromNode($selectionNode, $this->model, $this->context);
@@ -41,7 +41,6 @@ class SelectionSetParser
                 $query = QueryParser::fromNode(
                     $selectionNode,
                     $associationMap->toClassName,
-                    QueryParser::$associationOperations,
                     $this->context
                 );
                 $associatedName = $selectionNode->alias?->value ?? $name;
