@@ -18,6 +18,7 @@ class TotalOperation implements \JsonSerializable
     public function execute(Result $result)
     {
         $criteria = $result->getCriteria(($this->operation)($result));
+        $criteria->select('id');
         $result->addResult('__total', $this->alias, $criteria->count());
     }
 
