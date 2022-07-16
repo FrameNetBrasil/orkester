@@ -121,7 +121,7 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
         $sql = $query;
         $bindings = Arr::flatten($values, 1);
         foreach ($bindings as $binding) {
-            $sql = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('"%s"', $binding)), $sql);
+            $sql = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('\'%s\'', $binding)), $sql);
         }
         $this->logger->info($sql);
         return $query;
