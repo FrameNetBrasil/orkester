@@ -63,6 +63,9 @@ class UpdateOperation extends AbstractWriteOperation
      */
     public function collectExistingRows(MAuthorizedModel $model): array
     {
+        if (empty($this->operators)) {
+            throw new EGraphQLException(['argument_missing' => "id"]);
+        }
         $operator = new QueryOperation($this->context, $this->root);
         $operator->operators = $this->operators;
         $operator->isPrepared = true;
@@ -92,6 +95,7 @@ class UpdateOperation extends AbstractWriteOperation
         }
         //TODO batch
         $rows = $this->collectExistingRows($model);
+        $rows = array_key_exists(0, $rows) ? $rows : [$rows];
         $modified = [];
 
         foreach ($rows as $row) {
