@@ -26,7 +26,7 @@ class Allow
 
     public static function except(...$values): callable
     {
-        return fn($value) => mdump(!in_array($value, $values));
+        return fn($value) => !in_array($value, $values);
     }
 
     public static function any(...$callables): callable
