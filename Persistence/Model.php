@@ -331,7 +331,7 @@ class Model
         $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
         $key = $classMap->keyAttributeName;
         $criteria = self::getCriteria();
-        $criteria->upserts($fields);
+//        $criteria->upserts($fields);
         $criteria->upsert([$fields], [$key], array_keys($fields));
         $lastInsertId = $criteria->getConnection()->getPdo()->lastInsertId();
         return $lastInsertId;
