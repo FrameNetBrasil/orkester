@@ -66,9 +66,9 @@ class Configuration
         if ($name[0] == '_') {
             $name = substr($name, 1);
         }
-        if ([$class, $name] = $this->namedServices[$name] ?? false) {
+        if ([$class, $method] = $this->namedServices[$name] ?? false) {
             $service = Manager::getContainer()->get($class);
-            return fn(...$args) => $service->$name(...$args);
+            return fn(...$args) => $service->$method(...$args);
         }
         if (is_callable($this->serviceResolver) && $service = ($this->serviceResolver)($name)) {
             return $service;
