@@ -3,6 +3,7 @@
 namespace Orkester\GraphQL\Operator;
 
 use GraphQL\Language\AST\IntValueNode;
+use GraphQL\Language\AST\ListValueNode;
 use GraphQL\Language\AST\NodeList;
 use GraphQL\Language\AST\ObjectFieldNode;
 use GraphQL\Language\AST\ObjectValueNode;
@@ -15,7 +16,7 @@ use Orkester\Persistence\Criteria\RetrieveCriteria;
 
 class SetOperator extends AbstractOperator
 {
-    public function __construct(ExecutionContext $context, protected ObjectValueNode|VariableNode $node)
+    public function __construct(ExecutionContext $context, protected ObjectValueNode|VariableNode|ListValueNode $node)
     {
         parent::__construct($context);
     }

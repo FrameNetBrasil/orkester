@@ -111,7 +111,9 @@ class Platform extends MySqlPlatform {
                 $type = substr(strtolower($value::class), 1);
             }
         }
-        if ($type == 'date') {
+        if ($type == 'boolean') {
+            return $value ? 1 : 0;
+        }else if ($type == 'date') {
             return is_object($value) ? $value->format('Y/m/d') : $value;
         } elseif ($type == 'time') {
             return is_object($value) ? $value->format('H:i:s') : $value;
@@ -134,7 +136,8 @@ class Platform extends MySqlPlatform {
         if (empty($value) && $value != '0') {
             return null;
         }
-        if ($type == 'date') {
+        if ($type == 'boolean') return (bool)$value;
+        else if ($type == 'date') {
             return Carbon::createFromFormat('Y-m-d', $value);
         } elseif ($type == 'timestamp' || $type == 'datetime') {
             return Carbon::createFromFormat('Y-m-d H:i:s', $value);

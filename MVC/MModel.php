@@ -141,11 +141,12 @@ class MModel
     /**
      * @throws EValidationException
      */
-    public function insert(object $object)
+    public function insert(object $object): int
     {
         static::beforeInsert($object);
         $pk = static::save($object);
         static::afterInsert($object, $pk);
+        return $pk;
     }
 
     public static function beforeInsert(object $object)
@@ -159,11 +160,12 @@ class MModel
     /**
      * @throws EValidationException
      */
-    public function update(object $object, object $old)
+    public function update(object $object, object $old): int
     {
         static::beforeUpdate($object, $old);
         $pk = static::save($object);
         static::afterUpdate($object, $old, $pk);
+        return $pk;
     }
 
     public static function beforeUpdate(object $object, object $old)
@@ -373,7 +375,7 @@ class MModel
                 throw new EValidationException($errors);
             }
             try {
-                static::save($entity);
+                $pk = static::save($entity);
             } catch(EValidationException $e) {
                 throw new EValidationException(array_merge(...$e->errors));
             }
@@ -383,7 +385,7 @@ class MModel
             }
             static::onAfterCreate($entity, $oldEntity);
             $transaction->commit();
-            return $entity;
+            return static::one([$classMap->getKeyAttributeName(), '=', $pk]);
         } catch (\Exception $e) {
             $transaction->rollback();
             throw $e;

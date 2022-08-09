@@ -75,15 +75,15 @@ class MAuthorizedModel
     /**
      * @throws EValidationException
      */
-    public function insert(object $object)
+    public function insert(object $object): int
     {
-        $this->model->insert($object);
+        return $this->model->insert($object);
     }
 
-    public function update(object $object, object $old)
+    public function update(object $object, object $old): int
     {
         if ($this->canUpdateEntity($object->{$this->getKeyAttributeName()})) {
-            $this->model->update($object, $old);
+            return $this->model->update($object, $old);
         }
         else {
             throw new \DomainException('forbidden');

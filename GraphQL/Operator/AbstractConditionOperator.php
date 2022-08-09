@@ -89,12 +89,38 @@ abstract class AbstractConditionOperator extends AbstractOperation
         }
         if ($node->value instanceof VariableNode) {
             $var = $this->context->getNodeValue($node->value);
-            $op = array_key_first($var);
-            $value = $var[$op];
+            if (empty($var)) return [];
+            if (isset($var[0])) {
+                $results = [];
+                foreach ($var as $condition) {
+                    $op = array_key_first($condition);
+                    $value = $condition[$op];
+                    $operator = $this->getCriteriaOperator($op, $value, $parameters);
+                    $results[] = [$field, $operator, $value];
+                }
+                return $results;
+            } else {
+                $op = array_key_first($var);
+                $value = $var[$op];
+            }
         } else {
-            $entry = $node->value->fields->offsetGet(0);
-            $value = $this->context->getNodeValue($entry->value);
-            $op = $entry->name->value;
+            if ($node->value instanceof ListValueNode) {
+                $results = [];
+                foreach ($node->value->values->getIterator() as $nodeItem) {
+                    $entry = $nodeItem->fields->offsetGet(0);
+                    $value = $this->context->getNodeValue($entry->value);
+                    $op = $entry->name->value;
+                    if (!(is_null($value) && $op != 'is_null')) {
+                        $operator = $this->getCriteriaOperator($op, $value, $parameters);
+                        $results[] = [$field, $operator, $value];
+                    }
+                }
+                return $results;
+            } else {
+                $entry = $node->value->fields->offsetGet(0);
+                $value = $this->context->getNodeValue($entry->value);
+                $op = $entry->name->value;
+            }
         }
         if (!(is_null($value) && $op != 'is_null')) {
             $operator = $this->getCriteriaOperator($op, $value, $parameters);

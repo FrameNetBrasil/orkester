@@ -37,6 +37,7 @@ class QueryOperation extends AbstractOperation
     public array $operators = [];
     public array $formatters = [];
     public array $attributeMaps = [];
+    public bool $isSubOperation = false;
     public bool $isSingleResult = false;
     public bool $isCriteriaOnly = false;
     public bool $includeTypename = false;
@@ -193,6 +194,7 @@ class QueryOperation extends AbstractOperation
         }
 
         $operation = new QueryOperation($this->context, $node);
+        $operation->isSubOperation = true;
         $container = Manager::getContainer();
         $associatedModel = $container->get($associationMap->getToClassName());
         $authorization = $container->get($associatedModel::$authorizationClass);
@@ -379,7 +381,9 @@ class QueryOperation extends AbstractOperation
             $rows = $updatedRows;
         }
         $this->restoreAfterSubCriteria($criteria, $removedParameters);
-        $result = ($this->isSingleResult || $this->context->isSingular($this->node->name->value)) ? ($rows[0] ?? null) : $rows;
+        $result = (!$this->isSubOperation &&
+            ($this->isSingleResult || $this->context->isSingular($this->node->name->value)))
+            ? ($rows[0] ?? null) : $rows;
         return [
             'criteria' => $criteria,
             'result' => $result

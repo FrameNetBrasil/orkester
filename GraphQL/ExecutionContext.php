@@ -5,6 +5,7 @@ namespace Orkester\GraphQL;
 use Carbon\Carbon;
 use Ds\Set;
 use GraphQL\Language\AST\ArgumentNode;
+use GraphQL\Language\AST\BooleanValueNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\ListValueNode;
@@ -136,10 +137,11 @@ class ExecutionContext
         return new MAuthorizedModel($model, $authorization);
     }
 
-    public function getCallableService(string $name): ?string
+    public function getCallableService(string $name): ?callable
     {
         if ($callable = (static::$conf)['services'][$name] ?? false) {
-            return $callable;
+            $class = Manager::getContainer()->get($callable[0]);
+            return fn(...$args) => $class->{$callable[1]}(...$args);
         } else if (array_key_exists('serviceResolver', static::$conf)) {
             return (static::$conf)['serviceResolver']($name);
         }
