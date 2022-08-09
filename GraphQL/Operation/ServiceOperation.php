@@ -69,8 +69,8 @@ class ServiceOperation extends AbstractMutationOperation
             $arguments[$argument->name->value] = $this->context->getNodeValue($argument->value);
         }
         try {
-            $args = $this->buildArguments($arguments, $service);
-            $result = $service(...$args);
+//            $args = $this->buildArguments($arguments, $service);
+            $result = $service(...$arguments);
             $selection = $this->collectSelectionSet($this->root->selectionSet);
             $response = [];
             return ['result' => $result];

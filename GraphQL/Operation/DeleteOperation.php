@@ -50,10 +50,27 @@ class DeleteOperation extends AbstractOperation
         $operator->isPrepared = true;
 
         $pk = $model->getClassMap()->getKeyAttributeName();
-        $rows = $operator->execute($model->getCriteria()->select($pk))['result'];
+        $rows = $operator->execute($model->getCriteria()->select($this->getSelectFields($model)))['result'];
         if (is_null($rows)) return [];
         if (!array_key_exists(0, $rows)) return [$rows];
         return $rows;
+    }
+
+    public function getSelectFields(MAuthorizedModel $model): string
+    {
+        $selects = [$model->getKeyAttributeName()];
+        /** @var FieldNode $selection */
+        foreach ($this->root->selectionSet?->selections->getIterator() ?? [] as $selection) {
+            if ($selection->name->value == '__typename') {
+                $typename = $this->context->getModelTypename($model);
+                $selects[] = "$typename as __typename";
+            } else if ($selection->name->value == 'id') {
+                $selects[] = "{$model->getKeyAttributeName()} as id";
+            } else {
+                $selects[] = "{$selection->name->value}" . ($selection->alias ? " as {$selection->alias->value}" : '');
+            }
+        }
+        return implode(',', $selects);
     }
 
     /**
@@ -76,6 +93,9 @@ class DeleteOperation extends AbstractOperation
                 throw new EGraphQLForbiddenException($modelName, 'delete');
             }
         }
-        return null;
+        return [
+            'criteria' => null,
+            'result' => $this->context->isSingular($modelName) ? ($rows[0] ?? null) : $rows
+        ];
     }
 }

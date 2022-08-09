@@ -24,6 +24,7 @@ use Orkester\GraphQL\Operation\QueryOperation;
 use Orkester\GraphQL\Operation\ServiceOperation;
 use Orkester\GraphQL\Operation\TotalOperation;
 use Orkester\GraphQL\Operation\UpdateOperation;
+use Orkester\GraphQL\Operation\UpsertOperation;
 use Orkester\Manager;
 use Orkester\MVC\MModel;
 
@@ -123,7 +124,9 @@ class Executor
         $this->requiresTransaction = true;
         $operationName = match ($definition->name->value) {
             'insert' => InsertOperation::class,
+            'upsert' => UpsertOperation::class,
             'delete' => DeleteOperation::class,
+            'remove' => DeleteOperation::class,
             'update' => UpdateOperation::class,
             'service' => ServiceOperation::class,
             default => null

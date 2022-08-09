@@ -5,6 +5,7 @@ namespace Orkester\GraphQL\Operation;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
+use GraphQL\Language\AST\NullValueNode;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLForbiddenException;
 use Orkester\Exception\EGraphQLNotFoundException;
@@ -69,7 +70,7 @@ class UpdateOperation extends AbstractWriteOperation
         $operator = new QueryOperation($this->context, $this->root);
         $operator->operators = $this->operators;
         $operator->isPrepared = true;
-        return $operator->execute($model->getCriteria()->select('*'))['result'];
+        return $operator->execute($model->getCriteria()->select('*'))['result'] ?? [];
     }
 
     public function prepare(?MAuthorizedModel $model)
@@ -93,28 +94,33 @@ class UpdateOperation extends AbstractWriteOperation
         if (empty($this->set)) {
             $this->prepare($model);
         }
+        $modifiedKeys = [];
         //TODO batch
         $rows = $this->collectExistingRows($model);
-        $rows = array_key_exists(0, $rows) ? $rows : [$rows];
-        $modified = [];
+        if (empty($rows)) {
+            $values = $this->createEntityArray($this->set, $model, false);
+            $modifiedKeys[] = $model->insert((object)$values);
+        } else {
+            $rows = array_key_exists(0, $rows) ? $rows : [$rows];
+            $modified = [];
 
-        foreach ($rows as $row) {
-            $currentRowObject = (object)$row;
-            $values = $this->createEntityArray($this->set, $model, true);
-            if (!empty($values)) {
-                $modified[] = [(object)array_merge($row, $values), $currentRowObject];
+            foreach ($rows as $row) {
+                $currentRowObject = (object)$row;
+                $values = $this->createEntityArray($this->set, $model, true);
+                if (!empty($values)) {
+                    $modified[] = [(object)array_merge($row, $values), $currentRowObject];
+                }
             }
-        }
 
-        $pk = $model->getClassMap()->getKeyAttributeName();
-        $modifiedKeys = [];
-        try {
-            foreach ($modified as [$new, $old]) {
-                $model->update($new, $old);
-                $modifiedKeys[] = $new->$pk;
+            $pk = $model->getClassMap()->getKeyAttributeName();
+            try {
+                foreach ($modified as [$new, $old]) {
+                    $model->update($new, $old);
+                    $modifiedKeys[] = $new->$pk;
+                }
+            } catch (EValidationException $e) {
+                throw new EGraphQLValidationException($this->handleValidationErrors($e->errors));
             }
-        } catch(EValidationException $e) {
-            throw new EGraphQLValidationException($this->handleValidationErrors($e->errors));
         }
         return $this->createSelectionResult($model, $this->root, $modifiedKeys, $this->context->isSingular($modelName));
     }
