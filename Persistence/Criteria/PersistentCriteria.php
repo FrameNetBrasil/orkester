@@ -320,6 +320,16 @@ class PersistentCriteria
         return $this;
     }
 
+    public function setAssociationIndex(string $associationName, string $index)
+    {
+        $associationCriteria = $this->getAssociationCriteria($associationName);
+        if ($associationCriteria == NULL) {
+            $associationCriteria = $this->addAssociationCriteria($associationName);
+        }
+        $associationCriteria->setIndex($index);
+        return $this;
+    }
+
     public function setAssociationType(string $associationName, string $joinType)
     {
         $associationCriteria = $this->getAssociationCriteria($associationName);
@@ -479,10 +489,10 @@ class PersistentCriteria
     }
 
     public function addAssociationCriteria(
-        string $name,
-        string $joinType = 'INNER',
+        string   $name,
+        string   $joinType = 'INNER',
         ClassMap $classMap = null,
-        string $fromAlias = null
+        string   $fromAlias = null
     ): AssociationCriteria|null
     {
         if ($classMap == NULL) {

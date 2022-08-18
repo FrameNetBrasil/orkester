@@ -106,7 +106,7 @@ class MModel
                     }
                     $object->{$attributeMap->getName()} = $value;
                 }
-                if (is_null($value) && ($default = $attributeMap->getDefault())) {
+                if (is_null($value) && (!is_null($default = $attributeMap->getDefault()))) {
                     if (is_callable($default)) {
                         $default($value);
                     }

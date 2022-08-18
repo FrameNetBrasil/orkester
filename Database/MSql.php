@@ -92,10 +92,11 @@ class MSql
         $cond = '';
         if (is_array($this->join)) {
             foreach ($this->join as $join) {
+                $index = $join[4] ? " FORCE INDEX FOR JOIN (`$join[4]`) " : "";
                 if ($cond != '') {
-                    $cond = "($cond " . $join[3] . " JOIN $join[1] ON ($join[2]))";
+                    $cond = "($cond " . $join[3] . " JOIN $join[1] $index ON ($join[2]))";
                 } else {
-                    $cond = "($join[0] " . $join[3] . " JOIN $join[1] ON ($join[2]))";
+                    $cond = "($join[0] " . $join[3] . " JOIN $join[1] $index ON ($join[2]))$index";
                 }
             }
         } else {

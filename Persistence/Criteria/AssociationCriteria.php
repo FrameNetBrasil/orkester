@@ -16,6 +16,7 @@ class AssociationCriteria
     private string $attribute;
     private PersistentCriteria $criteria;
     private string $joinType;
+    private string $index = '';
     private array $conditions = [];
 
     public function __construct(
@@ -32,6 +33,22 @@ class AssociationCriteria
     public function getCriteria(): PersistentCriteria
     {
         return $this->criteria;
+    }
+
+    /**
+     * @return string
+     */
+    public function getIndex(): string
+    {
+        return $this->index;
+    }
+
+    /**
+     * @param string $index
+     */
+    public function setIndex(string $index): void
+    {
+        $this->index = $index;
     }
 
     public function setAssociationMap(AssociationMap $associationMap)
@@ -102,7 +119,7 @@ class AssociationCriteria
             $condition = $names->fromColumnName . "=" . $associativeTable . '.' . $names->fromColumn;
             $join[] = [$names->fromTable, $associativeTable, $condition, $this->joinType];
             $condition = $associativeTable . '.' . $names->toColumn . "=" . $names->toColumnName;
-            $join[] = [$associativeTable, $names->toTable, $condition, $this->joinType];
+            $join[] = [$associativeTable, $names->toTable, $condition, $this->joinType, $this->index];
         } else {
             $baseClassMap = $this->criteria->getClassMap();
             $fromAlias = $this->fromAlias;
@@ -112,9 +129,8 @@ class AssociationCriteria
             foreach($this->conditions as $extraCondition) {
                 $condition .= ' AND ('. $extraCondition[0] . $extraCondition[1].$extraCondition[2].')';
             }
-            $join[] = array($names->fromTable, $names->toTable, $condition, $this->joinType);
+            $join[] = array($names->fromTable, $names->toTable, $condition, $this->joinType, $this->index);
         }
-        //mdump($join);
         return $join;
     }
 

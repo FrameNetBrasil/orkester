@@ -16,6 +16,7 @@ use Orkester\GraphQL\Operator\AbstractOperator;
 use Orkester\GraphQL\Operator\GroupOperator;
 use Orkester\GraphQL\Operator\HavingOperator;
 use Orkester\GraphQL\Operator\IdOperator;
+use Orkester\GraphQL\Operator\IndexOperator;
 use Orkester\GraphQL\Operator\JoinOperator;
 use Orkester\GraphQL\Operator\LimitOperator;
 use Orkester\GraphQL\Operator\OffsetOperator;
@@ -87,6 +88,7 @@ class QueryOperation extends AbstractOperation
                 'offset' => OffsetOperator::class,
                 'having' => HavingOperator::class,
                 'union' => UnionOperator::class,
+                'index' => IndexOperator::class,
                 default => null
             };
             if (is_null($class)) {
@@ -347,10 +349,9 @@ class QueryOperation extends AbstractOperation
             $criteria->clearSelect();
             $criteria->select($fromKey);
             $toClassMap = $associationMap->getToClassMap();
-            $associationCriteria = $toClassMap->getCriteria();
+            $associationCriteria = $toClassMap->getCriteria()->distinct();
             $cardinality = $associationMap->getCardinality();
-
-            $values = array_filter(array_map(fn($r) => $r[$fromKey], $criteria->asResult()), fn($r) => !empty($r));
+            $values = array_map(fn($subRow) => $subRow[$fromKey], $criteria->asResult());
             if ($cardinality == 'oneToOne') {
                 $newAssociation = $this->createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey);
                 $joinField = $newAssociation->getName() . "." . $associationMap->getFromKey();
@@ -365,8 +366,6 @@ class QueryOperation extends AbstractOperation
             $subResult = $operation->execute($associationCriteria)['result'];
             $subResult = group_by($subResult, $fk, false);
             $updatedRows = [];
-            // this line is necessary for reasons beyond understanding
-//            unset($row);
             foreach ($rows as &$row) {
                 $value = $subResult[$row[$fromKey] ?? ''] ?? [];
                 if ($cardinality == 'oneToOne') {
