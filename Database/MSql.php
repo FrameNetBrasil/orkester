@@ -96,7 +96,7 @@ class MSql
                 if ($cond != '') {
                     $cond = "($cond " . $join[3] . " JOIN $join[1] $index ON ($join[2]))";
                 } else {
-                    $cond = "($join[0] " . $join[3] . " JOIN $join[1] $index ON ($join[2]))$index";
+                    $cond = "($join[0] " . $join[3] . " JOIN $join[1] $index ON ($join[2]))";
                 }
             }
         } else {
