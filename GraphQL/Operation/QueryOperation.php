@@ -351,7 +351,10 @@ class QueryOperation extends AbstractOperation
             $toClassMap = $associationMap->getToClassMap();
             $associationCriteria = $toClassMap->getCriteria()->distinct();
             $cardinality = $associationMap->getCardinality();
-            $values = array_map(fn($subRow) => $subRow[$fromKey], $criteria->asResult());
+            $values = array_filter(
+                array_map(fn($subRow) => $subRow[$fromKey], $criteria->asResult()),
+                fn($r) => !empty($r)
+            );
             if ($cardinality == 'oneToOne') {
                 $newAssociation = $this->createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey);
                 $joinField = $newAssociation->getName() . "." . $associationMap->getFromKey();
