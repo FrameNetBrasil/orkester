@@ -14,6 +14,10 @@
     ],
     "require": {
         "php": "^8.0.2",
+        "ext-apcu": "^5",
+        "ext-pdo": "*",
+        "ext-json": "*",
+        "ext-curl": "*",
         "slim/slim": "4.*",
         "slim/psr7": "^1.2",
         "php-di/php-di": "6.4",
@@ -27,9 +31,9 @@
         "phpmyadmin/sql-parser": "^5.5",
         "illuminate/database": "^8.0|^9.0",
         "illuminate/events": "^8.0|^9.0",
-        "ext-apcu": "^5",
-        "ext-pdo": "*",
-        "greenlion/php-sql-parser": "^4.5"
+        "greenlion/php-sql-parser": "^4.5",
+        "guzzlehttp/guzzle": "^7.4",
+        "vlucas/phpdotenv": "^5.4"
     },
     "autoload": {
         "files": [
