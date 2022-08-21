@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Orkester\Handlers;
 
-use Orkester\MVC\MError;
+use Orkester\Controllers\MError;
 use Exception;
 use Orkester\Results\MResultObject;
 use Psr\Http\Message\ResponseInterface as Response;

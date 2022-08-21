@@ -1,6 +1,6 @@
 <?php
 
-namespace Orkester\MVC;
+namespace Orkester\Controllers;
 
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLForbiddenException;

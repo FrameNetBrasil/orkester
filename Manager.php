@@ -75,7 +75,7 @@ class Manager
      * Instância singleton.
      */
 //    static private $instance = NULL;
-//    static private string $basePath;
+    static private string $basePath;
     static private string $confPath;
     static private string $classPath;
 
@@ -100,7 +100,7 @@ class Manager
 //    static private MAjax $ajax;
 //    static private MFrontController $frontController;
 //    static private bool $isAjax = false;
-//    static private MAuth $auth;
+      static private object $auth;
 //    static private array $databases = [];
 //    static private ?MLogin $login = NULL;
 
@@ -147,7 +147,7 @@ class Manager
     {
         $reflection = new \ReflectionClass(\Composer\Autoload\ClassLoader::class);
         $basePath = dirname($reflection->getFileName(), 3);
-//        self::$basePath = $basePath;
+        self::$basePath = $basePath;
         self::$confPath = $basePath . '/conf';
         self::loadConf(self::$confPath . '/conf.php');
 
@@ -311,11 +311,13 @@ class Manager
 //        return self::$basePath;
 //    }
 
-//    public static function getBasePath(): string
-//    {
-//        return self::$basePath;
-//    }
-//
+    public static function getBasePath(string $path = null): string
+    {
+        return is_null($path) ?
+            self::$basePath :
+            self::$basePath . "/$path";
+    }
+
     public static function getAppPath(string $path = null): string
     {
         return is_null($path) ?
@@ -446,15 +448,15 @@ class Manager
 //        self::$isLogged = $value;
 //    }
 //
-//    public static function getAuth(): MAuth
-//    {
-//        return self::$auth;
-//    }
-//
-//    public static function setAuth(MAuth $value): void
-//    {
-//        self::$auth = $value;
-//    }
+    public static function getAuth()
+    {
+        return self::$auth;
+    }
+
+    public static function setAuth($value): void
+    {
+        self::$auth = $value;
+    }
 //
 //    public static function checkLogin(bool $generateException): bool
 //    {

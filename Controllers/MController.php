@@ -1,6 +1,6 @@
 <?php
 
-namespace Orkester\MVC;
+namespace Orkester\Controllers;
 
 use Orkester\Manager;
 use Orkester\Results\Exception\MResultForbidden;
