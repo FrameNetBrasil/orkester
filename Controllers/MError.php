@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Orkester\MVC;
+namespace Orkester\Controllers;
 
 use JsonSerializable;
 

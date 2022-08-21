@@ -11,28 +11,12 @@ use Orkester\Services\OTraceFormatter;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 
-//use App\UI\Controls\MPageControl;
-//use App\UI\MEasyUiPainter;
-//use DI\Factory\RequestedEntry;
-//use Orkester\Persistence\PersistentManager;
-//use Orkester\Persistence\PersistenceSQL;
-
 use function DI\create;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use Monolog\Processor\UidProcessor;
 
-//
-//use Orkester\Database\MDatabase;
-//use Orkester\Manager;
-//use Orkester\MVC\MContext;
 use Orkester\Services\MLog;
-
-//use Orkester\Services\MSession;
-//use Orkester\Services\Http\MAjax;
-//use Orkester\Services\Http\MRequest;
-//use Orkester\Services\Http\MResponse;
-//use Orkester\UI\MPage;
 
 return function (ContainerBuilder $containerBuilder) {
     $containerBuilder->addDefinitions([
