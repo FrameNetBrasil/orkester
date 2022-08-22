@@ -4,15 +4,12 @@
 namespace Orkester\JsonApi;
 
 
-use Doctrine\DBAL\Exception\InvalidFieldNameException;
 use JetBrains\PhpStorm\ArrayShape;
-use Orkester\Exception\EDBException;
 use Orkester\Exception\EOrkesterException;
-use Orkester\Exception\ESecurityException;
 use Orkester\Exception\EValidationException;
 use Orkester\Manager;
-use Orkester\MVC\MController;
-use Orkester\MVC\MModel;
+use Orkester\Controllers\MController;
+use Orkester\Persistence\Model;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
 
@@ -28,16 +25,16 @@ class JsonApi extends MController
         return new ($conf[$key][$name])();
     }
 
-    public static function modelFromResource($resource): MModel
+    public static function modelFromResource($resource): Model
     {
         $instance = static::getEndpointInstance($resource, false);
-        if ($instance instanceof MModel) {
+        if ($instance instanceof Model) {
             return $instance;
         }
         throw new \InvalidArgumentException('Resource model not found', 404);
     }
 
-    public static function validateAssociation(MModel $model, object $entity, string $associationName, mixed $associated, bool $throw = false): array
+    public static function validateAssociation(Model $model, object $entity, string $associationName, mixed $associated, bool $throw = false): array
     {
         $validationMethod = 'validate' . $associationName;
         if (method_exists($model, $validationMethod)) {
@@ -52,7 +49,7 @@ class JsonApi extends MController
         return $errors ?? [];
     }
 
-    public function get(array $args, MModel $model, Request $request): array
+    public function get(array $args, Model $model, Request $request): array
     {
         $params = $request->getQueryParams();
         return Retrieve::process(
@@ -71,7 +68,7 @@ class JsonApi extends MController
         );
     }
 
-    public function post(array $args, MModel $model): array
+    public function post(array $args, Model $model): array
     {
         if (array_key_exists('relationship', $args)) {
             if (!$model->existsId($args['id'])) {
@@ -98,7 +95,7 @@ class JsonApi extends MController
         }
     }
 
-    public function patch(array $args, MModel $model): array
+    public function patch(array $args, Model $model): array
     {
 
         if (array_key_exists('relationship', $args)) {
@@ -116,7 +113,7 @@ class JsonApi extends MController
         }
     }
 
-    public function delete(array $args, MModel $model): array
+    public function delete(array $args, Model $model): array
     {
         if (array_key_exists('relationship', $args)) {
             if (!$model->existsId($args['id'])) {
@@ -170,10 +167,10 @@ class JsonApi extends MController
                 array_push($es, static::createError($code, $key, $value));
             }
             $content = static::createErrorResponse($es);
-        } catch(ESecurityException $e) {
+        } catch(EOrkesterException $e) {
             $code = $e->getCode();
             $content = static::createErrorResponse(static::createError($code, 'Forbidden', $e->getMessage()));
-        } catch(InvalidFieldNameException | EDBException $e) {
+        } catch(EOrkesterException $e) {
             $code = 400; //Bad request
             $content = static::createErrorResponse(
                 static::createError($code, 'Bad request', 'Invalid or missing field')
