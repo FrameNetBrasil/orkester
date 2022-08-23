@@ -100,9 +100,13 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
     public function wrap($value, $prefixAlias = false): string
     {
         if ($prefixAlias) return parent::wrap($value, $prefixAlias);
-        $parser = new PHPSQLParser();
-        $parsed = $parser->parse("select " . $value);
-        return $this->parseNode($this->criteria, $parsed['SELECT'][0], $value, $this->context != 'columns' && $this->context != 'from');
+        if (($this->context == 'from') || ($this->context == 'joins')) {
+            return $value;
+        } else {
+            $parser = new PHPSQLParser();
+            $parsed = $parser->parse("select " . $value);
+            return $this->parseNode($this->criteria, $parsed['SELECT'][0], $value, $this->context != 'columns' && $this->context != 'from');
+        }
     }
 
     public function columnize(array $columns): string
