@@ -9,6 +9,7 @@ abstract class AbstractConditionArgument
         return match ($operator) {
             'is_null' => null,
             'contains' => "%$value%",
+            'starts_with' => "$value%",
             default => $value
         };
     }
@@ -25,7 +26,7 @@ abstract class AbstractConditionArgument
             'in' => 'IN',
             'nin' => 'NOT IN',
             'is_null' => $value ? 'IS NULL' : 'IS NOT NULL',
-            'like', 'contains' => 'LIKE',
+            'like', 'contains', 'starts_with' => 'LIKE',
             'nlike' => 'NOT LIKE',
             'regex' => 'RLIKE',
             default => null
