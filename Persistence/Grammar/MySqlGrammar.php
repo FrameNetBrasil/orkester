@@ -101,7 +101,7 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
     {
         if ($prefixAlias) return parent::wrap($value, $prefixAlias);
         if (($this->context == 'from') || ($this->context == 'joins')) {
-            return $value;
+            return parent::wrap($value, $prefixAlias);
         } else {
             $parser = new PHPSQLParser();
             $parsed = $parser->parse("select " . $value);

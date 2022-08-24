@@ -153,9 +153,14 @@ class Model
         if ($key == '') {
             $key = $toClassMap->keyAttributeMap->name;
         }
-        $associationMap->fromKey = $key;
-        $associationMap->toKey = $toClassMap->keyAttributeMap?->name ?? $key;
-
+        if (str_contains($key, ':')) {
+            $k = explode(':', $key);
+            $associationMap->fromKey = $k[0];
+            $associationMap->toKey = $k[1];
+        } else {
+            $associationMap->fromKey = $key;
+            $associationMap->toKey = $toClassMap->keyAttributeMap?->name ?? $key;
+        }
         $keyAttributeMap = $fromClassMap->getAttributeMap($key);
         if (is_null($keyAttributeMap)) {
             self::attribute(name: $key, key: Key::FOREIGN, type: Type::INTEGER, nullable: false);
