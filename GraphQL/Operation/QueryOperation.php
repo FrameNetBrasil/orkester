@@ -4,11 +4,13 @@ namespace Orkester\GraphQL\Operation;
 
 use Illuminate\Support\Arr;
 use Orkester\Exception\EGraphQLException;
+use Orkester\GraphQL\Argument\JoinArgument;
 use Orkester\GraphQL\Set\OperatorSet;
 use Orkester\GraphQL\Set\SelectionSet;
 use Orkester\GraphQL\Result;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
+use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Model;
 
@@ -58,29 +60,50 @@ class QueryOperation implements \JsonSerializable
 
     protected function executeAssociatedQueries(Criteria $criteria, array &$rows, Result $result)
     {
+        $associationsType = [];
+        foreach ($this->operatorSet->getIterator() as $o) {
+            if ($o instanceof JoinArgument) {
+                $associationsType = $o->getByAssociation($result);
+            }
+        }
         foreach ($this->selectionSet->getAssociatedQueries() as $associatedQuery) {
             $associationMap = $associatedQuery->getAssociationMap();
             $fromClassMap = $associationMap->fromClassMap;
             $fromKey = $associationMap->fromKey;
-            $fromIds = array_map(fn($row) => $row[$fromClassMap->keyAttributeName], $rows);
+            //$fromIds = array_map(fn($row) => $row[$fromClassMap->keyAttributeName], $rows);
+            //ver como seria funcional para manter as chaves unicas
+            //$fromIds = array_map(fn($row) => $row[$fromKey], $rows);
+            $fromIds = [];
+            foreach ($rows as $row) {
+                $id = $row[$fromKey];
+                $fromIds[$id] = $id;
+            }
             $toKey = $associationMap->toKey;
             $toClassMap = $associationMap->toClassMap;
             $associatedCriteria = $toClassMap->getCriteria();
             //$this->applyJoinConditions($associatedCriteria, $associationMap, $fromClassMap->model);
             $cardinality = $associationMap->cardinality;
-            $groupKey = $fromKey;
+            //$groupKey = $fromKey;
+            $groupKey = $toKey;
             if ($cardinality == Association::ONE) {
-                $whereField = '_gql' . "." . $fromClassMap->keyAttributeName;
-                $associatedCriteria->joinClass($fromClassMap->model, '_gql', $toKey, '=', '_gql' . '.' . $fromKey);
-                $associatedCriteria->where($whereField, 'IN', $fromIds);
-                $associatedCriteria->select($fromKey);
+//                $whereField = '_gql' . "." . $fromClassMap->keyAttributeName;
+                //$whereField = '_gql' . "." . $fromKey;
+                //$associatedCriteria->joinClass($fromClassMap->model, '_gql', $toKey, '=', '_gql' . '.' . $fromKey);
+                //$associatedCriteria->where($whereField, 'IN', $fromIds);
+                $associatedCriteria->where($toKey, 'IN', $fromIds);
+//                $associatedCriteria->select($fromKey);
+                $associatedCriteria->select($toKey);
+                $associatedCriteria->distinct(true);
             } else if ($cardinality == Association::MANY) {
-                $associatedCriteria->where($fromKey, 'IN', $fromIds);
-                $associatedCriteria->select($fromKey);
+//                $associatedCriteria->where($fromKey, 'IN', $fromIds);
+//                $associatedCriteria->select($fromKey);
+                $associatedCriteria->where($toKey, 'IN', $fromIds);
+                $associatedCriteria->select($toKey);
             } else if ($cardinality == Association::ASSOCIATIVE) {
                 $model = $toClassMap->model;
                 $model::associationMany('_gql', model: $fromClassMap->model, associativeTable: $associationMap->associativeTable);
-                $associatedCriteria->select('_gql' . '.' . $fromKey);
+//                $associatedCriteria->select('_gql' . '.' . $fromKey);
+                $associatedCriteria->select('_gql' . '.' . $toKey);
                 $groupKey = $associationMap->fromClassMap->keyAttributeMap->columnName;
             } else {
                 throw new EGraphQLException([$cardinality->value => 'Unhandled cardinality']);
@@ -88,12 +111,23 @@ class QueryOperation implements \JsonSerializable
             $queryResult = $associatedQuery->getOperation()->executeFrom($associatedCriteria, $result, false);
             $subRows = group_by($queryResult, $groupKey, $associatedQuery->getOperation()->selectionSet);
             $associatedName = $associatedQuery->getName();
-            foreach ($rows as &$row) {
+            foreach ($rows as $index => $row) {
                 $value = $subRows[$row[$fromKey] ?? ''] ?? [];
                 if ($cardinality == Association::ONE) {
-                    $value = $value[0] ?? null;
+                    $value = $value[0] ?? [];
                 }
-                $row[$associatedName] = $associatedQuery->getOperation()->getFinalValue($value, $result);
+                $rows[$index][$associatedName] = $associatedQuery->getOperation()->getFinalValue($value, $result);
+                if (isset($associationsType[$associatedName])) {
+                    if ($associationsType[$associatedName] == Join::INNER) {
+                        if (empty($value)) {
+                            unset($rows[$index]);
+                        }
+                    }
+                } else {
+                    if (empty($value)) {
+                        unset($rows[$index]);
+                    }
+                }
             }
         }
     }
@@ -103,7 +137,9 @@ class QueryOperation implements \JsonSerializable
         if (!empty($this->selectionSet->forcedSelection)) {
             foreach ($rows as &$row) {
                 foreach ($this->selectionSet->forcedSelection as $key) {
-                    unset($row[$key]);
+                    if (!$this->selectionSet->isSelected($key)) {
+                        unset($row[$key]);
+                    }
                 }
             }
         }
