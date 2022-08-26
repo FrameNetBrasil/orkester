@@ -28,18 +28,6 @@ class JoinArgument extends AbstractArgument implements \JsonSerializable
         return "join";
     }
 
-    public function getByAssociation(Result $result): array
-    {
-        $associations = [];
-        foreach (($this->value)($result) as $join) {
-            foreach($join as $joinType => $association) {
-                $type = Join::from($joinType);
-                $associations[$association] = $type;
-            }
-        }
-        return $associations;
-    }
-
     public static function fromNode(ListValueNode|VariableNode $node, Context $context): JoinArgument
     {
         return new JoinArgument($context->getNodeValue($node));
