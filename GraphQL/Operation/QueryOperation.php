@@ -60,12 +60,6 @@ class QueryOperation implements \JsonSerializable
 
     protected function executeAssociatedQueries(Criteria $criteria, array &$rows, Result $result)
     {
-        $associationsType = [];
-        foreach ($this->operatorSet->getIterator() as $o) {
-            if ($o instanceof JoinArgument) {
-                $associationsType = $o->getByAssociation($result);
-            }
-        }
         foreach ($this->selectionSet->getAssociatedQueries() as $associatedQuery) {
             $associationMap = $associatedQuery->getAssociationMap();
             $fromClassMap = $associationMap->fromClassMap;
@@ -117,17 +111,6 @@ class QueryOperation implements \JsonSerializable
                     $value = $value[0] ?? [];
                 }
                 $rows[$index][$associatedName] = $associatedQuery->getOperation()->getFinalValue($value, $result);
-                if (isset($associationsType[$associatedName])) {
-                    if ($associationsType[$associatedName] == Join::INNER) {
-                        if (empty($value)) {
-                            unset($rows[$index]);
-                        }
-                    }
-                } else {
-                    if (empty($value)) {
-                        unset($rows[$index]);
-                    }
-                }
             }
         }
     }
