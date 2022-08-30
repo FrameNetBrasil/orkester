@@ -35,7 +35,7 @@ class WhereArgument extends AbstractArgument implements \JsonSerializable
             $criteria->whereNull($column);
         } else if ($operator == 'IS NOT NULL') {
             $criteria->whereNotNull($column);
-        } else {
+        } else if(!empty($value)) {
             if ($and) {
                 $criteria->where($column, $operator, $value);
             } else {
