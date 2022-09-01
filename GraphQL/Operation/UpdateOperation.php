@@ -47,10 +47,9 @@ class UpdateOperation extends AbstractWriteOperation
                     'set' => SetOperator::class,
                     default => null
                 };
-                if (is_null($class)) {
-                    throw new EGraphQLException(['unknown_argument' => $argument->name->value]);
+                if ($class != null) {
+                    $this->operators[] = new $class($this->context, $argument->value);
                 }
-                $this->operators[] = new $class($this->context, $argument->value);
             }
         }
     }

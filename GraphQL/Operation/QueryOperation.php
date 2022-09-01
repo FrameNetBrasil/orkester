@@ -340,21 +340,26 @@ class QueryOperation extends AbstractOperation
             }
         }
         $removedParameters = $this->prepareForSubCriteria($criteria);
-
         foreach ($this->subOperations as $alias => [$operation, $associationName]) {
 //            $operation->parameters = &$this->parameters;
             $associationMap = $classMap->getAssociationMap($associationName);
             $fromKey = $associationMap->getFromKey();
             $fk = $associationMap->getToKey();
-            $criteria->clearSelect();
-            $criteria->select($fromKey);
+//            $criteria->clearSelect();
+//            $criteria->select($fromKey);
             $toClassMap = $associationMap->getToClassMap();
             $associationCriteria = $toClassMap->getCriteria()->distinct();
             $cardinality = $associationMap->getCardinality();
-            $values = array_filter(
-                array_map(fn($subRow) => $subRow[$fromKey], $criteria->asResult()),
-                fn($r) => !empty($r)
-            );
+
+            $set = new Set(array_filter(
+                array_map(fn($r) => $r[$fromKey], $rows),
+                fn($k) => !empty($k)
+            ));
+            $values = $set->toArray();
+//            $values = array_filter(
+//                array_map(fn($subRow) => $subRow[$fromKey], $criteria->asResult()),
+//                fn($r) => !empty($r)
+//            );
             if ($cardinality == 'oneToOne') {
                 $newAssociation = $this->createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey);
                 $joinField = $newAssociation->getName() . "." . $associationMap->getFromKey();

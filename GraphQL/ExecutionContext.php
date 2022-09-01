@@ -89,6 +89,10 @@ class ExecutionContext
         if ($node instanceof ObjectValueNode) {
             $result = [];
             foreach ($node->fields->getIterator() as $fieldNode) {
+                if ($fieldNode->value->kind == NodeKind::VARIABLE &&
+                    !array_key_exists($fieldNode->value->name->value, $this->variables)) {
+                    continue;
+                }
                 $result[$fieldNode->name->value] = $this->getNodeValue($fieldNode);
             }
             return $result;
