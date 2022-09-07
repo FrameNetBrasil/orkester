@@ -10,6 +10,7 @@ use Orkester\GraphQL\Context;
 use Orkester\GraphQL\Argument\AbstractArgument;
 use Orkester\GraphQL\Argument\GroupByArgument;
 use Orkester\GraphQL\Argument\IdArgument;
+use Orkester\GraphQL\Argument\DatabaseArgument;
 use Orkester\GraphQL\Argument\JoinArgument;
 use Orkester\GraphQL\Argument\LimitArgument;
 use Orkester\GraphQL\Argument\OffsetArgument;
@@ -57,6 +58,9 @@ class OperatorSet implements \IteratorAggregate, \JsonSerializable
         }
         if ($node = $nodes['id'] ?? false) {
             $operators[] = IdArgument::fromNode($node, $context);
+        }
+        if ($node = $nodes['database'] ?? false) {
+            $operators[] = DatabaseArgument::fromNode($node, $context);
         }
         if ($node = $nodes['join'] ?? false) {
             $operators[] = JoinArgument::fromNode($node, $context);
