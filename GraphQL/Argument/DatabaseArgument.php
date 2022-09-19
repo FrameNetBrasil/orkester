@@ -15,7 +15,12 @@ class DatabaseArgument extends AbstractArgument implements \JsonSerializable
 
     public function __invoke(Criteria $criteria, Result $result): Criteria
     {
+        $currentFetchMode = (new \ReflectionClass(get_class($criteria->connection)))
+            ->getProperty('fetchMode')->getValue($criteria->connection);
+        mdump('--' . $currentFetchMode);
         $connection = Model::$capsule->getConnection(($this->value)($result));
+        (new \ReflectionClass(get_class($connection)))
+            ->getProperty('fetchMode')->setValue($connection, $currentFetchMode);
         $criteria->connection = $connection;
         return $criteria;
     }
