@@ -134,7 +134,7 @@ class Platform extends MySqlPlatform {
 
     public function convertToPHPValue($value, $type) {
         if (empty($value) && $value != '0') {
-            return null;
+            return is_string($value) ? '' : null;
         }
         if ($type == 'boolean') return (bool)$value;
         else if ($type == 'date') {

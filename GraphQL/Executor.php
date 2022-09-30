@@ -85,6 +85,13 @@ class Executor
         if (is_null($definition->selectionSet)) {
             return;
         }
+        if($definition->name?->value == 'service') {
+            foreach ($definition->selectionSet->selections->getIterator() as $fieldNode) {
+                $operationName = $fieldNode->alias?->value ?? $fieldNode->name->value;
+                $this->operations[$operationName] = ['model' => null, 'operation' => new ServiceOperation($this->context, $fieldNode)];
+            }
+            return;
+        }
         foreach ($definition->selectionSet->selections->getIterator() as $fieldNode) {
             $operationName = $fieldNode->alias?->value ?? $fieldNode->name->value;
             if (in_array($operationName, ['__schema', '__type'])) {

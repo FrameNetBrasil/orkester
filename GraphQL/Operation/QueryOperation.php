@@ -34,6 +34,7 @@ use Orkester\Persistence\Map\ClassMap;
 class QueryOperation extends AbstractOperation
 {
     public Set $selection;
+    public ?string $pluck = null;
     public array $subOperations = [];
     public array $operators = [];
     public array $formatters = [];
@@ -66,6 +67,9 @@ class QueryOperation extends AbstractOperation
             if ($this->context->getNodeValue($one->value)) {
                 $this->isSingleResult = true;
             };
+        }
+        if ($pluck = array_pop_key('pluck', $arguments)) {
+            $this->pluck = $this->context->getNodeValue($pluck->value);
         }
         if (array_pop_key('criteria', $arguments)) {
             $this->context->addOmitted($this->getName());
@@ -118,22 +122,27 @@ class QueryOperation extends AbstractOperation
 
     public function formatValue(string $key, mixed $value)
     {
+        if (is_null($value)) return $value;
         /** @var AttributeMap $map */
-        if (!is_null($value) && $map = $this->attributeMaps[$key] ?? false) {
+        if ($map = $this->attributeMaps[$key] ?? false) {
             $phpValue = $map->getValueFromDb($value);
-            if ($format = $this->formatters[$key] ?? false) {
-                if ($format == "boolean") {
-                    return $phpValue == true;
-                }
-                $type = $map->getType();
-                return match ($type) {
-                    'datetime', 'time', 'date', 'timestamp' => $phpValue->format($format),
-                    default => $phpValue
-                };
-            }
-            return $phpValue;
+        } else {
+            $phpValue = $value;
         }
-        return $value;
+        if ($format = $this->formatters[$key] ?? false) {
+            if ($format == "boolean") {
+                return $phpValue == true;
+            }
+            if ($format == "number") {
+                return $phpValue + 0;
+            }
+            $type = $map->getType();
+            return match ($type) {
+                'datetime', 'time', 'date', 'timestamp' => $phpValue->format($format),
+                default => $phpValue
+            };
+        }
+        return $phpValue;
     }
 
     public function handleAttribute(FieldNode $node, MAuthorizedModel $model)
@@ -165,9 +174,9 @@ class QueryOperation extends AbstractOperation
             $this->attributeMaps[$name] = $attributeMap;
         }
         if ($argFormat = $arguments['format'] ?? false) {
-            if ($isComputed) {
-                throw new EGraphQLException(['invalid_argument' => 'computed_attribute_unsupported_format']);
-            }
+//            if ($isComputed) {
+//                throw new EGraphQLException(['invalid_argument' => 'computed_attribute_unsupported_format']);
+//            }
             $this->formatters[$name] = $argFormat->value->value;
         }
         if (!$isComputed && !$model->getClassMap()->attributeExists($mapField)) {
@@ -376,21 +385,30 @@ class QueryOperation extends AbstractOperation
             $updatedRows = [];
             foreach ($rows as &$row) {
                 $value = $subResult[$row[$fromKey] ?? ''] ?? [];
-                if ($cardinality == 'oneToOne') {
+                if ($operation->pluck) {
+                    $value = array_map(fn($r) => $r[$operation->pluck], $value);
+                }
+                if ($cardinality == 'oneToOne' || $operation->isSingleResult) {
                     $value = $value[0] ?? null;
                 }
-//                if (in_array($fromKey, $columnsToExclude)) {
-//                    unset($row[$fromKey]);
-//                }
                 $row[$alias] = $value;
                 $updatedRows[] = $row;
             }
             $rows = $updatedRows;
         }
+
         $this->restoreAfterSubCriteria($criteria, $removedParameters);
-        $result = (!$this->isSubOperation &&
-            ($this->isSingleResult || $this->context->isSingular($this->node->name->value)))
-            ? ($rows[0] ?? null) : $rows;
+        if ($this->isSubOperation) {
+            $result = $rows;
+        } else {
+            if ($this->pluck) {
+                $rows = array_map(fn($r) => $r[$this->pluck], $rows);
+            }
+            $result = $this->isSingleResult || $this->context->isSingular($this->node->name->value) ?
+                $rows[0] ?? null :
+                $rows;
+        }
+
         return [
             'criteria' => $criteria,
             'result' => $result
