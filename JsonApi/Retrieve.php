@@ -171,6 +171,7 @@ class Retrieve
         if (!empty($sort)) {
             $sortFields = explode(',', $sort);
             foreach ($sortFields as $sf) {
+                $sf = trim($sf);
                 $order = $sf[0] == '-' ? ' DESC' : ' ASC';
                 $field = ltrim($sf, '-');
                 $criteria->orderBy($field . $order);
