@@ -258,15 +258,18 @@ class QueryOperation extends AbstractOperation
         return $this->node->alias ? $this->node->alias->value : $this->node->name->value;
     }
 
-    public function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap, int|string $fromKey, int|string $toKey): AssociationMap
+    public function createTemporaryAssociation(ClassMap $fromClassMap, ClassMap $toClassMap, int|string $fromKey, int|string $toKey, string $table = null): AssociationMap
     {
         $name = '_gql';
         $associationMap = new AssociationMap($name, $fromClassMap);
         $associationMap->setToClassName($toClassMap->getName());
         $associationMap->setToClassMap($toClassMap);
-
-        $associationMap->setCardinality('oneToOne');
-
+        if ($table) {
+            $associationMap->setAssociativeTable($table);
+            $associationMap->setCardinality('manyToMany');
+        } else {
+            $associationMap->setCardinality('oneToOne');
+        }
         $associationMap->addKeys($fromKey, $toKey);
         $associationMap->setKeysAttributes();
         $fromClassMap->putAssociationMap($associationMap);
@@ -369,6 +372,7 @@ class QueryOperation extends AbstractOperation
 //                array_map(fn($subRow) => $subRow[$fromKey], $criteria->asResult()),
 //                fn($r) => !empty($r)
 //            );
+
             if ($cardinality == 'oneToOne') {
                 $newAssociation = $this->createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey);
                 $joinField = $newAssociation->getName() . "." . $associationMap->getFromKey();
@@ -378,7 +382,10 @@ class QueryOperation extends AbstractOperation
                 $associationCriteria->where($fk, 'IN', $values);
                 $associationCriteria->select($fk);
             } else {
-                throw new EGraphQLException([$cardinality => 'Unhandled cardinality']);
+                $newAssociation = $this->createTemporaryAssociation($toClassMap, $classMap, $fk, $fromKey, $associationMap->getAssociativeTable());
+                $joinField = $newAssociation->getName() . "." . $associationMap->getFromKey();
+                $associationCriteria->where($joinField, 'IN', $values);
+                $associationCriteria->select($joinField);
             }
             $subResult = $operation->execute($associationCriteria)['result'];
             $subResult = group_by($subResult, $fk, false);

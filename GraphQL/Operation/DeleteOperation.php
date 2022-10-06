@@ -49,9 +49,8 @@ class DeleteOperation extends AbstractOperation
         $operator->operators = $this->operators;
         $operator->isPrepared = true;
 
-        $pk = $model->getClassMap()->getKeyAttributeName();
         $rows = $operator->execute($model->getCriteria()->select($this->getSelectFields($model)))['result'];
-        if (is_null($rows)) return [];
+        if (empty($rows)) return [];
         if (!array_key_exists(0, $rows)) return [$rows];
         return $rows;
     }
