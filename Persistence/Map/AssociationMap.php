@@ -172,7 +172,7 @@ class AssociationMap
         return $this->indexAttribute;
     }
 
-    public function setDeleteAutomatic(bool $value = false):void
+    public function setDeleteAutomatic(bool $value = false): void
     {
         $this->deleteAutomatic = $value;
     }
@@ -364,8 +364,7 @@ class AssociationMap
             $where .= " AND ";
             if (is_array($idsTo)) {
                 $where .= $this->toAttributeMap->getName() . " IN (" . implode(',', $idsTo) . ")";
-            }
-            else {
+            } else {
                 $where .= $this->toAttributeMap->getName() . " = " . $idsTo;
             }
         }
@@ -386,6 +385,24 @@ class AssociationMap
         //$statement->setParameters($object->getOIDValue());
         $statement->setParameters($value);
         return $statement->update();
+    }
+
+    public function getAssociativeUpsertStatement(MDatabase $db, int $idFrom, array $idsTo = []): MSql
+    {
+        $statement = new MSql();
+        $statement->setDb($db);
+        $statement->setTables($this->getAssociativeTable());
+        $columns = $this->fromAttributeMap->getName() . ", " . $this->toAttributeMap->getName();
+        $values = '';
+        foreach ($idsTo as $idTo) {
+            $values .= "($idFrom, $idTo),";
+        }
+        $values = trim($values, ',');
+        $statement->setColumns($columns);
+        $onUpdate = "{$this->fromAttributeMap->getName()}={$this->fromAttributeMap->getName()}, {$this->toAttributeMap->getName()}={$this->toAttributeMap->getName()}";
+        $statement->command = "INSERT INTO {$this->getAssociativeTable()} ($columns) VALUES $values ON DUPLICATE KEY UPDATE $onUpdate";
+        $statement->prepareAndBind();
+        return $statement;
     }
 
 }

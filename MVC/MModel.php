@@ -97,11 +97,11 @@ class MModel
         $errors = [];
         static::beforeSave($object);
         /** @var AttributeMap $attributeMap */
-        foreach($classMap->getAttributesMap() as $attributeMap) {
+        foreach ($classMap->getAttributesMap() as $attributeMap) {
             try {
                 $value = $object->{$attributeMap->getName()} ?? null;
                 if ($validator = $attributeMap->getValidator()) {
-                    if(is_callable($validator)) {
+                    if (is_callable($validator)) {
                         $validator($value);
                     }
                     $object->{$attributeMap->getName()} = $value;
@@ -109,8 +109,7 @@ class MModel
                 if (is_null($value) && (!is_null($default = $attributeMap->getDefault()))) {
                     if (is_callable($default)) {
                         $default($value);
-                    }
-                    else {
+                    } else {
                         $value = $default;
                     }
                 }
@@ -118,7 +117,7 @@ class MModel
                     throw new EValidationException([$attributeMap->getName() => 'attribute_not_nullable']);
                 }
                 $object->{$attributeMap->getName()} = $value;
-            } catch(EValidationException $e) {
+            } catch (EValidationException $e) {
                 $errors[] = $e->errors;
             }
         }
@@ -376,7 +375,7 @@ class MModel
             }
             try {
                 $pk = static::save($entity);
-            } catch(EValidationException $e) {
+            } catch (EValidationException $e) {
                 throw new EValidationException(array_merge(...$e->errors));
             }
 
@@ -568,6 +567,22 @@ class MModel
             $id = is_int($entity) ? $entity : static::getClassMap()->getObjectKey($entity);
             static::deleteAssociation($id, $associationName, null, $validate);
             static::saveAssociation($entity, $associationName, $associated, $validate);
+            $transaction->commit();
+        } catch (\Exception $e) {
+            $transaction->rollback();
+            throw $e;
+        }
+    }
+
+    public static function appendAssociativate(int $id, string $associationName, array $associated): void
+    {
+        $transaction = static::beginTransaction();
+        try {
+            $fromClassMap = static::getClassMap();
+            $associationMap = $fromClassMap->getAssociationMap($associationName);
+            $db = Manager::getDatabase($fromClassMap->getDatabaseName());
+            $command = $associationMap->getAssociativeUpsertStatement($db, $id, $associated);
+            Manager::getPersistentManager()->getPersistence()->execute([$command]);
             $transaction->commit();
         } catch (\Exception $e) {
             $transaction->rollback();

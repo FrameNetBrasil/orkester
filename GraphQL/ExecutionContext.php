@@ -62,7 +62,7 @@ class ExecutionContext
             if (count($parts) >= 2) {
                 $key = last($parts);
                 $subResult = $this->results[$parts[0]]['result'];
-                if (array_key_exists(0, $subResult)) {
+                if (array_key_exists(0, $subResult ?? [])) {
                     $result = array_map(fn($row) => $row[$key], $subResult);
                 } else {
                     $result = $subResult[$key] ?? [];
