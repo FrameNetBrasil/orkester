@@ -17,7 +17,6 @@ class DatabaseArgument extends AbstractArgument implements \JsonSerializable
     {
         $currentFetchMode = (new \ReflectionClass(get_class($criteria->connection)))
             ->getProperty('fetchMode')->getValue($criteria->connection);
-        mdump('--' . $currentFetchMode);
         $connection = Model::$capsule->getConnection(($this->value)($result));
         (new \ReflectionClass(get_class($connection)))
             ->getProperty('fetchMode')->setValue($connection, $currentFetchMode);
