@@ -33,8 +33,9 @@ class HttpErrorHandler extends SlimErrorHandler
         $error = new MError(
             MError::SERVER_ERROR,
             'An internal error has occurred while processing your request.',
-            $file,
-            (string)$line,
+            '',''
+//            $file,
+//            (string)$line,
         );
 
         if ($exception instanceof HttpException) {
@@ -65,8 +66,12 @@ class HttpErrorHandler extends SlimErrorHandler
         }
 
         $result = new MResultObject((object)[
-            'statusCode' => $statusCode,
-            'error' => $error,
+            'data' => null,
+            'errors' => [$message],
+            'extensions' => [
+                'code' => $statusCode,
+                'exception' => $exception->getMessage()
+            ]
         ]);
         $response = $this->responseFactory->createResponse($statusCode);
 
