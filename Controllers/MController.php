@@ -165,53 +165,6 @@ class MController
         return $this->result->apply($this->request, $this->response);
     }
 
-    /**
-     * Obtem o conteúdo da view e passa para uma classe Result:
-     * - MRenderJSON se for uma chamada Ajax
-     * - MRenderPage se for uma chamada não-Ajax (um GET via browser)
-     * @param string $viewName Nome da view. Se não informado, assume que é o nome da action.
-     * @param object $parameters Objeto Data.
-     */
-//    public function render(string $viewName = '', array $parameters = []): Response
-//    {
-//        $this->encryptData();
-//        $viewFile = $this->getViewFile($viewName, $parameters);
-//        $view = new MView($viewFile);
-//        $this->result = $view->getResult($this->httpMethod, $this->resultFormat);
-//        return $this->result->apply($this->request, $this->response);
-//    }
-
-    /**
-     * A partir do nome do controller e do nome da view, constrói o path completo do arquivo da view.
-     * Executa renderView para obter o conteúdo a ser passado para uma classe Result.
-     * @param string $viewName
-     * @param array $parameters object Objeto Data
-     * @return string Conteudo a ser passado para uma classe Result
-     */
-//    private function getViewFile(string $viewName = '', array $parameters = []): string
-//    {
-//        $controller = get_class($this);
-//        $view = $viewName;
-//        if ($view == '') {
-//            $view = $this->action;
-//        }
-//        //$this->addParameters($parameters);
-//        $base = preg_replace("/Controllers/i", "Views", $controller);
-//        $base = str_replace("App\\", "", $base);
-//        $base = str_replace("Controller", "", $base);
-//        $path = str_replace("\\", "/", Manager::getAppPath() . "/" . $base . '/' . $view);
-//        $extensions = ['.blade.php', '.js', '.blade.xml', '.xml', '.vue'];
-//        $viewFile = '';
-//        foreach ($extensions as $extension) {
-//            $fileName = $path . $extension;
-//            if (file_exists($fileName)) {
-//                $viewFile = $fileName;
-//                break;
-//            }
-//        }
-//        return $viewFile;
-//    }
-
     private function downloadView(string $viewName): Response
     {
         $controller = get_class($this);

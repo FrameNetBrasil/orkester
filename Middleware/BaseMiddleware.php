@@ -19,7 +19,6 @@ abstract class BaseMiddleware  implements Middleware
         ];
         try {
             $secretKey = Manager::getConf('login.AUTH0_CLIENT_SECRET');
-            mdump($secretKey);
             $out = '';
             openssl_pkey_export ($secretKey, $out, NULL, $config);
 
