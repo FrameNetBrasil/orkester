@@ -82,7 +82,7 @@ function group_by(array $data, $key, SelectionSet $selectionSet): array
 {
     return array_reduce($data, function (array $accumulator, array $element) use ($selectionSet, $key) {
         $groupKey = $element[$key];
-        $cols = array_filter($element, fn ($k) => is_array($element[$k]) || $selectionSet->isSelected($k), ARRAY_FILTER_USE_KEY);
+        $cols = array_filter($element, fn($k) => is_array($element[$k]) || $selectionSet->isSelected($k), ARRAY_FILTER_USE_KEY);
         $accumulator[$groupKey][] = $cols;// $element;
         return $accumulator;
     }, []);
@@ -191,25 +191,16 @@ function isJson($x)
 function errorHandler($errno, $errstr, $errfile, $errline)
 {
     $codes = Manager::getConf('logs.errorCodes');
-//    if (Manager::supressWarning($errno, $errstr)) {
-//        return;
-//    }
-//    if (in_array($errno, $codes)) {
-        if (Manager::getLog()) {
-            Manager::logMessage("[ERROR] [Code] $errno [Error] $errstr [File] $errfile [Line] $errline");
-        }
-//    }
+    if (Manager::getLog()) {
+        Manager::logMessage("[ERROR] [Code] $errno [Error] $errstr [File] $errfile [Line] $errline");
+    }
 }
 
 function shutdown()
 {
     $error = error_get_last();
     if ($error) {
-//        var_dump($error);
         errorHandler($error['type'], $error['message'], $error['file'], $error['line']);
-        //if ($error & $error['type'] & (E_ALL & ~E_NOTICE & ~E_STRICT)) {
-        //    Manager::logError($error['message']);
-        //}
     }
     Manager::getLog()->log(Logger::INFO, "SHUTDOWN");
 }
