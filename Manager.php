@@ -512,7 +512,8 @@ class Manager
 //
     public static function logMessage(string $msg)
     {
-        self::$log->logMessage($msg);
+        //self::$log->logMessage($msg);
+        self::$log->log(Logger::INFO, $msg);
     }
 //
 //    public static function getRequest(): Request|null
