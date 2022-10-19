@@ -41,8 +41,8 @@ class UpsertOperation extends AbstractWriteOperation
         } else if ($argument->name->value == 'objects') {
             $objects = $this->context->getNodeValue($argument->value);
 
-            if (!array_key_exists(0, $objects)) {
-                throw new EGraphQLException(['argument' => 'objects argument expects a list of entities']);
+            if (!$objects || !array_key_exists(0, $objects)) {
+                $objects = [];
             }
             $this->objects = $objects;
         } else {
