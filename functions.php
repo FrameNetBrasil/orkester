@@ -40,7 +40,7 @@ function minfo(...$var)
     return $var[0];
 }
 
-function mtrace($var)
+function mtrace(...$var)
 {
     Manager::getLog()->getLogger()->log(Logger::DEBUG, print_r($var, true), ['tag' => 'TRACE']);
     return $var[0];
