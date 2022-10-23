@@ -91,6 +91,7 @@ class JsonApi extends MController
         if (method_exists($instance, $action)) {
             $instance->setRequestResponse($request, $response);
             Manager::getData()->id = $args['id'] ?? null;
+            $instance->init();
             $content = (object)['data' => $instance->$action()];
             return [$content, 200];
         } else {
