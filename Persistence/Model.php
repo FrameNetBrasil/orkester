@@ -26,7 +26,7 @@ class Model
     public static Psr16Adapter $cachedClassMaps;
     public static Capsule $capsule;
     private static array $classMaps = [];
-    private static int $fetchStyle;
+    protected static int $fetchStyle;
 
     public static function init(array $dbConfigurations, int $fetchStyle): void
     {
