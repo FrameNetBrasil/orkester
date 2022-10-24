@@ -282,6 +282,14 @@ class Model
             ->toArray();
     }
 
+    public static function deleteAssociation(string $associationChain, int $id): array
+    {
+        return static::getCriteria()
+            ->select($associationChain . '.*')
+            ->where('id', '=', $id)
+            ->delete();
+    }
+
     public static function find(int $id): object|array|null
     {
         return static::getCriteria()->find($id);
