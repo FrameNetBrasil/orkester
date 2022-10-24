@@ -334,7 +334,7 @@ class Manager
 
     public static function setDataField(string $field, mixed $value = null): void
     {
-        self::$data->field = $value;
+        self::$data->$field = $value;
     }
 
     public static function getData(): object
