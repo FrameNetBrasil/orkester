@@ -217,4 +217,51 @@ class Criteria extends Builder
         }
         return $this;
     }
+
+    public function getResult() {
+        return $this->get();
+    }
+
+    public function chunkResult(mixed $key = 0, mixed $value = 1, bool $showKeyValue = false)
+    {
+        $pdo = $this->connection->getPDO();
+        $newResult = [];
+        $rs = $this->getResult();
+        if (!empty($rs)) {
+
+            foreach ($rs as $row) {
+                $sKey = trim($row[$key]);
+                $sValue = trim($row[$value]);
+                $newResult[$sKey] = ($showKeyValue ? $sKey . " - " : '') . $sValue;
+            }
+        }
+        return $newResult;
+    }
+
+    public function treeResult($group, $node)
+    {
+        $tree = array();
+        if ($rs = $this->getResult()) {
+            $tree = array();
+            $node = explode(',', $node);
+            $group = explode(',', $group);
+            foreach ($rs as $row) {
+                $aNode = array();
+                foreach ($node as $n) {
+                    if ($this->fetchStyle == \FETCH_NUM) {
+                        $aNode[] = $row[$n];
+                    } else {
+                        $aNode[$n] = $row[$n];
+                    }
+                }
+                $s = '';
+                foreach ($group as $g) {
+                    $s .= '[$row[\'' . $g . '\']]';
+                }
+                eval("\$tree$s" . "[] = \$aNode;");
+            }
+        }
+        return $tree;
+    }
+
 }
