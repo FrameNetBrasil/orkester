@@ -222,43 +222,39 @@ class Criteria extends Builder
         return $this->get();
     }
 
-    public function chunkResult(mixed $key = 0, mixed $value = 1, bool $showKeyValue = false)
+    public function chunkResult(string $fieldKey = '', string $fieldValue = '')
     {
-        $pdo = $this->connection->getPDO();
         $newResult = [];
-        $rs = $this->getResult();
-        if (!empty($rs)) {
-
-            foreach ($rs as $row) {
-                $sKey = trim($row[$key]);
-                $sValue = trim($row[$value]);
-                $newResult[$sKey] = ($showKeyValue ? $sKey . " - " : '') . $sValue;
+        if (($fieldKey != '') && ($fieldValue != '')) {
+            $rs = $this->getResult();
+            if (!empty($rs)) {
+                foreach ($rs as $row) {
+                    $sKey = trim($row[$fieldKey]);
+                    $sValue = trim($row[$fieldValue]);
+                    $newResult[$sKey] = $sValue;
+                }
             }
         }
         return $newResult;
     }
 
-    public function treeResult($group, $node)
+    public function treeResult(string $group, string $node)
     {
-        $tree = array();
-        if ($rs = $this->getResult()) {
-            $tree = array();
+        $tree = [];
+        $rs = $this->getResult();
+        if (!empty($rs)) {
             $node = explode(',', $node);
             $group = explode(',', $group);
             foreach ($rs as $row) {
-                $aNode = array();
+                $aNode = [];
                 foreach ($node as $n) {
-                    if ($this->fetchStyle == \FETCH_NUM) {
-                        $aNode[] = $row[$n];
-                    } else {
-                        $aNode[$n] = $row[$n];
-                    }
+                    $aNode[$n] = $row[$n];
                 }
                 $s = '';
                 foreach ($group as $g) {
                     $s .= '[$row[\'' . $g . '\']]';
                 }
-                eval("\$tree$s" . "[] = \$aNode;");
+                eval("\$tree{$s}" . "[] = \$aNode;");
             }
         }
         return $tree;
