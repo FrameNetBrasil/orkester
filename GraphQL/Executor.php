@@ -85,7 +85,7 @@ class Executor
         if (is_null($definition->selectionSet)) {
             return;
         }
-        if($definition->name?->value == 'service') {
+        if ($definition->name?->value == 'service') {
             foreach ($definition->selectionSet->selections->getIterator() as $fieldNode) {
                 $operationName = $fieldNode->alias?->value ?? $fieldNode->name->value;
                 $this->operations[$operationName] = ['model' => null, 'operation' => new ServiceOperation($this->context, $fieldNode)];
@@ -199,7 +199,7 @@ class Executor
             } catch (EGraphQLException $e) {
                 $errors[$alias] = $e->errors;
                 merror($e->getMessage());
-            } catch (\Exception | \Error $e) {
+            } catch (\Exception|\Error $e) {
                 mfatal($e->getTraceAsString());
                 mfatal($e->getMessage());
                 $errors[$alias]['bad_request'] = 'internal_server_error';
@@ -248,11 +248,17 @@ class Executor
             $metaErrors['not_found'] = $e->errors;
         } catch (EGraphQLException $e) {
             $metaErrors['execution_error'] = $e->errors;
-        } catch (DependencyException | NotFoundException $e) {
+        } catch (DependencyException|NotFoundException $e) {
             $metaErrors['internal'] = 'failed instantiating model';
         }
         if (isset($transaction)) $transaction->rollback();
         return ['data' => null, 'errors' => ['$meta' => $metaErrors]];
+    }
+
+    public static function run(string $query, array $variables = [])
+    {
+        $executor = new self($query, $variables);
+        return $executor->execute();
     }
 
 }

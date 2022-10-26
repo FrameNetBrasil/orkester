@@ -136,6 +136,9 @@ class QueryOperation extends AbstractOperation
             if ($format == "number") {
                 return $phpValue + 0;
             }
+            if ($format == "json") {
+                return json_decode($phpValue, true);
+            }
             $type = $map->getType();
             return match ($type) {
                 'datetime', 'time', 'date', 'timestamp' => $phpValue->format($format),
