@@ -96,9 +96,15 @@ class UpdateOperation extends AbstractWriteOperation
         $modifiedKeys = [];
         //TODO batch
         $rows = $this->collectExistingRows($model);
+
         if (empty($rows)) {
             $values = $this->createEntityArray($this->set, $model, false);
-            $modifiedKeys[] = $model->insert((object)$values);
+            try {
+                $modifiedKeys[] = $model->insert((object)$values);
+            } catch (EValidationException $e) {
+                throw new EGraphQLValidationException($this->handleValidationErrors($e->errors));
+            }
+
         } else {
             $rows = array_key_exists(0, $rows) ? $rows : [$rows];
             $modified = [];
