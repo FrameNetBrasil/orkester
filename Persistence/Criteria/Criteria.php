@@ -7,6 +7,7 @@ use Ds\Set;
 use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Arr;
 use Monolog\Logger;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Grammar\MySqlGrammar;
@@ -61,6 +62,10 @@ class Criteria extends Builder
         $this->connection->table($this->tableName());
         $this->from($this->tableName());
         return $this;
+    }
+
+    public function getModel() {
+        return $this->model;
     }
 
     public function newQuery()
@@ -216,6 +221,11 @@ class Criteria extends Builder
             $this->setParameter($p, $v);
         }
         return $this;
+    }
+
+    public function update(array $values)
+    {
+        parent::update(Arr::only($values, array_keys($this->classMap->insertAttributeMaps)));
     }
 
     public function getResult() {
