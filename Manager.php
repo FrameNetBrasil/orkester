@@ -3,6 +3,7 @@
 namespace Orkester;
 
 use Composer\Factory;
+use Monolog\Logger;
 use Orkester\Exception\EOrkesterException;
 use Orkester\Handlers\HttpErrorHandler;
 
@@ -200,7 +201,7 @@ class Manager
         if (file_exists(self::$confPath . '/environment.php')) {
             self::loadConf(self::$confPath . '/environment.php');
         }
-        self::$log = self::$container->get(MLog::class);
+        self::$log = new MLog(self::$container->get(Logger::class));
         Manager::$data = (object)[];
 
         register_shutdown_function("shutdown");
@@ -515,7 +516,7 @@ class Manager
             if ($level >= 2) {
                 //$dsn = "dumper:{$config['db']}:host={$config['host']};dbname={$config['dbname']}";
                 $dsn = "{$config['db']}:host={$config['host']};dbname={$config['dbname']}";
-                $callback = function($expr, $took) use ($datasource) {
+                $callback = function ($expr, $took) use ($datasource) {
                     Manager::getLog()->logSQL($expr->getDebugQuery(), $datasource);
                 };
                 $args = [];//['callback' => $callback];

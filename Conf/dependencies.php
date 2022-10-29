@@ -4,15 +4,18 @@ declare(strict_types=1);
 use App\UI\Controls\MPageControl;
 use App\UI\MEasyUiPainter;
 use DI\Factory\RequestedEntry;
+use Monolog\Formatter\LineFormatter;
+use Monolog\Handler\FingersCrossedHandler;
+use Monolog\Handler\RotatingFileHandler;
+use Monolog\Handler\SocketHandler;
+use Monolog\Handler\WhatFailureGroupHandler;
 use Orkester\Persistence\PersistentManager;
 use Orkester\Persistence\PersistenceSQL;
+use Orkester\Services\OTraceFormatter;
 use function DI\create;
 use DI\ContainerBuilder;
-use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
-use Monolog\Processor\UidProcessor;
 use Psr\Container\ContainerInterface;
-use Psr\Log\LoggerInterface;
 
 use Orkester\Database\MDatabase;
 use Orkester\Manager;
@@ -26,23 +29,39 @@ use Orkester\UI\MPage;
 
 return function (ContainerBuilder $containerBuilder) {
     $containerBuilder->addDefinitions([
-        LoggerInterface::class => function (ContainerInterface $c) {
-            $settings = $c->get('settings');
+        Logger::class => function (ContainerInterface $c) {
+            $lineFormat = "[%datetime%] %channel%[%level_name%]%context.tag%: %message%" . PHP_EOL;
+            $dateFormat = "Y/m/d H:i:s";
+            $conf = Manager::getConf("logs");
 
-            $loggerSettings = $settings['logger'];
-            $logger = new Logger($loggerSettings['name']);
+            $logger = new \Monolog\Logger('');
+            $handlers = [];
 
-            $processor = new UidProcessor();
-            $logger->pushProcessor($processor);
+            if ($conf['path']) {
+                $fileHandler =
+                    (new RotatingFileHandler("{$conf['path']}/orkester.log"))
+                        ->setFormatter(new LineFormatter($lineFormat, $dateFormat));
+                $handlers[] = new FingersCrossedHandler($fileHandler, Logger::WARNING);
+            }
 
-            $handler = new StreamHandler($loggerSettings['path'], $loggerSettings['level']);
-            $logger->pushHandler($handler);
-
+            if ($port = $conf['port'] ?? false) {
+                $strict = $conf['strict'] ?? false;
+                if (!$strict || $strict == $_SERVER['REMOTE_ADDR']) {
+                    $peer = $conf['peer'] ?? '';
+                    $socketHandler =
+                        (new SocketHandler("tcp://$peer:$port"))
+                            ->setFormatter(new OTraceFormatter())
+                            ->setPersistent(false);
+                    $handlers[] = $socketHandler;
+                }
+            }
+            $group = new WhatFailureGroupHandler($handlers);
+            $logger->pushHandler($group);
             return $logger;
         },
         MRequest::class => create(),
         MResponse::class => create(),
-        MAjax::class => function() {
+        MAjax::class => function () {
             $ajax = new MAjax();
             $ajax->initialize(Manager::getOptions('charset'));
             return $ajax;
@@ -52,13 +71,13 @@ return function (ContainerBuilder $containerBuilder) {
         MContext::class => DI\autowire(),
         MDatabase::class => create(),
         MPage::class => create(),
-        'PersistenceBackend' => function() {
+        'PersistenceBackend' => function () {
             return new PersistenceSQL();
         },
-        'PersistentConfigLoader' => function() {
+        'PersistentConfigLoader' => function () {
             return new \Orkester\Persistence\PHPConfigLoader();
         },
-        'PersistentManager' => function() {
+        'PersistentManager' => function () {
             return PersistentManager::getInstance();
         },
         'app\\*Controller' => function (ContainerInterface $c, RequestedEntry $entry) {
