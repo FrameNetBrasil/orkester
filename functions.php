@@ -1,5 +1,6 @@
 <?php
 
+use Monolog\Logger;
 use Orkester\Manager;
 use Orkester\Services\MTrace;
 
@@ -10,39 +11,40 @@ function _M($msg, $params = NULL)
 
 function mdump(...$var)
 {
-    MTrace::traceDebug("DEBUG", ...$var);
+    Manager::getLog()->log(Logger::DEBUG, ...$var);
     return $var[0] ?? null;
 }
 
 function mfatal(...$var)
 {
-    MTrace::traceDebug("FATAL", ...$var);
+    Manager::getLog()->log(Logger::CRITICAL, ...$var);
     return $var[0];
 }
 
 function merror(...$var)
 {
-    MTrace::traceDebug("ERROR", ...$var);
+    Manager::getLog()->log(Logger::ERROR, ...$var);
     return $var[0];
 }
 
 function mwarn(...$var)
 {
-    MTrace::traceDebug("WARN", ...$var);
+    Manager::getLog()->log(Logger::WARNING, ...$var);
     return $var[0];
 }
 
 function minfo(...$var)
 {
-    MTrace::traceDebug("INFO", ...$var);
+    Manager::getLog()->log(Logger::INFO, ...$var);
     return $var[0];
 }
 
-function mtrace($var)
+function mtrace(...$var)
 {
-    MTrace::trace(print_r($var, true));
+    Manager::getLog()->log(Logger::INFO, ...$var);
     return $var[0];
 }
+
 
 function mconsole($var)
 {
@@ -59,7 +61,8 @@ function buildPath(array $parts): string
     return implode(DIRECTORY_SEPARATOR, $parts);
 }
 
-function array_find($xs, $f) {
+function array_find($xs, $f)
+{
     foreach ($xs as $x) {
         if (call_user_func($f, $x) === true)
             return $x;
