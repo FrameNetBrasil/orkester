@@ -66,6 +66,10 @@ class ServiceOperation extends AbstractMutationOperation
         $arguments = [];
         /** @var ArgumentNode $argument */
         foreach ($this->root->arguments->getIterator() as $argument) {
+            if ($argument->name->value === 'omit') {
+                $this->context->addOmitted($this->root->alias?->value ?? $this->root->name->value);
+                continue;
+            }
             $arguments[$argument->name->value] = $this->context->getNodeValue($argument->value);
         }
         try {
