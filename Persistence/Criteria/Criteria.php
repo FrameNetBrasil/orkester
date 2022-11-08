@@ -164,7 +164,7 @@ class Criteria extends Builder
             $this->wheres[] = compact(
                 'type', 'column', 'operator', 'query', 'boolean'
             );
-            $this->addBinding($value->getBindings(), 'where');
+            $this->addBinding($query->getBindings(), 'where');
         } else {
             $uOp = strtoupper($operator ?? "");
             $uValue = is_string($value) ? strtoupper($value) : $value;
