@@ -145,7 +145,6 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
             if (isset($query->$component)) {
                 $this->context = $component;
                 $method = 'compile' . ucfirst($component);
-
                 $sqlOrkester[$component] = $this->$method($query, $query->$component);
             }
         }
@@ -170,6 +169,21 @@ class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
         $this->criteria = $original;
         return $result;
     }
+
+    /**
+     * Compile a where condition with a sub-select.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  array  $where
+     * @return string
+     */
+    protected function whereSub(Builder $query, $where)
+    {
+        $select = $this->compileSelect($where['query']);
+        $this->context = 'wheres';
+        return $this->wrap($where['column']).' '.$where['operator']." ($select)";
+    }
+
 
     public function compileHavings(Builder $query): string
     {
