@@ -3,20 +3,8 @@
 namespace Orkester\Controllers;
 
 use Orkester\Manager;
-use Orkester\Results\Exception\MResultForbidden;
-use Orkester\Results\Exception\MResultNotFound;
-use Orkester\Results\Exception\MResultNotImplemented;
-use Orkester\Results\Exception\MResultRuntimeError;
-use Orkester\Results\Exception\MResultUnauthorized;
-use Orkester\Results\MBrowserFile;
-use Orkester\Results\MRedirect;
-use Orkester\Results\MRenderBinary;
-use Orkester\Results\MRenderStatic;
 use Orkester\Results\MResult;
-use Orkester\Results\MResultNull;
 use Orkester\Results\MResultObject;
-use Orkester\Results\MResultList;
-use Orkester\Results\MResultResponse;
 use Orkester\Security\MSSL;
 use Orkester\Types\MFile;
 use Slim\Exception\HttpNotFoundException;
@@ -96,8 +84,6 @@ class MController
     {
         mtrace('mcontroller::dispatch = ' . $action);
         $this->action = $action;
-        $this->result = new MResultNull;
-        $this->decryptData();
         if (!method_exists($this, $this->action)) {
             throw new HttpNotFoundException($this->request, 'Action ' . $this::class . ':' . $action . ' not found!');
         } else {
@@ -181,19 +167,6 @@ class MController
     }
 
     /**
-     * Envia um objeto MPromptData para a classe Result MRenderPrompt. É esperado que a aplicação defina uma clase MView
-     * que estende de MBaseView, para pré-processar o objeto MPromptData e gerar seu conteúdo.
-     * @param string|object $type String com o tipo de prompt, ou um objeto que será processado pela aplicação para gerar o conteúdo do prompt.
-     * @param string $message Messagem do prompt.
-     * @param string $action1 Ação para o botão do prompt.
-     * @param string $action2 Ação para o botão do prompt.
-     * @throws ERuntimeException Caso o parâmetro type não seja um string ou objeto.
-     */
-    public function renderPrompt($type, $message = '', $action1 = '', $action2 = '')
-    {
-    }
-
-    /**
      * Preenche o objeto MAjax com os dados do controller corrent (objeto Data) para seu usado pela classe Result MRenderJSON.
      * @param string $json String JSON opcional.
      */
@@ -236,122 +209,6 @@ class MController
     public function renderError(string|object|array $message = '', int $code = 200): Response
     {
         return $this->renderResponse('error', $message, $code);
-    }
-
-    /**
-     * Download de arquivo via browser.
-     * @param MFile $file Arquivo a ser enviado para o browser.
-     */
-    public function renderFile(MFile $file): Response
-    {
-        $this->result = new MBrowserFile($file);
-        return $this->result->apply($this->request, $this->response);
-    }
-
-    /**
-     * Renderiza um stream binário inline através da classe Result MRenderBinary.
-     * @param $stream stream binário.
-     */
-    public function renderStream($stream): Response
-    {
-        $this->result = new MRenderBinary($stream, true, 'raw');
-        return $this->result->apply($this->request, $this->response);
-    }
-
-    /**
-     * Renderiza um stream binário inline através da classe Result MRenderBinary, opcionalmente usando um nome de arquivo.
-     * @param $stream Stream binário.
-     * @param string $fileName Nome do arquivo.
-     */
-    public function renderBinary($stream, $fileName = ''): Response
-    {
-        $this->result = new MRenderBinary($stream, true, $fileName);
-        return $this->result->apply($this->request, $this->response);
-    }
-
-    /**
-     * Download de arquivo através da classe Result MRenderBinary.
-     * @param string $filePath Path do arquivo para download.
-     * @param string $fileName Nome do arquivo a ser exibido para o usuário do browser.
-     */
-    public function renderDownload($filePath, $fileName = ''): Response
-    {
-        $this->result = new MRenderBinary(null, false, $fileName, $filePath);
-        return $this->result->apply($this->request, $this->response);
-    }
-
-    /**
-     * @param $filePath string Path of static file
-     * @param $contentTye string mimetype of file
-     */
-    public function renderStatic(string $filePath, string $contentTye): Response
-    {
-        $this->result = new MRenderStatic($filePath, $contentTye);
-        return $this->result->apply($this->request, $this->response);
-    }
-
-    /**
-     * Redireciona browser para outra URL.
-     * @param $url URL
-     */
-    public function redirect(string $url): Response
-    {
-        $this->result = new MRedirect($url);
-        return $this->result->apply($this->request, $this->response);
-    }
-
-    /**
-     * Renderiza erro de NotFound.
-     * @param $msg Mensagem a ser exibida.
-     */
-    public function notfound($msg)
-    {
-        $this->result = new MResultNotFound($msg);
-        return $this->result->apply($this->request, $this->response);
-    }
-
-    /**
-     * Vasculha o $this->data para encontrar campos que precisam ser criptografados.
-     */
-    private function encryptData()
-    {
-        $this->cryptIterator(function ($plain, $token) {
-            return MSSL::simmetricEncrypt($plain, $token);
-        });
-    }
-
-    /**
-     * Vasculha o $this->data para encontrar campos que precisam ser descriptografados.
-     */
-    private function decryptData()
-    {
-        if ($this->httpMethod == 'POST') {
-            $this->cryptIterator(function ($encrypted, $token) {
-                return MSSL::simmetricDecrypt($encrypted, $token);
-            });
-        }
-    }
-
-    /**
-     * Função que itera o $this->encryptedFields e encontra os campos que devem ser criptografados ou decriptografados.
-     * @param \Closure $function
-     * @throws ERuntimeException
-     */
-    private function cryptIterator(\Closure $function)
-    {
-        $token = Manager::getSessionToken();
-
-        foreach ($this->encryptedFields as $field) {
-            if (isset($this->data->{$field})) {
-                $result = $function($this->data->{$field}, $token);
-
-                if ($result === false) {
-                    $name = get_class($this);
-                    throw new ERuntimeException("[cryptError]{$name}Controller::{$field}");
-                }
-                $this->data->{$field} = $result;
-            }
-        }
     }
 
     public function setRequest(Request $request)
