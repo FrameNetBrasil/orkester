@@ -167,6 +167,13 @@ class Criteria extends Builder
             $this->addBinding($query->getBindings(), 'where');
         } else {
             $uOp = strtoupper($operator ?? "");
+            if ($uOp == 'STARTSWITH') {
+                $uOP = 'LIKE';
+                $value = $value . '%';
+            } elseif ($uOp == 'CONTAINS') {
+                $uOP = 'LIKE';
+                $value = '%' . $value . '%';
+            }
             $uValue = is_string($value) ? strtoupper($value) : $value;
             if (($uValue === 'NULL') || is_null($value)) {
                 $this->whereNull($attribute);
