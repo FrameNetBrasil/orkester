@@ -168,10 +168,10 @@ class Criteria extends Builder
         } else {
             $uOp = strtoupper($operator ?? "");
             if ($uOp == 'STARTSWITH') {
-                $uOp = 'LIKE';
+                $operator = 'LIKE';
                 $value = $value . '%';
             } elseif ($uOp == 'CONTAINS') {
-                $uOp = 'LIKE';
+                $operator = 'LIKE';
                 $value = '%' . $value . '%';
             }
             $uValue = is_string($value) ? strtoupper($value) : $value;
