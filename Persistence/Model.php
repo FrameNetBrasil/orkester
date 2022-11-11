@@ -440,7 +440,7 @@ class Model
     public static function list(object|array|null $filter = null, array $select = []): array
     {
         $criteria = static::filter($filter);
-        if (is_string($select)) {
+        if (!empty($select)) {
             $criteria->select($select);
         }
         return $criteria->get()->toArray();
@@ -449,7 +449,9 @@ class Model
     public static function one($conditions, array $select = []): object|null
     {
         $criteria = static::getCriteria()->range(1, 1);
-        if ($select) $criteria->select($select);
+        if (!empty($select)) {
+            $criteria->select($select);
+        }
         $result = static::filter($conditions, $criteria)->get()->toArray();
         return empty($result) ? null : (object)$result[0];
     }
