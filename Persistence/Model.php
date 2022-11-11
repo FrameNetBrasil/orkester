@@ -402,7 +402,7 @@ class Model
         return static::getConnection($databaseName)->transaction($cb);
     }
 
-    public static function criteriaByFilter(object|null $params, string|null $select = null): Criteria
+    public static function criteriaByFilter(object|null $params, array $select = []): Criteria
     {
         $criteria = static::getCriteria();
         if (!empty($select)) {
@@ -437,7 +437,7 @@ class Model
         return $criteria;
     }
 
-    public static function list(object|array|null $filter = null, string|null $select = null): array
+    public static function list(object|array|null $filter = null, array $select = []): array
     {
         $criteria = static::filter($filter);
         if (is_string($select)) {
@@ -446,7 +446,7 @@ class Model
         return $criteria->get()->toArray();
     }
 
-    public static function one($conditions, ?string $select = null): object|null
+    public static function one($conditions, array $select = []): object|null
     {
         $criteria = static::getCriteria()->range(1, 1);
         if ($select) $criteria->select($select);
