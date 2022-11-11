@@ -437,12 +437,15 @@ class Model
         return $criteria;
     }
 
-    public static function list(object|array|null $filter = null, array $select = []): array
+    public static function list(object|array|null $filter = null, array $select = [], array|string $order = ''): array
     {
-        $criteria = static::filter($filter);
+        //$criteria = static::filter($filter);
+        $criteria = static::getCriteria();
         if (!empty($select)) {
             $criteria->select($select);
         }
+        $criteria->filter($filter);
+        $criteria->order($order);
         return $criteria->get()->toArray();
     }
 

@@ -190,6 +190,30 @@ class Criteria extends Builder
         return $this;
     }
 
+    public function filter(array|null $filters)
+    {
+        if (!empty($filters)) {
+            $filters = is_string($filters[0]) ? [$filters] : $filters;
+            foreach ($filters as [$field, $op, $value]) {
+                $this->where($field, $op, $value);
+            }
+        }
+    }
+
+    public function order(array|string|null $orders)
+    {
+        if (!empty($orders)) {
+            if (is_string($orders)) {
+                $this->orderBy($orders, 'asc');
+            } else {
+                $orders = is_string($orders[0]) ? [$orders] : $orders;
+                foreach ($orders as $spec) {
+                    $this->orderBy($spec[0], $spec[1] ?? 'asc');
+                }
+            }
+        }
+    }
+
     public function joinClass($className, $alias, $first, $operator = null, $second = null, $type = 'inner', $where = false)
     {
         $this->registerClass($className);
