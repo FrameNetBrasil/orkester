@@ -25,7 +25,9 @@ class JoinOperator extends AbstractOperator
             $node = $item->fields->offsetGet(0);
             $type = $node->name->value;
             $path = $this->context->getNodeValue($node->value);
-            $criteria->setAssociationType($path, $type);
+            if ($path) {
+                $criteria->setAssociationType($path, $type);
+            }
         }
         return $criteria;
     }
