@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Orkester\Handlers;
 
-use App\ResponseEmitter\ResponseEmitter;
+use Slim\ResponseEmitter;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Exception\HttpInternalServerErrorException;
 
