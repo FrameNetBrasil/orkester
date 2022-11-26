@@ -92,12 +92,33 @@ class JsonApi extends MController
             $instance->setRequestResponse($request, $response);
             Manager::getData()->id = Manager::getData()->id ?? $args['id'] ?? null;
             $instance->init();
-            $content = (object)['data' => $instance->$action()];
+            $data = (array)Manager::getData();
+            mdump($data);
+            $class = $instance::class;
+            mdump($class, $action);
+            mdump($class . '::' . $action);
+            $arguments = $this->buildArguments($data,$class . '::' . $action);
+            mdump($arguments);
+            $content = (object)['data' => $instance->$action(...$arguments)];
             return [$content, 200];
         } else {
             throw new \InvalidArgumentException('Service not found', 404);
         }
     }
+
+    public function buildArguments(array $arguments, $service)
+    {
+        $reflectionMethod = new \ReflectionMethod($service);
+        $reflectionParameters = $reflectionMethod->getParameters();
+        $missingArguments = [];
+        $typeMismatch = [];
+        $result = [];
+        foreach ($reflectionParameters as $reflectionParameter) {
+            $result[$reflectionParameter->getName()] = $arguments[$reflectionParameter->getName()] ?? null;
+        }
+        return $result;
+    }
+
 
     public function routeNotFound(Request $request, Response $response): Response
     {
