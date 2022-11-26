@@ -93,12 +93,8 @@ class JsonApi extends MController
             Manager::getData()->id = Manager::getData()->id ?? $args['id'] ?? null;
             $instance->init();
             $data = (array)Manager::getData();
-            mdump($data);
             $class = $instance::class;
-            mdump($class, $action);
-            mdump($class . '::' . $action);
             $arguments = $this->buildArguments($data,$class . '::' . $action);
-            mdump($arguments);
             $content = (object)['data' => $instance->$action(...$arguments)];
             return [$content, 200];
         } else {
