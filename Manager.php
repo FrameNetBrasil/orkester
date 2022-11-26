@@ -55,9 +55,9 @@ class Manager
      */
     private static ?MSession $session = null;
 
-    public static function process()
+    public static function process(string $basePath = '')
     {
-        self::init();
+        self::init($basePath);
         self::handler();
         self::terminate();
     }
@@ -67,10 +67,10 @@ class Manager
 
     }
 
-    public static function init()
+    public static function init(string $basePath = '')
     {
         $reflection = new \ReflectionClass(\Composer\Autoload\ClassLoader::class);
-        $basePath = dirname($reflection->getFileName(), 3);
+        $basePath = ($basePath != '') ? $basePath : dirname($reflection->getFileName(), 3);
         self::$basePath = $basePath;
         self::$confPath = $basePath . '/conf';
         self::loadConf(self::$confPath . '/conf.php');
