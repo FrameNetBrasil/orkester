@@ -168,7 +168,7 @@ class Executor
         /** @var OperationDefinitionNode $definition */
         foreach ($this->definitions as $definition) {
             match ($definition->operation) {
-                'query' => $this->prepareQueries($definition),
+                'query', 'subscription' => $this->prepareQueries($definition),
                 'mutation' => $this->prepareMutations($definition),
                 default => throw new EGraphQLException(['unknown_operation' => $definition->operation])
             };
