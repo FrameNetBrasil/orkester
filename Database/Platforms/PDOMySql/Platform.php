@@ -137,6 +137,7 @@ class Platform extends MySqlPlatform {
             return is_string($value) ? '' : null;
         }
         if ($type == 'boolean') return (bool)$value;
+        else if ($type == 'float') return $value + 0;
         else if ($type == 'date') {
             return Carbon::createFromFormat('Y-m-d', $value);
         } elseif ($type == 'timestamp' || $type == 'datetime') {
