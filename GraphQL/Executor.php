@@ -2,6 +2,7 @@
 
 namespace Orkester\GraphQL;
 
+use App\Exceptions\NotAuthorizedException;
 use DI\DependencyException;
 use DI\NotFoundException;
 use Ds\Set;
@@ -194,6 +195,8 @@ class Executor
                 $errors[$alias]['not_found'] = $e->errors;
             } catch (EGraphQLForbiddenException $e) {
                 $errors[$alias]['forbidden'] = $e->errors;
+            } catch(NotAuthorizedException $e) {
+                $errors[$alias]['forbidden'] = $e->getMessage();
             } catch (EGraphQLValidationException $e) {
                 $errors[$alias]['invalid_value'] = $e->errors;
             } catch (EGraphQLException $e) {
