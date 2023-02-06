@@ -8,23 +8,58 @@ use GraphQL\Language\AST\VariableNode;
 use Orkester\GraphQL\Context;
 use Orkester\GraphQL\Result;
 use Orkester\Persistence\Criteria\Criteria;
+use Orkester\Persistence\Map\AssociationMap;
+use Orkester\Persistence\Map\ClassMap;
+use Orkester\Persistence\Model;
 
 class WhereArgument extends AbstractArgument implements \JsonSerializable
 {
 
-    protected function getWhereArguments(string $field, string $condition, mixed $value): array
+    protected function getWhereArgumentsRecursive(ClassMap $classMap, array $conditions, string $prefix)
     {
-        $op = AbstractConditionArgument::processOperator($condition, $value);
-        $newValue = AbstractConditionArgument::transformValue($condition, $value);
-        return [$field, $op, $newValue];
+
     }
 
-    protected function processComposedCondition(array $definition): array
+    protected function getWhereArguments(string $field, string|array $condition, mixed $value, ClassMap $classMap, string $associationPrefix = ""): array
+    {
+        $prefix = empty($associationPrefix) ? "" : "$associationPrefix.";
+        if ($classMap->getAttributeMap($field)) {
+            $op = AbstractConditionArgument::processOperator($condition, $value);
+            $newValue = AbstractConditionArgument::transformValue($condition, $value);
+            return [[$prefix . $field, $op, $newValue]];
+        } else if ($associationMap = $classMap->getAssociationMap($field)) {
+            $result = [];
+            $associatedClassMap = $associationMap->toClassMap;
+            if ($associatedClassMap->getAttributeMap($condition)) {
+                $associatedOp = array_key_first($value);
+                $associatedValue = $value[$associatedOp];
+                $result[] = [
+                    "$prefix$field.$condition",
+                    AbstractConditionArgument::processOperator($associatedOp, $associatedValue),
+                    AbstractConditionArgument::transformValue($associatedOp, $associatedValue)
+                ];
+            } else {
+                foreach ($value as $associatedField => $associatedCondition) {
+                    $op = array_key_first($associatedCondition);
+                    $associatedValue = $associatedCondition[$op];
+                    array_push(
+                        $result,
+                        ...$this->getWhereArguments($associatedField, $op, $associatedValue, $associatedClassMap, "$prefix$field.$condition")
+                    );
+
+                }
+            }
+            return $result;
+        }
+        return [];
+    }
+
+    protected function processComposedCondition(array $definition, Criteria $criteria): array
     {
         $field = $definition['field'];
         unset($definition['field']);
         foreach ($definition as $op => $value) {
-            $where[] = $this->getWhereArguments($field, $op, $value);
+            $where[] = $this->getWhereArguments($field, $op, $value, $criteria->getModel()::getClassMap());
         }
         return $where ?? [];
     }
@@ -35,7 +70,7 @@ class WhereArgument extends AbstractArgument implements \JsonSerializable
             $criteria->whereNull($column);
         } else if ($operator == 'IS NOT NULL') {
             $criteria->whereNotNull($column);
-        } else if(!empty($value)) {
+        } else if (!empty($value)) {
             if ($and) {
                 $criteria->where($column, $operator, $value);
             } else {
@@ -54,6 +89,7 @@ class WhereArgument extends AbstractArgument implements \JsonSerializable
     public function getConditions(array $conditionGroup, Criteria $criteria): array
     {
         $items = [];
+        $classMap = $criteria->getModel()::getClassMap();
         foreach ($conditionGroup as $field => $conditions) {
             if ($field == 'and') {
                 $this->applyConditionGroup($conditions, $criteria);
@@ -68,16 +104,21 @@ class WhereArgument extends AbstractArgument implements \JsonSerializable
                 }
             } else if ($conditions instanceof Criteria) {
                 $criteria->where($field, 'IN', $conditions);
-            }
-            else if (array_key_exists(0, $conditions)) {
+            } else if (array_key_exists(0, $conditions)) {
                 foreach ($conditions as $condition) {
                     $op = array_key_first($condition);
                     $value = $condition[$op];
-                    $items[] = $this->getWhereArguments($field, $op, $value);
+                    array_push(
+                        $items,
+                        ...$this->getWhereArguments($field, $op, $value, $classMap)
+                    );
                 }
             } else {
                 foreach ($conditions as $condition => $value) {
-                    $items[] = $this->getWhereArguments($field, $condition, $value);
+                    array_push(
+                        $items,
+                        ...$this->getWhereArguments($field, $condition, $value, $classMap)
+                    );
                 }
             }
         }
