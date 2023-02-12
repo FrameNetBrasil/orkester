@@ -28,6 +28,7 @@ class Model
     private static array $classMaps = [];
     protected static int $fetchStyle;
     private static array $properties = [];
+
     public static function init(array $dbConfigurations, int $fetchStyle): void
     {
         self::$cachedClassMaps = Manager::getCache();
@@ -125,7 +126,7 @@ class Model
         $attributeMap->validator = $validator;
         $attributeMap->virtual = $virtual;
         self::$classMaps[get_called_class()]->addAttributeMap($attributeMap);
-        self::$properties[get_called_class()]['attribute'][] = $name;
+        static::$properties[get_called_class()]['attribute'][] = $name;
     }
 
     public static function associationOne(
@@ -173,7 +174,7 @@ class Model
         $associationMap->conditions = $conditions;
         $associationMap->joinType = $join;
         $fromClassMap->addAssociationMap($associationMap);
-        self::$properties[get_called_class()]['association'][] = $name;
+        static::$properties[get_called_class()]['association'][] = $name;
     }
 
     public static function associationMany(
@@ -185,7 +186,7 @@ class Model
         string $order = ''
     ): void
     {
-        self::$properties[get_called_class()]['association'][] = $name;
+        static::$properties[get_called_class()]['association'][] = $name;
         $fromClassMap = self::$classMaps[get_called_class()];
         $fromClassName = $fromClassMap->model;
         $toClassName = $model;
@@ -256,11 +257,12 @@ class Model
         }
     }
 
-    public static function getProperties(string $className = ''): array {
+    public static function getProperties(string $className = ''): array
+    {
         if ($className != '') {
             return static::$properties[$className];
         }
-        return self::$properties;
+        return static::$properties;
     }
 
     public static function getCriteria(string $databaseName = null): Criteria
