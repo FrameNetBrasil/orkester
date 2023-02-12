@@ -256,7 +256,10 @@ class Model
         }
     }
 
-    public static function getProperties(): array {
+    public static function getProperties(string $className = ''): array {
+        if ($className != '') {
+            return static::$properties[$className];
+        }
         return static::$properties;
     }
 
