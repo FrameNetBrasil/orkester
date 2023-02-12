@@ -131,7 +131,7 @@ class Model
         $attributeMap->validator = $validator;
         $attributeMap->virtual = $virtual;
         self::$classMaps[get_called_class()]->addAttributeMap($attributeMap);
-        static::$properties[get_called_class()]['attribute'][] = $name;
+        static::$properties[get_called_class()]['attribute'][$name] = $type;
     }
 
     public static function associationOne(
@@ -179,7 +179,7 @@ class Model
         $associationMap->conditions = $conditions;
         $associationMap->joinType = $join;
         $fromClassMap->addAssociationMap($associationMap);
-        static::$properties[get_called_class()]['association'][] = $name;
+        static::$properties[get_called_class()]['association'][$name] = $name;
     }
 
     public static function associationMany(
@@ -191,7 +191,7 @@ class Model
         string $order = ''
     ): void
     {
-        static::$properties[get_called_class()]['association'][] = $name;
+        static::$properties[get_called_class()]['association'][$name] = $name;
         $fromClassMap = self::$classMaps[get_called_class()];
         $fromClassName = $fromClassMap->model;
         $toClassName = $model;
