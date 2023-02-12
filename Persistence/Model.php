@@ -185,6 +185,7 @@ class Model
         string $order = ''
     ): void
     {
+        self::$properties[get_called_class()]['association'][] = $name;
         $fromClassMap = self::$classMaps[get_called_class()];
         $fromClassName = $fromClassMap->model;
         $toClassName = $model;
@@ -253,7 +254,6 @@ class Model
             self::$classMaps[$name] = $classMap;
             $classMap->tableName = $associationMap->associativeTable;
         }
-        self::$properties[get_called_class()]['association'][] = $name;
     }
 
     public static function getProperties(): array {
