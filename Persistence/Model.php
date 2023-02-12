@@ -256,6 +256,10 @@ class Model
         self::$properties[get_called_class()]['association'][] = $name;
     }
 
+    public static function getProperties(): array {
+        return static::$properties;
+    }
+
     public static function getCriteria(string $databaseName = null): Criteria
     {
         $databaseName ??= Manager::getOptions('db');
