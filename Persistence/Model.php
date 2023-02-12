@@ -33,6 +33,7 @@ class Model
     public static function init(array $dbConfigurations, int $fetchStyle): void
     {
         self::$cachedClassMaps = Manager::getCache();
+        self::$cachedProperties = Manager::getCache();
         self::$capsule = new Capsule();
         self::$capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
         self::$capsule->setAsGlobal();
