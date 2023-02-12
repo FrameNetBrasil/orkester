@@ -72,14 +72,15 @@ class Model
         $className ??= static::class;
         if (!isset(self::$classMaps[$className])) {
             $key = self::getSignature($className);
+            $keyProps = self::getSignature($className . "props");
             if (self::$cachedClassMaps->has($key)) {
                 self::$classMaps[$className] = self::$cachedClassMaps->get($key);
-                self::$properties[$className] = self::$cachedProperties->get($key);
+                self::$properties[$className] = self::$cachedProperties->get($keyProps);
             } else {
                 self::$classMaps[$className] = new ClassMap($className);
                 $className::map();
                 self::$cachedClassMaps->set($key, self::$classMaps[$className], 300);
-                self::$cachedProperties->set($key, self::$properties[$className], 300);
+                self::$cachedProperties->set($keyProps, self::$properties[$className], 300);
             }
 
         }
