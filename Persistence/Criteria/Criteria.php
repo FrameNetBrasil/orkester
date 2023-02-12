@@ -271,7 +271,7 @@ class Criteria extends Builder
             if (!empty($rs)) {
                 foreach ($rs as $row) {
                     $sKey = trim($row[$fieldKey]);
-                    $sValue = trim($row[$fieldValue]);
+                    $sValue = $row[$fieldValue];
                     $newResult[$sKey] = $sValue;
                 }
             }
