@@ -24,10 +24,11 @@ class Model
 {
     public static ClassMap $classMap;
     public static Psr16Adapter $cachedClassMaps;
+    private static array $properties = [];
+    public static Psr16Adapter $cachedProperties;
     public static Capsule $capsule;
     private static array $classMaps = [];
     protected static int $fetchStyle;
-    private static array $properties = [];
 
     public static function init(array $dbConfigurations, int $fetchStyle): void
     {
@@ -72,10 +73,12 @@ class Model
             $key = self::getSignature($className);
             if (self::$cachedClassMaps->has($key)) {
                 self::$classMaps[$className] = self::$cachedClassMaps->get($key);
+                self::$properties[$className] = self::$cachedProperties->get($key);
             } else {
                 self::$classMaps[$className] = new ClassMap($className);
                 $className::map();
                 self::$cachedClassMaps->set($key, self::$classMaps[$className], 300);
+                self::$cachedProperties->set($key, self::$properties[$className], 300);
             }
 
         }
