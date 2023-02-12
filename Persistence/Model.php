@@ -260,7 +260,7 @@ class Model
         if ($className != '') {
             return static::$properties[$className];
         }
-        return static::$properties;
+        return self::$properties;
     }
 
     public static function getCriteria(string $databaseName = null): Criteria
