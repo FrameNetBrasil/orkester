@@ -319,8 +319,11 @@ class Model
         $key = $classMap->keyAttributeName;
         $criteria = self::getCriteria();
         $criteria->upsert([$fields], [$key], array_keys($fields));
-        $lastInsertId = $criteria->getConnection()->getPdo()->lastInsertId();
-        return $lastInsertId;
+        if ($object->$key) {
+            return $object->$key;
+        } else {
+            return $criteria->getConnection()->getPdo()->lastInsertId();
+        }
     }
 
     public static function delete(int $id): int
