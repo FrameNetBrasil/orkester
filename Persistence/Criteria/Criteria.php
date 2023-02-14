@@ -64,7 +64,8 @@ class Criteria extends Builder
         return $this;
     }
 
-    public function getModel() {
+    public function getModel()
+    {
         return $this->model;
     }
 
@@ -195,7 +196,9 @@ class Criteria extends Builder
         if (!empty($filters)) {
             $filters = is_string($filters[0]) ? [$filters] : $filters;
             foreach ($filters as [$field, $op, $value]) {
-                $this->where($field, $op, $value);
+                if (!is_null($value)) {
+                    $this->where($field, $op, $value);
+                }
             }
         }
     }
@@ -259,7 +262,8 @@ class Criteria extends Builder
         parent::update(Arr::only($values, array_keys($this->classMap->insertAttributeMaps)));
     }
 
-    public function getResult() {
+    public function getResult()
+    {
         return $this->get();
     }
 
