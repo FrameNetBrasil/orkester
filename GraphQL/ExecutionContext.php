@@ -137,7 +137,7 @@ class ExecutionContext
         }
         $container = Manager::getContainer();
         $model = $container->get($modelName);
-        $authorization = $container->get($model::$authorizationClass);
+        $authorization = $container->make($model::$authorizationClass);
         return new MAuthorizedModel($model, $authorization);
     }
 
