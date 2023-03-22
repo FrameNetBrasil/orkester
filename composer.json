@@ -29,8 +29,7 @@
         "composer/composer": "^2.2",
         "webonyx/graphql-php": "^14.11",
         "phpmyadmin/sql-parser": "^5.5",
-        "illuminate/database": "^8.0|^9.0",
-        "illuminate/events": "^8.0|^9.0",
+        "laravel/framework": "^10.0",
         "greenlion/php-sql-parser": "^4.5",
         "guzzlehttp/guzzle": "^7.4",
         "vlucas/phpdotenv": "^5.4"
