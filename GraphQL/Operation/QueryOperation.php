@@ -96,8 +96,9 @@ class QueryOperation implements \JsonSerializable
             } else if ($cardinality == Association::ASSOCIATIVE) {
                 $model = $toClassMap->model;
                 $model::associationMany('_gql', model: $fromClassMap->model, associativeTable: $associationMap->associativeTable);
-//                $associatedCriteria->select('_gql' . '.' . $fromKey);
-                $associatedCriteria->select('_gql' . '.' . $toKey);
+                $associatedCriteria->select('_gql' . '.' . $fromKey);
+//                $associatedCriteria->select('_gql' . '.' . $toKey);
+                $associatedCriteria->where($fromKey, 'IN', $fromIds);
                 $groupKey = $associationMap->fromClassMap->keyAttributeMap->columnName;
             } else {
                 throw new EGraphQLException([$cardinality->value => 'Unhandled cardinality']);
