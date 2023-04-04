@@ -25,7 +25,7 @@
         "aura/session": "^2.1",
         "ramsey/uuid": "^4.2",
         "php-ds/php-ds": "^1.4",
-        "phpfastcache/phpfastcache": "^8",
+        "phpfastcache/phpfastcache": "^9",
         "composer/composer": "^2.2",
         "webonyx/graphql-php": "^14.11",
         "phpmyadmin/sql-parser": "^5.5",
