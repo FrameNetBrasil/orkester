@@ -78,6 +78,14 @@ class ClassMap
 //        //$this->superClassMap = $this->getManager()->getClassMap($superClassName);
 //    }
 
+    public function getAttributeMaps() : array {
+        return $this->attributeMaps;
+    }
+
+    public function getAssociationMaps() : array {
+        return $this->associationMaps;
+    }
+
     public function addAttributeMap(AttributeMap $attributeMap)
     {
         $attributeMap->classMap = $this;
