@@ -149,6 +149,11 @@ class Criteria extends Builder
         return $this;
     }
 
+    public function select($columns = ['*'])
+    {
+        parent::select($columns);
+    }
+
     public function where($attribute, $operator = null, $value = null, $boolean = 'and')
     {
         if ($attribute instanceof Closure) {
