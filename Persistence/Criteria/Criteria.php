@@ -152,6 +152,7 @@ class Criteria extends Builder
     public function select($columns = ['*'])
     {
         parent::select($columns);
+        return $this;
     }
 
     public function where($attribute, $operator = null, $value = null, $boolean = 'and')
