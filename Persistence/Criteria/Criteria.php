@@ -151,7 +151,13 @@ class Criteria extends Builder
 
     public function select($columns = ['*'])
     {
-        parent::select($columns);
+        $allColumns = ((is_array($columns) && ($columns[0] == '*')) || ((is_string($columns) && ($columns == '*'))));
+        if ($allColumns) {
+            $attributes = $this->maps[$this->model]->getAttributeMaps();
+            parent::select(array_keys($attributes));
+        } else {
+            parent::select($columns);
+        }
         return $this;
     }
 
