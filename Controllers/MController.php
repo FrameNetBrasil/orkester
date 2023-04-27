@@ -212,7 +212,7 @@ class MController
         } else {
             $page = new MPage();
             $content = $page->renderInertia($inertia);
-            $this->setResult(new MRenderPage($content));
+            $this->result = new MRenderPage($content);
         }
     }
 
