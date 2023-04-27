@@ -5,24 +5,22 @@ namespace Orkester\Controllers;
 use Orkester\Manager;
 use Orkester\Results\MResult;
 use Orkester\Results\MResultObject;
-use Orkester\Security\MSSL;
-use Orkester\Types\MFile;
+use Orkester\UI\Inertia\Inertia;
+use Orkester\UI\Inertia\InertiaHeaders;
+use Orkester\UI\MPage;
 use Slim\Exception\HttpNotFoundException;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
-use Slim\Routing\RouteContext;
-
 
 class MController
 {
     protected string $httpMethod = '';
     protected string $resultFormat = 'html';
     protected object $data;
-    private array $encryptedFields = [];
     protected string $action;
     protected MResult $result;
-    protected Request $request;
-    protected Response $response;
+    public Request $request;
+    public Response $response;
 
     protected ?string $prefix; // string before '/'
     protected ?string $resource;
@@ -54,25 +52,12 @@ class MController
         $this->httpMethod = $httpMethod;
     }
 
-    protected function parseRoute(Request $request, Response $response)
+    protected function route(Request $request, Response $response, array $args = [])
     {
         $this->setRequestResponse($request, $response);
-        $routeContext = RouteContext::fromRequest($request);
-        $route = $routeContext->getRoute();
-        $arguments = $route->getArguments();
-        $this->setHTTPMethod($route->getMethods()[0]);
-        $this->module = $arguments['module'] ?? 'Main';
-        $this->controller = $arguments['controller'] ?? 'Main';
-        $this->action = $arguments['action'] ?? 'main';
-        $this->id = $arguments['id'] ?? NULL;
-    }
-
-    public function route(Request $request, Response $response): Response
-    {
-        $this->parseRoute($request, $response);
-        if ($this->action == 'view') {
-            return $this->downloadView($this->id);
-        }
+        $this->data->params = $args['params'] ?? [];
+        $this->action = $args['action'] ?? 'main';
+        $this->id = $this->data->params[0] ?? NULL;
         return $this->dispatch($this->action);
     }
 
@@ -83,8 +68,7 @@ class MController
     public function dispatch(string $action): Response
     {
         mtrace('mcontroller::dispatch = ' . $action);
-        $this->action = $action;
-        if (!method_exists($this, $this->action)) {
+        if (!method_exists($this, $action)) {
             throw new HttpNotFoundException($this->request, 'Action ' . $this::class . ':' . $action . ' not found!');
         } else {
             $response = $this->callAction($this->action);
@@ -166,19 +150,21 @@ class MController
         return $this->renderStream($stream);
     }
 
-    /**
-     * Preenche o objeto MAjax com os dados do controller corrent (objeto Data) para seu usado pela classe Result MRenderJSON.
-     * @param string $json String JSON opcional.
-     */
     public function renderObject(object $object, int $code = 200): Response
     {
         $this->result = new MResultObject($object, $code);
         return $this->result->apply($this->request, $this->response);
     }
 
-    public function renderList(array $list = []): Response
+    public function renderArray(array $array, int $code = 200): Response
     {
-        $this->result = new MResultList($list);
+        $this->result = new MResultObject($array, $code);
+        return $this->result->apply($this->request, $this->response);
+    }
+
+    public function renderData(int $code = 200): Response
+    {
+        $this->result = new MResultObject($this->data, $code);
         return $this->result->apply($this->request, $this->response);
     }
 
@@ -210,6 +196,25 @@ class MController
     {
         return $this->renderResponse('error', $message, $code);
     }
+
+    public function renderInertia(string $component, array $props = [])
+    {
+        if (isset($this->data)) {
+            foreach ($this->data as $prop => $value) {
+                $props[$prop] = $value;
+            }
+        }
+        $inertia = (object)Inertia::render($component, $props);
+        if (InertiaHeaders::inRequest()) {
+            InertiaHeaders::addToResponse();
+            $this->renderObject($inertia);
+        } else {
+            $page = new MPage();
+            $content = $page->renderInertia($inertia);
+            $this->setResult(new MRenderPage($content));
+        }
+    }
+
 
     public function setRequest(Request $request)
     {
