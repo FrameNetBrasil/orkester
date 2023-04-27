@@ -26,7 +26,8 @@ class MPage
 
     public function fetch($templateName = '')
     {
-        return ($templateName == '') ? $this->template->fetch($this->templateName) : $this->template->fetch($templateName);
+        $args['page'] = $this;
+        return ($templateName == '') ? $this->template->fetch($this->templateName, $args) : $this->template->fetch($templateName, $args);
     }
 
     public function renderContent()
