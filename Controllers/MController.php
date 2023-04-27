@@ -52,7 +52,7 @@ class MController
         $this->httpMethod = $httpMethod;
     }
 
-    protected function route(Request $request, Response $response, array $args = [])
+    public function route(Request $request, Response $response, array $args = [])
     {
         $this->setRequestResponse($request, $response);
         $this->data->params = $args['params'] ?? [];
