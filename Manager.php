@@ -72,6 +72,8 @@ class Manager
         $reflection = new \ReflectionClass(\Composer\Autoload\ClassLoader::class);
         $basePath = ($basePath != '') ? $basePath : dirname($reflection->getFileName(), 3);
         self::$basePath = $basePath;
+        register_shutdown_function("shutdown");
+
         self::$confPath = $basePath . '/conf';
         self::loadConf(self::$confPath . '/conf.php');
 
@@ -140,7 +142,6 @@ class Manager
         $dbConf = self::getConf('db');
         $fetchStyle = self::getOptions('fetchStyle');
         Model::init($dbConf, $fetchStyle);
-        register_shutdown_function("shutdown");
     }
 
     /**
