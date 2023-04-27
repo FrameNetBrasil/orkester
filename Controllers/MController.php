@@ -198,7 +198,7 @@ class MController
         return $this->renderResponse('error', $message, $code);
     }
 
-    public function renderInertia(string $component, array $props = [])
+    public function renderInertia(string $component, array $props = []): Response
     {
         if (isset($this->data)) {
             foreach ($this->data as $prop => $value) {
@@ -208,11 +208,12 @@ class MController
         $inertia = (object)Inertia::render($component, $props);
         if (InertiaHeaders::inRequest()) {
             InertiaHeaders::addToResponse();
-            $this->renderObject($inertia);
+            return $this->renderObject($inertia);
         } else {
             $page = new MPage();
             $content = $page->renderInertia($inertia);
             $this->result = new MRenderPage($content);
+            return $this->result->apply($this->request, $this->response);
         }
     }
 
