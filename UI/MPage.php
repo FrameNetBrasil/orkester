@@ -10,6 +10,7 @@ class MPage
     private string $templateName;
     private string $content;
     private MBlade $template;
+
     public function __construct()
     {
         $this->templatePath = Manager::getConf('template.path');
@@ -25,8 +26,7 @@ class MPage
 
     public function fetch($templateName = '')
     {
-        $templateName = $templateName ?? $this->templateName;
-        return ($templateName != '') ? $this->template->fetch($templateName) : '';
+        return ($templateName == '') ? $this->template->fetch($this->templateName) : $this->template->fetch($templateName);
     }
 
     public function renderContent()
