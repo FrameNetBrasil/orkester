@@ -3,6 +3,7 @@
 namespace Orkester\Controllers;
 
 use Orkester\Manager;
+use Orkester\Results\MRenderPage;
 use Orkester\Results\MResult;
 use Orkester\Results\MResultObject;
 use Orkester\UI\Inertia\Inertia;

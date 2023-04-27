@@ -34,7 +34,7 @@ class MPage
         return $this->content;
     }
 
-    public function renderInertia(array $inertia)
+    public function renderInertia(object $inertia)
     {
         $page = htmlspecialchars(
             json_encode($inertia),
