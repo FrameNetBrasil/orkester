@@ -44,7 +44,7 @@ class MPage
         );
         $this->content = "<div id=\"app\" class=\"fit\" data-page=\"{$page}\"></div>";
         $args = [
-            'component' => $inertia['component']
+            'component' => $inertia->component
         ];
         return $this->fetch('', $args);
     }
