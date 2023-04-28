@@ -27,8 +27,8 @@ class PersistenceManager
     public static Capsule $capsule;
     public static int $fetchStyle;
     public static ClassMap $classMap;
-    private static array $properties = [];
-    private static array $classMaps = [];
+    public static array $properties = [];
+    public static array $classMaps = [];
 
     public static function init(array $dbConfigurations, int $fetchStyle): void
     {

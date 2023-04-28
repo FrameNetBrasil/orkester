@@ -15,6 +15,7 @@ use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
+use Orkester\Persistence\PersistenceManager;
 
 class Criteria extends Builder
 {
@@ -76,7 +77,7 @@ class Criteria extends Builder
 
     public function addMapFor(string $className)
     {
-        $classMap = Model::getClassMap($className);
+        $classMap = PersistenceManager::getClassMap($className);
         $this->maps[$className] = $classMap;
     }
 
