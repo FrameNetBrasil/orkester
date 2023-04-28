@@ -108,6 +108,7 @@ class Model
 
     public static function getClassMap(string|Model $className = null): ClassMap
     {
+        mtracestack();
         $className ??= static::class;
         if (!isset(self::$classMaps[$className])) {
             $key = self::getSignature($className);
@@ -128,7 +129,7 @@ class Model
 
     public static function getKeyAttributeName(): string
     {
-        return self::getClassMap()->keyAttributeName;
+        return PersistenceManager::getClassMap(get_called_class())->keyAttributeName;
     }
 
     public static function map(): void
@@ -137,12 +138,12 @@ class Model
 
     public static function table(string $name): void
     {
-        self::$classMaps[get_called_class()]->tableName = $name;
+        PersistenceManager::$classMaps[get_called_class()]->tableName = $name;
     }
 
     public static function extends(string $className): void
     {
-        self::$classMaps[get_called_class()]->superClassName = $className;
+        PersistenceManager::$classMaps[get_called_class()]->superClassName = $className;
     }
 
     public static function attribute(
@@ -169,8 +170,8 @@ class Model
         $attributeMap->nullable = $nullable;
         $attributeMap->validator = $validator;
         $attributeMap->virtual = $virtual;
-        self::$classMaps[get_called_class()]->addAttributeMap($attributeMap);
-        static::$properties[get_called_class()]['attribute'][$name] = $type;
+        PersistenceManager::$classMaps[get_called_class()]->addAttributeMap($attributeMap);
+        PersistenceManager::$properties[get_called_class()]['attribute'][$name] = $type;
     }
 
     public static function associationOne(
@@ -183,11 +184,11 @@ class Model
     ): void
     {
         /** @var ClassMap $fromClassMap */
-        $fromClassMap = self::$classMaps[get_called_class()];
+        $fromClassMap = PersistenceManager::$classMaps[get_called_class()];
         $fromClassName = $fromClassMap->model;
         $model = $base ? $fromClassMap->getAssociationMap($base)->fromClassName : $model;
         $toClassName = $model;
-        $toClassMap = self::getClassMap($toClassName);
+        $toClassMap = PersistenceManager::getClassMap($toClassName);
         $associationMap = new AssociationMap($name);
         $associationMap->fromClassMap = $fromClassMap;
         $associationMap->fromClassName = $fromClassName;
@@ -218,7 +219,7 @@ class Model
         $associationMap->conditions = $conditions;
         $associationMap->joinType = $join;
         $fromClassMap->addAssociationMap($associationMap);
-        static::$properties[get_called_class()]['association'][$name] = $name;
+        PersistenceManager::$properties[get_called_class()]['association'][$name] = $name;
     }
 
     public static function associationMany(
@@ -231,10 +232,10 @@ class Model
     ): void
     {
         static::$properties[get_called_class()]['association'][$name] = $name;
-        $fromClassMap = self::$classMaps[get_called_class()];
+        $fromClassMap = PersistenceManager::$classMaps[get_called_class()];
         $fromClassName = $fromClassMap->model;
         $toClassName = $model;
-        $toClassMap = self::getClassMap($toClassName);
+        $toClassMap = PersistenceManager::getClassMap($toClassName);
         $associationMap = new AssociationMap($name);
         $associationMap->fromClassMap = $fromClassMap;
         $associationMap->fromClassName = $fromClassName;
@@ -296,7 +297,7 @@ class Model
             $classMap = new ClassMap($name);
             $classMap->addAttributeMap($toClassMap->getAttributeMap($associationMap->toKey));
             $classMap->addAttributeMap($fromClassMap->getAttributeMap($associationMap->fromKey));
-            self::$classMaps[$name] = $classMap;
+            PersistenceManager::$classMaps[$name] = $classMap;
             $classMap->tableName = $associationMap->associativeTable;
         }
     }
@@ -304,9 +305,9 @@ class Model
     public static function getProperties(string $className = ''): array
     {
         if ($className != '') {
-            return static::$properties[$className];
+            return PersistenceManager::$properties[$className];
         }
-        return static::$properties;
+        return PersistenceManager::$properties;
     }
 
 
@@ -495,7 +496,7 @@ class Model
 
     protected static function getManyToManyAssociation(string $associationName): AssociationMap
     {
-        $classMap = static::getClassMap();
+        $classMap = PersistenceManager::getClassMap(get_called_class());
         $association = $classMap->getAssociationMap($associationName);
         if (empty($association)) {
             throw new \InvalidArgumentException("Unknown association: $associationName");
