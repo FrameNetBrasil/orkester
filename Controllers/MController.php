@@ -3,6 +3,7 @@
 namespace Orkester\Controllers;
 
 use Orkester\Manager;
+use Orkester\Results\MRenderException;
 use Orkester\Results\MRenderPage;
 use Orkester\Results\MResult;
 use Orkester\Results\MResultObject;
@@ -125,14 +126,15 @@ class MController
     {
         $code = $e->getCode();
         minfo('code = ' . $code);
-        $this->result = match ($code) {
-            401 => new MResultUnauthorized($e),
-            403 => new MResultForbidden($e),
-            404 => new MResultNotFound($e),
-            500 => new MResultRunTimeError($e),
-            501 => new MResultNotImplemented($e),
-            default => new MResultRunTimeError($e),
-        };
+//        $this->result = match ($code) {
+//            401 => new MResultUnauthorized($e),
+//            403 => new MResultForbidden($e),
+//            404 => new MResultNotFound($e),
+//            500 => new MResultRunTimeError($e),
+//            501 => new MResultNotImplemented($e),
+//            default => new MResultRunTimeError($e),
+//        };
+        $this->result = new MRenderException($e, $code);
         return $this->result->apply($this->request, $this->response);
     }
 
