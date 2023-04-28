@@ -63,6 +63,29 @@ class Model
         return $criteria->get()->toArray();
     }
 
+    public function filter(array|null $filters, Criteria|null $criteria = null): Criteria
+    {
+        $criteria = $criteria ?? $this->getCriteria();
+        if (!empty($filters)) {
+            $filters = is_string($filters[0]) ? [$filters] : $filters;
+            foreach ($filters as [$field, $op, $value]) {
+                $criteria->where($field, $op, $value);
+            }
+        }
+        return $criteria;
+    }
+
+    public function one($conditions, array $select = []): object|null
+    {
+        $criteria = $this->getCriteria()->range(1, 1);
+        if (!empty($select)) {
+            $criteria->select($select);
+        }
+        $result = $this->filter($conditions, $criteria)->get()->toArray();
+        return empty($result) ? null : (object)$result[0];
+    }
+
+
 
     ///////////////
 
@@ -108,7 +131,6 @@ class Model
 
     public static function getClassMap(string|Model $className = null): ClassMap
     {
-        mtracestack();
         $className ??= static::class;
         if (!isset(self::$classMaps[$className])) {
             $key = self::getSignature($className);
@@ -466,28 +488,6 @@ class Model
         return static::filter($params->filter, $criteria);
     }
 
-    public static function filter(array|null $filters, Criteria|null $criteria = null): Criteria
-    {
-        $criteria = $criteria ?? static::getCriteria();
-        if (!empty($filters)) {
-            $filters = is_string($filters[0]) ? [$filters] : $filters;
-            foreach ($filters as [$field, $op, $value]) {
-                $criteria->where($field, $op, $value);
-            }
-        }
-        return $criteria;
-    }
-
-
-    public static function one($conditions, array $select = []): object|null
-    {
-        $criteria = static::getCriteria()->range(1, 1);
-        if (!empty($select)) {
-            $criteria->select($select);
-        }
-        $result = static::filter($conditions, $criteria)->get()->toArray();
-        return empty($result) ? null : (object)$result[0];
-    }
 
     public static function exists(array $conditions): bool
     {
