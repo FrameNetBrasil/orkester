@@ -225,6 +225,11 @@ class Manager
         return self::$confPath;
     }
 
+    public static function getClassPath(): string
+    {
+        return self::$classPath;
+    }
+
     public static function getConf(string $key)
     {
         $k = explode('.', $key);

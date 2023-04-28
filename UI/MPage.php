@@ -14,7 +14,7 @@ class MPage
     public function __construct()
     {
         $this->templatePath = Manager::getConf('template.path');
-        $this->templateName = Manager::getConf('template.name');
+        $this->templateName = Manager::getConf('template.index');
         $path = Manager::getBasePath("public/{$this->templatePath}");
         $this->template = new MBlade([$path]);
     }
