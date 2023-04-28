@@ -10,6 +10,7 @@ use Monolog\Logger;
 use Orkester\Handlers\HttpErrorHandler;
 use Orkester\Handlers\ShutdownHandler;
 use Orkester\Persistence\Model;
+use Orkester\Persistence\PersistenceManager;
 use Orkester\Services\MCacheFast;
 use Orkester\Services\MLog;
 
@@ -141,7 +142,7 @@ class Manager
 
         $dbConf = self::getConf('db');
         $fetchStyle = self::getOptions('fetchStyle');
-        Model::init($dbConf, $fetchStyle);
+        PersistenceManager::init($dbConf, $fetchStyle);
     }
 
     /**
