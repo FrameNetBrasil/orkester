@@ -30,6 +30,45 @@ class Model
     private static array $classMaps = [];
     protected static int $fetchStyle;
 
+
+    ///////////////
+
+    public function getCriteria(string $databaseName = null): Criteria
+    {
+        $databaseName ??= Manager::getOptions('db');
+        $connection = PersistenceManager::$capsule->getConnection($databaseName);
+        $connection->enableQueryLog();
+        (new \ReflectionClass(get_class($connection)))
+            ->getProperty('fetchMode')->setValue($connection, PersistenceManager::$fetchStyle);
+
+        $classMap = PersistenceManager::getClassMap(get_called_class());
+        $container = Manager::getContainer();
+        return $container->call(
+            function (Logger $logger) use ($connection, $classMap) {
+                $criteria = new Criteria($connection, $logger->withName('criteria'));
+                return $criteria->setClassMap($classMap);
+            }
+        );
+    }
+
+
+    public function list(object|array|null $filter = null, array $select = [], array|string $order = ''): array
+    {
+        $criteria = $this->getCriteria();
+        if (!empty($select)) {
+            $criteria->select($select);
+        }
+        $criteria->filter($filter);
+        $criteria->order($order);
+        return $criteria->get()->toArray();
+    }
+
+
+    ///////////////
+
+
+
+
     public static function init(array $dbConfigurations, int $fetchStyle): void
     {
         self::$cachedClassMaps = Manager::getCache();
@@ -270,24 +309,6 @@ class Model
         return static::$properties;
     }
 
-    public static function getCriteria(string $databaseName = null): Criteria
-    {
-        $databaseName ??= Manager::getOptions('db');
-        $connection = self::$capsule->getConnection($databaseName);
-        $connection->enableQueryLog();
-        (new \ReflectionClass(get_class($connection)))
-            ->getProperty('fetchMode')->setValue($connection, self::$fetchStyle);
-
-        $classMap = self::getClassMap(get_called_class());
-
-        $container = Manager::getContainer();
-        return $container->call(
-            function (Logger $logger) use ($connection, $classMap) {
-                $criteria = new Criteria($connection, $logger->withName('criteria'));
-                return $criteria->setClassMap($classMap);
-            }
-        );
-    }
 
     public static function getAssociation(string $associationChain, int $id): array
     {
@@ -456,17 +477,6 @@ class Model
         return $criteria;
     }
 
-    public static function list(object|array|null $filter = null, array $select = [], array|string $order = ''): array
-    {
-        //$criteria = static::filter($filter);
-        $criteria = static::getCriteria();
-        if (!empty($select)) {
-            $criteria->select($select);
-        }
-        $criteria->filter($filter);
-        $criteria->order($order);
-        return $criteria->get()->toArray();
-    }
 
     public static function one($conditions, array $select = []): object|null
     {
