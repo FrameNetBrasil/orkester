@@ -122,6 +122,14 @@ class MController
         }
     }
 
+    public function notify(string $type, string $message, array $actions = []) {
+        $this->data->notification = (object)[
+            'type' => $type,
+            'message' => $message,
+            'actions' => $actions
+        ];
+    }
+
     public function renderException(\Exception $e, string $action = ''): Response
     {
         $code = $e->getCode();
