@@ -318,4 +318,9 @@ class Criteria extends Builder
         return $tree;
     }
 
+    public function plainSQL(string $command, array $params = []) {
+        $databaseName ??= \Orkester\Manager::getOptions('db');
+        return $this->getConnection($databaseName)->select($command, $params);
+    }
+
 }

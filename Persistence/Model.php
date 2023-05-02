@@ -85,7 +85,10 @@ class Model
         return empty($result) ? null : (object)$result[0];
     }
 
-
+    public function find(int $id): object|array|null
+    {
+        return $this->getCriteria()->find($id);
+    }
 
     ///////////////
 
@@ -350,10 +353,7 @@ class Model
             ->delete();
     }
 
-    public static function find(int $id): object|array|null
-    {
-        return static::getCriteria()->find($id);
-    }
+
 
     public static function save(object $object): ?int
     {

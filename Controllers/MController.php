@@ -57,7 +57,11 @@ class MController
     public function route(Request $request, Response $response, array $args = [])
     {
         $this->setRequestResponse($request, $response);
-        $this->data->params = $args['params'] ?? [];
+        $params = $args['params'] ?? [];
+        if (!is_array($params)) {
+            $params = [$params];
+        }
+        $this->data->params = $params;
         $this->action = $args['action'] ?? 'main';
         $this->id = $this->data->params[0] ?? NULL;
         return $this->dispatch($this->action);
