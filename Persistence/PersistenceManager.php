@@ -391,7 +391,7 @@ class PersistenceManager
 
     public static function getConnection(?string $databaseName = null): Connection
     {
-        $databaseName ??= PersistenceManager::getOptions('db');
+        $databaseName ??= Manager::getOptions('db');
         return self::$capsule->getConnection($databaseName);
     }
 
