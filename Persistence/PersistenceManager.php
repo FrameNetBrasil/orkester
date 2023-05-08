@@ -272,15 +272,13 @@ class PersistenceManager
 
     public static function getCriteria(string $databaseName = null): Criteria
     {
-        $databaseName ??= PersistenceManager::getOptions('db');
+        $databaseName ??= Manager::getOptions('db');
         $connection = self::$capsule->getConnection($databaseName);
         $connection->enableQueryLog();
         (new \ReflectionClass(get_class($connection)))
             ->getProperty('fetchMode')->setValue($connection, self::$fetchStyle);
-
         $classMap = self::getClassMap(get_called_class());
-
-        $container = PersistenceManager::getContainer();
+        $container = Manager::getContainer();
         return $container->call(
             function (Logger $logger) use ($connection, $classMap) {
                 $criteria = new Criteria($connection, $logger->withName('criteria'));

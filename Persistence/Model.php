@@ -372,9 +372,11 @@ class Model
 
     public static function delete(int $id): int
     {
-        $classMap = self::getClassMap(get_called_class());
+        $modelClass = get_called_class();
+        $classMap = PersistenceManager::getClassMap($modelClass);
+        $model = new $modelClass();
         $key = $classMap->keyAttributeName;
-        $criteria = static::getCriteria();
+        $criteria = $model->getCriteria();
         return $criteria
             ->where($key, '=', $id)
             ->delete();
@@ -382,8 +384,10 @@ class Model
 
     public static function insert(array|object $data): ?int
     {
-        $classMap = static::getClassMap(get_called_class());
-        $criteria = static::getCriteria();
+        $modelClass = get_called_class();
+        $classMap = PersistenceManager::getClassMap($modelClass);
+        $model = new $modelClass();
+        $criteria = $model->getCriteria();
         if (is_object($data)) {
             $array = (array)$data;
             $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
