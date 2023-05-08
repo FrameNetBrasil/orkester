@@ -3,6 +3,7 @@
 namespace Orkester\Controllers;
 
 use Orkester\Manager;
+use Orkester\Results\MRedirect;
 use Orkester\Results\MRenderException;
 use Orkester\Results\MRenderPage;
 use Orkester\Results\MResult;
@@ -231,6 +232,11 @@ class MController
         }
     }
 
+    public function redirect($url)
+    {
+        $this->result = new MRedirect($url);
+        return $this->result->apply($this->request, $this->response);
+    }
 
     public function setRequest(Request $request)
     {
