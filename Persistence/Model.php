@@ -338,7 +338,10 @@ class Model
 
     public static function getAssociation(string $associationChain, int $id): array
     {
-        return static::getCriteria()
+        $modelClass = get_called_class();
+        $classMap = PersistenceManager::getClassMap($modelClass);
+        $model = new $modelClass();
+        return $model->getCriteria()
             ->select($associationChain . '.*')
             ->where('id', '=', $id)
             ->get()
@@ -347,13 +350,14 @@ class Model
 
     public static function deleteAssociation(string $associationChain, int $id): array
     {
-        return static::getCriteria()
+        $modelClass = get_called_class();
+        $classMap = PersistenceManager::getClassMap($modelClass);
+        $model = new $modelClass();
+        return $model->getCriteria()
             ->select($associationChain . '.*')
             ->where('id', '=', $id)
             ->delete();
     }
-
-
 
     public static function save(object $object): ?int
     {
