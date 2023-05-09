@@ -415,12 +415,16 @@ class Model
         return $lastInsertId;
     }
 
-    public static function update(object $object)
+    public static function update(array|object $data)
     {
         $modelClass = get_called_class();
         $classMap = PersistenceManager::getClassMap($modelClass);
         $model = new $modelClass();
-        $array = (array)$object;
+        if (is_object($data)) {
+            $array = (array)$data;
+        } else {
+            $array = $data;
+        }
         $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
         $key = $classMap->keyAttributeName;
         // key must be present
