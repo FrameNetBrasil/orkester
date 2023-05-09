@@ -361,11 +361,13 @@ class Model
 
     public static function save(object $object): ?int
     {
-        $classMap = self::getClassMap(get_called_class());
+        $modelClass = get_called_class();
+        $classMap = PersistenceManager::getClassMap($modelClass);
+        $model = new $modelClass();
+        $criteria = $model->getCriteria();
         $array = (array)$object;
         $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
         $key = $classMap->keyAttributeName;
-        $criteria = self::getCriteria();
         $criteria->upsert([$fields], [$key], array_keys($fields));
         if ($object->$key) {
             return $object->$key;
@@ -415,25 +417,31 @@ class Model
 
     public static function update(object $object)
     {
-        $classMap = self::getClassMap(get_called_class());
+        $modelClass = get_called_class();
+        $classMap = PersistenceManager::getClassMap($modelClass);
+        $model = new $modelClass();
         $array = (array)$object;
         $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
         $key = $classMap->keyAttributeName;
         // key must be present
         if (isset($fields[$key])) {
-            $criteria = static::getCriteria();
+            $criteria = $model->getCriteria();
             $criteria->where($key, '=', $fields[$key])->update($fields);
         }
     }
 
     public static function updateCriteria()
     {
-        return static::getCriteria();
+        $modelClass = get_called_class();
+        $model = new $modelClass();
+        return $model->getCriteria();
     }
 
     public static function deleteCriteria()
     {
-        return static::getCriteria();
+        $modelClass = get_called_class();
+        $model = new $modelClass();
+        return $model->getCriteria();
     }
 
     public static function getName(): string
@@ -475,15 +483,15 @@ class Model
 
     public static function criteriaByFilter(object|null $params, array $select = []): Criteria
     {
-        $criteria = static::getCriteria();
+        $modelClass = get_called_class();
+        $model = new $modelClass();
+        $criteria = $model->getCriteria();
         if (!empty($select)) {
             $criteria->select($select);
         }
         if (!is_null($params)) {
             if (!empty($params->pagination->rows)) {
                 $page = $params->pagination->page ?? 1;
-                //mdump('rows = ' . $params->pagination->rows);
-                //mdump('offset = ' . $offset);
                 $criteria->range($page, $params->pagination->rows);
             }
             if (!empty($params->pagination->sort)) {
@@ -493,13 +501,15 @@ class Model
                 );
             }
         }
-        return static::filter($params->filter, $criteria);
+        return $model->filter($params->filter, $criteria);
     }
 
 
     public static function exists(array $conditions): bool
     {
-        return !is_null(static::one($conditions));
+        $modelClass = get_called_class();
+        $model = new $modelClass();
+        return !is_null($model->one($conditions));
     }
 
     protected static function getManyToManyAssociation(string $associationName): AssociationMap
@@ -524,7 +534,9 @@ class Model
         ],
             $associatedIds
         );
-        static::getCriteria()
+        $modelClass = get_called_class();
+        $model = new $modelClass();
+        $model->getCriteria()
             ->setClassMap(self::$classMaps["{$association->fromClassName}_$association->associativeTable"])
             ->upsert($columns, [$association->toKey, $association->fromKey]);
     }
@@ -532,7 +544,10 @@ class Model
     public static function removeAssociation(string $associationName, mixed $id, ?array $associatedIds): void
     {
         $association = static::getManyToManyAssociation($associationName);
-        $criteria = static::getCriteria()
+        $modelClass = get_called_class();
+        $model = new $modelClass();
+        $criteria = $model->getCriteria();
+        $criteria
             ->setClassMap(self::$classMaps["{$association->fromClassName}_$association->associativeTable"])
             ->where($association->fromKey, '=', $id);
         if (is_array($associatedIds)) {
