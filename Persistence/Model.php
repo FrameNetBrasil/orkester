@@ -33,7 +33,7 @@ class Model
 
     ///////////////
 
-    public function getCriteria(string $databaseName = null): Criteria
+    public static function getCriteria(string $databaseName = null): Criteria
     {
         $databaseName ??= Manager::getOptions('db');
         $connection = PersistenceManager::$capsule->getConnection($databaseName);
@@ -134,22 +134,23 @@ class Model
 
     public static function getClassMap(string|Model $className = null): ClassMap
     {
-        $className ??= static::class;
-        if (!isset(self::$classMaps[$className])) {
-            $key = self::getSignature($className);
-            $keyProps = self::getSignature($className . "props");
-            if (self::$cachedClassMaps->has($key)) {
-                self::$classMaps[$className] = self::$cachedClassMaps->get($key);
-                self::$properties[$className] = self::$cachedProperties->get($keyProps);
-            } else {
-                self::$classMaps[$className] = new ClassMap($className);
-                $className::map();
-                self::$cachedClassMaps->set($key, self::$classMaps[$className], 300);
-                self::$cachedProperties->set($keyProps, self::$properties[$className], 300);
-            }
-
-        }
-        return self::$classMaps[$className];
+        return PersistenceManager::getClassMap($className ?? static::class);
+//        $className ??= static::class;
+//        if (!isset(self::$classMaps[$className])) {
+//            $key = self::getSignature($className);
+//            $keyProps = self::getSignature($className . "props");
+//            if (self::$cachedClassMaps->has($key)) {
+//                self::$classMaps[$className] = self::$cachedClassMaps->get($key);
+//                self::$properties[$className] = self::$cachedProperties->get($keyProps);
+//            } else {
+//                self::$classMaps[$className] = new ClassMap($className);
+//                $className::map();
+//                self::$cachedClassMaps->set($key, self::$classMaps[$className], 300);
+//                self::$cachedProperties->set($keyProps, self::$properties[$className], 300);
+//            }
+//
+//        }
+//        return self::$classMaps[$className];
     }
 
     public static function getKeyAttributeName(): string
@@ -567,5 +568,4 @@ class Model
         self::appendAssociation($associationName, $id, $associatedIds);
         self::commit();
     }
-
 }

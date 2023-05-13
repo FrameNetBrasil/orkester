@@ -9,9 +9,7 @@ namespace Orkester\Persistence\Map;
 //use Orkester\Persistence\PersistentObject;
 //use Orkester\Utils\MUtil;
 
-use Orkester\Manager;
 use Orkester\Persistence\Criteria\Criteria;
-use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Enum\Key;
 use Orkester\Persistence\Model;
 
@@ -78,6 +76,9 @@ class ClassMap
 //        //$this->superClassMap = $this->getManager()->getClassMap($superClassName);
 //    }
 
+    /**
+     * @return AttributeMap[]
+     */
     public function getAttributeMaps() : array {
         return $this->attributeMaps;
     }
@@ -160,6 +161,31 @@ class ClassMap
     public function getCriteria(): Criteria
     {
         return $this->model::getCriteria();
+    }
+
+    protected $attributesNames = [];
+    protected $associationNames = [];
+    /**
+     * @return string[]
+     */
+    public function getAttributesNames(): array
+    {
+        if (empty($this->attributesNames))
+            $this->attributesNames = array_map(
+                fn($map) => $map->name,
+                $this->getAttributeMaps()
+            );
+        return $this->attributesNames;
+    }
+
+    public function getAssociationsNames(): array
+    {
+        if (empty($this->associationNames))
+            $this->associationNames = array_map(
+                fn($map) => $map->name,
+                $this->getAssociationMaps()
+            );
+        return $this->associationNames;
     }
 
 

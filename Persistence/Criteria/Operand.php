@@ -12,7 +12,7 @@ class Operand
 {
     public function __construct(
         public Criteria $criteria,
-        public string   $field,
+        public string|Expression   $field,
         public string   $alias = ''
     )
     {
@@ -119,7 +119,7 @@ class Operand
                 }
                 $toTableName = $this->criteria->tableName($associationMap->toClassName);
                 if (!isset($this->criteria->tableAlias[$joinIndex])) {
-                    $this->criteria->tableAlias[$joinIndex] = 'a' . ++$this->criteria->aliasCount;
+                    $this->criteria->tableAlias[$joinIndex] = $associationName . '_' . ++$this->criteria->aliasCount;
                     $this->criteria->generatedAliases[] = $this->criteria->tableAlias[$joinIndex];
                 }
                 $toAlias = $this->criteria->tableAlias[$joinIndex];
@@ -196,9 +196,12 @@ class Operand
             $this->field = $attributeMap->columnName;
         }
         if ($attributeMap->reference != '') {
-            $this->alias = $this->field;
-            $this->field = $attributeMap->reference;
-            return $this->resolveOperand();
+            if (strpos($attributeMap->reference, "(") === false) {
+                $this->alias = $this->field;
+                $this->field = $attributeMap->reference;
+                return $this->resolveOperand();
+            }
+            return new Expression("$attributeMap->reference as $this->field");
         } else {
             if ($attributeMap->name != $attributeMap->columnName) {
                 $this->alias = $attributeMap->name;
