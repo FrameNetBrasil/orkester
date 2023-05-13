@@ -11,6 +11,7 @@ use Illuminate\Support\Arr;
 use Monolog\Logger;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Grammar\MySqlGrammar;
+use Orkester\Persistence\Grammar\SQLiteGrammar;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
@@ -40,7 +41,12 @@ class Criteria extends Builder
 
     public function __construct(ConnectionInterface $connection, Logger $logger)
     {
-        parent::__construct($connection, new MySqlGrammar($this));
+        $grammar = match(get_class($connection->getQueryGrammar())) {
+            \Illuminate\Database\Query\Grammars\MySqlGrammar::class => new MySqlGrammar($this),
+            \Illuminate\Database\Query\Grammars\SQLiteGrammar::class => new SQLiteGrammar($this),
+            default => throw new \InvalidArgumentException("Unknown database grammar")
+        };
+        parent::__construct($connection, $grammar);
         $this->logger = $logger;
         $this->generatedAliases = new Set();
     }
@@ -72,7 +78,7 @@ class Criteria extends Builder
 
     public function newQuery()
     {
-        return new static($this->connection, $this->logger);
+        return (new static($this->connection, $this->logger))->setModel($this->model);
     }
 
     public function addMapFor(string $className)

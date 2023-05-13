@@ -2,7 +2,7 @@
 
 namespace Orkester\Persistence\Grammar;
 
-class MySqlGrammar extends \Illuminate\Database\Query\Grammars\MySqlGrammar
+class SQLiteGrammar extends \Illuminate\Database\Query\Grammars\SQLiteGrammar
 {
     use OrkesterGrammarTrait;
 }

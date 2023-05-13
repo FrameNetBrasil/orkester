@@ -35,7 +35,8 @@
         "guzzlehttp/guzzle": "^7.4",
         "vlucas/phpdotenv": "^5.4",
         "ryangjchandler/standalone-blade": "*",
-        "illuminate/view": "9.35.1"
+        "illuminate/view": "9.35.1",
+        "laminas/laminas-permissions-acl": "^2.14"
     },
     "autoload": {
         "files": [

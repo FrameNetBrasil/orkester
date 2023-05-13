@@ -28,6 +28,9 @@ class PersistenceManager
     public static int $fetchStyle;
     public static ClassMap $classMap;
     public static array $properties = [];
+    /**
+     * @var ClassMap[]
+     */
     public static array $classMaps = [];
 
     public static function init(array $dbConfigurations, int $fetchStyle): void
