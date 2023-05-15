@@ -379,31 +379,65 @@ class Model
 
     public static function delete(int $id): int
     {
-        $modelClass = get_called_class();
-        $classMap = PersistenceManager::getClassMap($modelClass);
-        $model = new $modelClass();
-        $key = $classMap->keyAttributeName;
-        $criteria = $model->getCriteria();
-        return $criteria
-            ->where($key, '=', $id)
+        return static::getCriteria()
+            ->where(static::getClassMap()->keyAttributeName, '=', $id)
             ->delete();
     }
 
-    public static function insert(array|object $data): ?int
+    public static function transform(array &$row)
     {
-        $modelClass = get_called_class();
-        $classMap = PersistenceManager::getClassMap($modelClass);
-        $model = new $modelClass();
-        $criteria = $model->getCriteria();
-        if (is_object($data)) {
-            $array = (array)$data;
-            $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
-            $criteria->insert([$fields]);
-        } else {
-            $criteria->insert($data);
+        return $row;
+    }
+
+    public static function validate(array $row): array
+    {
+        return [];
+    }
+
+    protected static function prepareWrite(array $data, bool $strict = true): array
+    {
+        $classMap = PersistenceManager::getClassMap(static::class);
+        $validAttributes = array_keys($classMap->insertAttributeMaps);
+        $rows = array_key_exists(0, $data) ? $data : [$data];
+        $accepted = [];
+        $errors = [];
+        foreach($rows as $row) {
+            $row = Arr::only($row, $validAttributes);
+            $err = static::validate($row);
+
+            if (empty($err)) {
+                $accepted[] = static::transform($row);
+            } else {
+                $errors[] = $err;
+            }
         }
-        $lastInsertId = $criteria->getConnection()->getPdo()->lastInsertId();
-        return $lastInsertId;
+        //if ($strict && !empty($errors)) {
+            //throw new \Exception("error");
+        //}
+        return $accepted;
+    }
+
+    public static function insert(array $data, bool $strict = true): ?int
+    {
+        $rows = static::prepareWrite($data, $strict);
+        $criteria = static::getCriteria();
+        $criteria->insert($rows);
+        return $criteria->getConnection()->getPdo()->lastInsertId();
+    }
+
+    public static function upsert(array $data, array|string $uniqueBy, $update = null, bool $strict = true): ?int
+    {
+        $rows = static::prepareWrite($data, $strict);
+        $criteria = static::getCriteria();
+        $criteria->upsert($rows, $uniqueBy, $update);
+        return $criteria->getConnection()->getPdo()->lastInsertId();
+    }
+
+    public static function update(array $data, bool $strict = true)
+    {
+        $rows = static::prepareWrite($data, $strict);
+        $criteria = static::getCriteria();
+        $criteria->update($rows);
     }
 
     public static function insertUsingCriteria(array $fields, Criteria $usingCriteria): ?int
@@ -414,25 +448,6 @@ class Model
         $criteria->insertUsing($fields, $usingCriteria);
         $lastInsertId = $criteria->getConnection()->getPdo()->lastInsertId();
         return $lastInsertId;
-    }
-
-    public static function update(array|object $data)
-    {
-        $modelClass = get_called_class();
-        $classMap = PersistenceManager::getClassMap($modelClass);
-        $model = new $modelClass();
-        if (is_object($data)) {
-            $array = (array)$data;
-        } else {
-            $array = $data;
-        }
-        $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
-        $key = $classMap->keyAttributeName;
-        // key must be present
-        if (isset($fields[$key])) {
-            $criteria = $model->getCriteria();
-            $criteria->where($key, '=', $fields[$key])->update($fields);
-        }
     }
 
     public static function updateCriteria()
@@ -459,22 +474,22 @@ class Model
     public static function getConnection(?string $databaseName = null): Connection
     {
         $databaseName ??= Manager::getOptions('db');
-        return self::$capsule->getConnection($databaseName);
+        return PersistenceManager::$capsule->getConnection($databaseName);
     }
 
     public static function beginTransaction(?string $databaseName = null)
     {
-        static::getConnection($databaseName)->beginTransaction();
+        PersistenceManager::beginTransaction($databaseName);
     }
 
     public static function commit(?string $databaseName = null)
     {
-        static::getConnection($databaseName)->commit();
+        PersistenceManager::commit($databaseName);
     }
 
     public static function rollback(?string $databaseName = null)
     {
-        static::getConnection($databaseName)->rollBack();
+        PersistenceManager::rollback($databaseName);
     }
 
     public static function transaction(callable $closure, ?string $databaseName = null): mixed

@@ -17,6 +17,7 @@ use PHPSQLParser\PHPSQLParser;
 
 trait OrkesterGrammarTrait
 {
+    protected bool $appendTablePrefix = false;
     public string $context = '';
     private bool $isLogging;
     public Logger $logger;
@@ -26,7 +27,7 @@ trait OrkesterGrammarTrait
      *
      * @var string[]
      */
-    protected $selectComponentsOrkester = [
+    protected array $selectComponentsOrkester = [
         'aggregate',
         'columns',
         'from',
@@ -63,7 +64,7 @@ trait OrkesterGrammarTrait
                 $parts = explode('.', $resolved);
                 $column = count($parts) > 1 ? $parts[1] : $parts[0];
                 $column = $column == '*' ? '*' : "`$column`";
-                $result = count($parts) > 1 ?
+                $result = count($parts) > 1 && $this->appendTablePrefix ?
                     "`$parts[0]`.$column" :
                     "$column";
             }
@@ -186,26 +187,35 @@ trait OrkesterGrammarTrait
 
     public function compileSelect(Builder $query): string
     {
+        $this->appendTablePrefix = true;
         return $this->logSql(parent::compileSelect($query), $this->criteria->getBindings());
     }
 
     public function compileUpdate(Builder $query, array $values): string
     {
+        $this->appendTablePrefix = false;
         return $this->logSql(parent::compileUpdate($query, $values), $values);
     }
 
     public function compileDelete(Builder $query): string
     {
+        $this->appendTablePrefix = false;
         return $this->logSql(parent::compileDelete($query), $this->criteria->getBindings());
     }
 
     public function compileUpsert(Builder $query, array $values, array $uniqueBy, array $update): string
     {
-        return $this->logSql(parent::compileUpsert($query, $values, $uniqueBy, $update), $values);
+        $this->appendTablePrefix = false;
+        $wasLogging = $this->isLogging;
+        $this->isLogging = false;
+        $sql = parent::compileUpsert($query, $values, $uniqueBy, $update);
+        $this->isLogging = $wasLogging;
+        return $this->logSql($sql, $values);
     }
 
     public function compileInsert(Builder $query, array $values): string
     {
+        $this->appendTablePrefix = false;
         return $this->logSql(parent::compileInsert($query, $values), $values);
     }
 }
