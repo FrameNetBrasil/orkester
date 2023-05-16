@@ -74,14 +74,14 @@ class Model
         return $criteria;
     }
 
-    public static function one($conditions, array $select = []): object|null
+    public static function one($conditions, array $select = []): array|null
     {
         $criteria = static::getCriteria()->range(1, 1);
         if (!empty($select)) {
             $criteria->select($select);
         }
         $result = static::filter($conditions, $criteria)->get()->toArray();
-        return empty($result) ? null : (object)$result[0];
+        return empty($result) ? null : $result[0];
     }
 
     public static function find(int $id): object|array|null
