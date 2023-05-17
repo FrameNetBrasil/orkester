@@ -101,6 +101,7 @@ class CriteriaBuilder extends Builder
             $sql,
             $this->cleanBindings(Arr::flatten($values, 1))
         );
+        if (!$returning) return Collection::empty();
         return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
     }
 

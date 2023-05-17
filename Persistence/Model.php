@@ -379,7 +379,7 @@ class Model
     {
         $row = static::prepareWrite($data);
         $criteria = static::getCriteria();
-        return $criteria->insert($row, $returning)[0];
+        return $criteria->insert($row, $returning)[0] ?? [];
     }
 
     public static function update(array $data, array $returning = null): array
