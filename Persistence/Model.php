@@ -30,8 +30,49 @@ class Model
     private static array $properties = [];
     private static array $classMaps = [];
 
+    public static function getCriteria(string $databaseName = null): Criteria
+    {
+        return PersistenceManager::getCriteria($databaseName, static::class);
+    }
 
-    ///////////////
+    public static function list(object|array|null $filter = null, array $select = [], array|string $order = ''): array
+    {
+        //$criteria = static::filter($filter);
+        $criteria = static::getCriteria();
+        if (!empty($select)) {
+            $criteria->select($select);
+        }
+        $criteria->filter($filter);
+        $criteria->order($order);
+        return $criteria->get()->toArray();
+    }
+
+    public static function filter(array|null $filters, Criteria|null $criteria = null): Criteria
+    {
+        $criteria = $criteria ?? static::getCriteria();
+        if (!empty($filters)) {
+            $filters = is_string($filters[0]) ? [$filters] : $filters;
+            foreach ($filters as [$field, $op, $value]) {
+                $criteria->where($field, $op, $value);
+            }
+        }
+        return $criteria;
+    }
+
+    public static function one($conditions, array $select = []): array|null
+    {
+        $criteria = static::getCriteria()->range(1, 1);
+        if (!empty($select)) {
+            $criteria->select($select);
+        }
+        $result = static::filter($conditions, $criteria)->get()->toArray();
+        return empty($result) ? null : $result[0];
+    }
+
+    public static function find(int $id): object|array|null
+    {
+        return static::getCriteria()->find($id);
+    }
 
     public static function init(array $dbConfigurations, int $fetchStyle): void
     {
@@ -260,19 +301,11 @@ class Model
 
     public static function getAssociation(string $associationChain, int $id): array
     {
-        $modelClass = get_called_class();
-        $classMap = PersistenceManager::getClassMap($modelClass);
-        $model = new $modelClass();
-        return $model->getCriteria()
+        return static::getCriteria()
             ->select($associationChain . '.*')
             ->where('id', '=', $id)
             ->get()
             ->toArray();
-    }
-
-    public static function getCriteria(string $databaseName = null): Criteria
-    {
-        return PersistenceManager::getCriteria($databaseName, static::class);
     }
 
     public static function getConnection(?string $databaseName = null): Connection
@@ -283,10 +316,7 @@ class Model
 
     public static function deleteAssociation(string $associationChain, int $id): array
     {
-        $modelClass = get_called_class();
-        $classMap = PersistenceManager::getClassMap($modelClass);
-        $model = new $modelClass();
-        return $model->getCriteria()
+        return static::getCriteria()
             ->select($associationChain . '.*')
             ->where('id', '=', $id)
             ->delete();
@@ -301,13 +331,11 @@ class Model
 
     public static function save(object $object): ?int
     {
-        $modelClass = get_called_class();
-        $classMap = PersistenceManager::getClassMap($modelClass);
-        $model = new $modelClass();
-        $criteria = $model->getCriteria();
+        $classMap = PersistenceManager::getClassMap(get_called_class());
         $array = (array)$object;
         $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
         $key = $classMap->keyAttributeName;
+        $criteria = self::getCriteria();
         $criteria->upsert([$fields], [$key], array_keys($fields));
         if ($object->$key) {
             return $object->$key;
@@ -342,7 +370,7 @@ class Model
         return [];
     }
 
-    public static function transform(array &$row)
+    public static function transform(array $row)
     {
         return $row;
     }
@@ -369,7 +397,7 @@ class Model
 
     public static function insertUsingCriteria(array $fields, Criteria $usingCriteria): ?int
     {
-        $classMap = static::getClassMap(get_called_class());
+        $classMap = PersistenceManager::getClassMap(static::class);
         $usingCriteria->applyBeforeQueryCallbacks();
         $criteria = static::getCriteria();
         $criteria->insertUsing($fields, $usingCriteria);
@@ -379,16 +407,12 @@ class Model
 
     public static function updateCriteria()
     {
-        $modelClass = get_called_class();
-        $model = new $modelClass();
-        return $model->getCriteria();
+        return static::getCriteria();
     }
 
     public static function deleteCriteria()
     {
-        $modelClass = get_called_class();
-        $model = new $modelClass();
-        return $model->getCriteria();
+        return static::getCriteria();
     }
 
     public static function getName(): string
@@ -414,15 +438,15 @@ class Model
 
     public static function criteriaByFilter(object|null $params, array $select = []): Criteria
     {
-        $modelClass = get_called_class();
-        $model = new $modelClass();
-        $criteria = $model->getCriteria();
+        $criteria = static::getCriteria();
         if (!empty($select)) {
             $criteria->select($select);
         }
         if (!is_null($params)) {
             if (!empty($params->pagination->rows)) {
                 $page = $params->pagination->page ?? 1;
+                //mdump('rows = ' . $params->pagination->rows);
+                //mdump('offset = ' . $offset);
                 $criteria->range($page, $params->pagination->rows);
             }
             if (!empty($params->pagination->sort)) {
@@ -432,36 +456,12 @@ class Model
                 );
             }
         }
-        return $model->filter($params->filter, $criteria);
-    }
-
-    public function filter(array|null $filters, Criteria|null $criteria = null): Criteria
-    {
-        $criteria = $criteria ?? $this->getCriteria();
-        if (!empty($filters)) {
-            $filters = is_string($filters[0]) ? [$filters] : $filters;
-            foreach ($filters as [$field, $op, $value]) {
-                $criteria->where($field, $op, $value);
-            }
-        }
-        return $criteria;
+        return static::filter($params->filter, $criteria);
     }
 
     public static function exists(array $conditions): bool
     {
-        $modelClass = get_called_class();
-        $model = new $modelClass();
-        return !is_null($model->one($conditions));
-    }
-
-    public function one($conditions, array $select = []): object|null
-    {
-        $criteria = $this->getCriteria()->range(1, 1);
-        if (!empty($select)) {
-            $criteria->select($select);
-        }
-        $result = $this->filter($conditions, $criteria)->get()->toArray();
-        return empty($result) ? null : (object)$result[0];
+        return !is_null(static::one($conditions));
     }
 
     public static function replaceAssociation(string $associationName, mixed $id, array $associatedIds): void
@@ -514,9 +514,7 @@ class Model
         ],
             $associatedIds
         );
-        $modelClass = get_called_class();
-        $model = new $modelClass();
-        $model->getCriteria()
+        static::getCriteria()
             ->setClassMap(self::$classMaps["{$association->fromClassName}_$association->associativeTable"])
             ->upsert($columns, [$association->toKey, $association->fromKey]);
     }
@@ -538,21 +536,5 @@ class Model
     {
         $rc = new \ReflectionClass(get_called_class());
         return $rc->getFileName();
-    }
-
-    public function list(object|array|null $filter = null, array $select = [], array|string $order = ''): array
-    {
-        $criteria = $this->getCriteria();
-        if (!empty($select)) {
-            $criteria->select($select);
-        }
-        $criteria->filter($filter);
-        $criteria->order($order);
-        return $criteria->get()->toArray();
-    }
-
-    public function find(int $id): object|array|null
-    {
-        return $this->getCriteria()->find($id);
     }
 }
