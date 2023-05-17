@@ -4,7 +4,7 @@ namespace Orkester\JsonApi;
 
 use JetBrains\PhpStorm\ArrayShape;
 use Orkester\Exception\EOrkesterException;
-use Orkester\Exception\EValidationException;
+use Orkester\Exception\ValidationException;
 use Orkester\Manager;
 use Orkester\Controllers\MController;
 use Slim\Psr7\Request;
@@ -46,7 +46,7 @@ class JsonApi extends MController
                 ($middleware . '::beforeRequest')($request, $args);
             }
             [0 => $content, 1 => $code] = $this->handleService($request, $response, $args);
-        } catch (EValidationException $e) {
+        } catch (ValidationException $e) {
             $code = 409; //Conflict
             $es = [];
             foreach ($e->errors as $key => $value) {

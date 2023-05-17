@@ -82,7 +82,7 @@ class Manager
         $appDir = empty($optAddDir) ? 'app' : $optAddDir;
         self::$appPath = $basePath . "/$appDir";
 
-        self::$classPath = $basePath . '/vendor/elymatos/orkester';
+        self::$classPath = $basePath . '/vendor/elymatos/Orkester';
 
         self::$mode = self::getOptions("mode");
         $tmpPath = self::getOptions('tmpPath');

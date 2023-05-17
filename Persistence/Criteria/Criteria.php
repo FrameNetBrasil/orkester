@@ -18,16 +18,11 @@ use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
 use Orkester\Persistence\PersistenceManager;
 
-class Criteria extends Builder
+class Criteria extends CriteriaBuilder
 {
     /** @var Connection */
     public $connection;
     public string|Model $model;
-    /**
-     * @var ClassMap[] $maps
-     */
-    private array $maps;
-    protected Logger $logger;
     public ClassMap $classMap;
     public $fieldAlias = [];
     public $tableAlias = [];
@@ -38,16 +33,19 @@ class Criteria extends Builder
     public $associationJoin = [];
     public $aliasCount = 0;
     public $parameters = [];
+    /**
+     * @var ClassMap[] $maps
+     */
+    private array $maps;
 
     public function __construct(ConnectionInterface $connection, Logger $logger)
     {
-        $grammar = match(get_class($connection->getQueryGrammar())) {
+        $grammar = match (get_class($connection->getQueryGrammar())) {
             \Illuminate\Database\Query\Grammars\MySqlGrammar::class => new MySqlGrammar($this),
             \Illuminate\Database\Query\Grammars\SQLiteGrammar::class => new SQLiteGrammar($this),
             default => throw new \InvalidArgumentException("Unknown database grammar")
         };
-        parent::__construct($connection, $grammar);
-        $this->logger = $logger;
+        parent::__construct($logger, $connection, $grammar);
         $this->generatedAliases = new Set();
     }
 
@@ -61,6 +59,35 @@ class Criteria extends Builder
         return $this;
     }
 
+    public function tableName(string $className = '')
+    {
+        if ($className != '') {
+            $this->registerClass($className);
+            $tableName = $this->maps[$className]->tableName;
+        } else {
+            $tableName = $this->maps[$this->model]->tableName;
+        }
+        return $tableName;
+    }
+
+    protected function registerClass($className)
+    {
+        if (!isset($this->maps[$className])) {
+            $this->addMapFor($className);
+        }
+    }
+
+    public function addMapFor(string $className)
+    {
+        $classMap = PersistenceManager::getClassMap($className);
+        $this->maps[$className] = $classMap;
+    }
+
+    public function getModel()
+    {
+        return $this->model;
+    }
+
     public function setModel(string $model)
     {
         $this->classMap = Model::getClassMap($model);
@@ -71,38 +98,9 @@ class Criteria extends Builder
         return $this;
     }
 
-    public function getModel()
-    {
-        return $this->model;
-    }
-
     public function newQuery()
     {
         return (new static($this->connection, $this->logger))->setModel($this->model);
-    }
-
-    public function addMapFor(string $className)
-    {
-        $classMap = PersistenceManager::getClassMap($className);
-        $this->maps[$className] = $classMap;
-    }
-
-    protected function registerClass($className)
-    {
-        if (!isset($this->maps[$className])) {
-            $this->addMapFor($className);
-        }
-    }
-
-    public function tableName(string $className = '')
-    {
-        if ($className != '') {
-            $this->registerClass($className);
-            $tableName = $this->maps[$className]->tableName;
-        } else {
-            $tableName = $this->maps[$this->model]->tableName;
-        }
-        return $tableName;
     }
 
     public function columnName(string $className, string $attribute)
@@ -142,30 +140,16 @@ class Criteria extends Builder
         return $this;
     }
 
-    public function alias($alias, string|Criteria $className = '')
+    public function filter(array|null $filters)
     {
-        if (is_string($className)) {
-            $this->classAlias[$alias] = $className;
-            $this->tableAlias[$alias] = $this->tableName($className);
-        } else if ($className instanceof Criteria) {
-            $this->criteriaAlias[$alias] = $className;
+        if (!empty($filters)) {
+            $filters = is_string($filters[0]) ? [$filters] : $filters;
+            foreach ($filters as [$field, $op, $value]) {
+                if (!is_null($value)) {
+                    $this->where($field, $op, $value);
+                }
+            }
         }
-        if ($className == '') {
-            $this->from($this->tableName($className), $alias);
-        }
-        return $this;
-    }
-
-    public function select($columns = ['*'])
-    {
-        $allColumns = ((is_array($columns) && ($columns[0] == '*')) || ((is_string($columns) && ($columns == '*'))));
-        if ($allColumns) {
-            $attributes = $this->maps[$this->model]->getAttributeMaps();
-            parent::select(array_keys($attributes));
-        } else {
-            parent::select($columns);
-        }
-        return $this;
     }
 
     public function where($attribute, $operator = null, $value = null, $boolean = 'and')
@@ -210,18 +194,6 @@ class Criteria extends Builder
         return $this;
     }
 
-    public function filter(array|null $filters)
-    {
-        if (!empty($filters)) {
-            $filters = is_string($filters[0]) ? [$filters] : $filters;
-            foreach ($filters as [$field, $op, $value]) {
-                if (!is_null($value)) {
-                    $this->where($field, $op, $value);
-                }
-            }
-        }
-    }
-
     public function order(array|string|null $orders)
     {
         if (!empty($orders)) {
@@ -245,6 +217,20 @@ class Criteria extends Builder
         return $this;
     }
 
+    public function alias($alias, string|Criteria $className = '')
+    {
+        if (is_string($className)) {
+            $this->classAlias[$alias] = $className;
+            $this->tableAlias[$alias] = $this->tableName($className);
+        } else if ($className instanceof Criteria) {
+            $this->criteriaAlias[$alias] = $className;
+        }
+        if ($className == '') {
+            $this->from($this->tableName($className), $alias);
+        }
+        return $this;
+    }
+
     public function joinSub($query, $as, $first, $operator = null, $second = null, $type = 'inner', $where = false)
     {
         $this->criteriaAlias[$as] = $query;
@@ -263,11 +249,6 @@ class Criteria extends Builder
         $this->parameters[$name] = null;
     }
 
-    public function setParameter(string $name, $value)
-    {
-        $this->parameters[$name] = $value;
-    }
-
     public function parameters(array $parameters)
     {
         foreach ($parameters as $p => $v) {
@@ -276,14 +257,14 @@ class Criteria extends Builder
         return $this;
     }
 
-    public function update(array $values)
+    public function setParameter(string $name, $value)
     {
-        parent::update(Arr::only($values, array_keys($this->classMap->insertAttributeMaps)));
+        $this->parameters[$name] = $value;
     }
 
-    public function getResult()
+    public function update(array $values, ?array $returning = null): \Illuminate\Support\Collection
     {
-        return $this->get();
+        return parent::update(Arr::only($values, array_keys($this->classMap->insertAttributeMaps)), $returning);
     }
 
     public function chunkResult(string $fieldKey = '', string $fieldValue = '')
@@ -300,6 +281,11 @@ class Criteria extends Builder
             }
         }
         return $newResult;
+    }
+
+    public function getResult()
+    {
+        return $this->get();
     }
 
     public function treeResult(string $group, string $node)
@@ -324,9 +310,22 @@ class Criteria extends Builder
         return $tree;
     }
 
-    public function plainSQL(string $command, array $params = []) {
+    public function plainSQL(string $command, array $params = [])
+    {
         $databaseName ??= \Orkester\Manager::getOptions('db');
         return $this->getConnection($databaseName)->select($command, $params);
+    }
+
+    public function select($columns = ['*'])
+    {
+        $allColumns = ((is_array($columns) && ($columns[0] == '*')) || ((is_string($columns) && ($columns == '*'))));
+        if ($allColumns) {
+            $attributes = $this->maps[$this->model]->getAttributeMaps();
+            parent::select(array_keys($attributes));
+        } else {
+            parent::select($columns);
+        }
+        return $this;
     }
 
 }

@@ -2,7 +2,7 @@
 
 namespace Orkester\Authorization;
 
-use Orkester\Exception\EValidationException;
+use Orkester\Exception\ValidationException;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
@@ -75,7 +75,7 @@ class MAuthorizedModel
     }
 
     /**
-     * @throws EValidationException
+     * @throws ValidationException
      */
     public function insert(object $object): int
     {

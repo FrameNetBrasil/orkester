@@ -78,14 +78,14 @@ function array_pop_key(mixed $key, array &$array)
     return $value;
 }
 
-function group_by(array $data, $key, SelectionSet $selectionSet): array
+function group_by(array|\Illuminate\Support\Collection $data, $key): array
 {
-    return array_reduce($data, function (array $accumulator, array $element) use ($selectionSet, $key) {
+    $accumulator = [];
+    foreach($data as $element) {
         $groupKey = $element[$key];
-        $cols = array_filter($element, fn($k) => is_array($element[$k]) || $selectionSet->isSelected($k), ARRAY_FILTER_USE_KEY);
-        $accumulator[$groupKey][] = $cols;// $element;
-        return $accumulator;
-    }, []);
+        $accumulator[$groupKey][] = $element;
+    }
+    return $accumulator;
 }
 
 function method(string $class, string $method): string

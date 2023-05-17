@@ -2,55 +2,57 @@
 
 namespace Orkester\GraphQL\Operation;
 
-use Orkester\GraphQL\Operation\HelperOperation;
-use JsonSerializable;
-use Orkester\GraphQL\Result;
-use Orkester\GraphQL\Value\GraphQLValue;
-use Orkester\Persistence\Criteria\Criteria;
-use Orkester\Persistence\Model;
+use GraphQL\Language\AST\ArgumentNode;
+use GraphQL\Language\AST\FieldNode;
+use GraphQL\Language\AST\NodeList;
+use Illuminate\Support\Arr;
+use Orkester\GraphQL\Context;
+use Orkester\Security\Privilege;
 
-class UpsertOperation implements JsonSerializable
+class UpsertOperation extends AbstractWriteOperation
 {
-    public function __construct(
-        protected string         $name,
-        protected ?string        $alias,
-        protected string|Model   $model,
-        protected QueryOperation $query,
-        protected GraphQLValue   $object,
-        protected ?GraphQLValue  $unique
-    )
+    protected array $uniqueBy = [];
+    protected ?array $updateColumns = null;
+
+    public function __construct(FieldNode $root, Context $context)
     {
+        $model = $context->getModel($root->name->value);
+        parent::__construct($root, $context, $model);
     }
 
-    public function execute(Result $result)
+    public function getResults()
     {
-        $objects = HelperOperation::mapObjects($this->object, $result);
-        $uniqueBy = is_null($this->unique) ? null : ($this->unique)($result);
-        $this->model::getCriteria()->upsert($objects, $uniqueBy);
-        $criteria = $this->model::getCriteria();
-        foreach ($objects as $value) {
-            $criteria->orWhere(
-                function (Criteria $c) use ($uniqueBy, $value) {
-                    $c->setModel($this->model);
-                    foreach ($uniqueBy ?? [] as $uq) {
-                        $c->where($uq, '=', $value[$uq]);
-                    }
-                    return $c;
-                }
-            );
+        if (!$this->acl->isGrantedPrivilege($this->model, Privilege::INSERT))
+            return null;
+
+        $ids = [];
+        $objects = $this->readArguments($this->root->arguments);
+        foreach ($objects as $object) {
+            $attributes = $object['attributes'];
+            $this->writeAssociationsBefore($object['associations']['before'], $attributes);
+            $id = $this->upsert($this->model, $attributes, $this->uniqueBy, $this->updateColumns);
+            $this->writeAssociationsAfter($object['associations']['after'], $id);
+            $ids[] = $id;
         }
-        $rows = $this->query->executeFrom($criteria, $result);
-        $result->addResult($this->name, $this->alias, $rows);
+        return $this->executeQueryOperation($ids);
     }
 
-    public function jsonSerialize(): array
+    protected function readArguments(NodeList $arguments): array
     {
-        return [
-            "name" => $this->name,
-            "alias" => $this->alias,
-            "type" => "mutation",
-            "model" => $this->model::getName(),
-            "object" => $this->object->jsonSerialize(),
-        ];
+        /** @var ArgumentNode $argument */
+        foreach ($arguments->getIterator() as $argument) {
+            $value = $this->context->getNodeValue($argument->value);
+            if ($argument->name->value == "object") {
+                $rawObjects = [$value];
+                $this->isSingle = true;
+            } else if ($argument->name->value == "objects") {
+                $rawObjects = $value;
+            } else if ($argument->name->value == "uniqueBy") {
+                $this->uniqueBy = $value;
+            } else if ($argument->name->value == "updateColumns") {
+                $this->updateColumns = $value;
+            }
+        }
+        return Arr::map($rawObjects ?? [], fn($o) => $this->readRawObject($o));
     }
 }

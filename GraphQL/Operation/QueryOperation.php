@@ -2,165 +2,202 @@
 
 namespace Orkester\GraphQL\Operation;
 
+use GraphQL\Language\AST\ArgumentNode;
+use GraphQL\Language\AST\FieldNode;
+use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
-use Orkester\Exception\EGraphQLException;
-use Orkester\GraphQL\Argument\JoinArgument;
-use Orkester\GraphQL\Set\OperatorSet;
-use Orkester\GraphQL\Set\SelectionSet;
-use Orkester\GraphQL\Result;
+use Orkester\GraphQL\Argument\ConditionArgument;
+use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
-use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Model;
+use Orkester\Security\Acl;
 
-class QueryOperation implements \JsonSerializable
+class QueryOperation extends AbstractOperation
 {
+    public Criteria $criteria;
+    protected Acl $acl;
+    protected string $name;
+    protected string $pluck = "";
+    protected array $selection = [];
+    protected array $forcedSelection = [];
+    /**
+     * @var string[]
+     */
+    protected Model|string $model;
+    protected array $subQueries = [];
 
-    public function __construct(
-        protected string       $name,
-        protected Model|string $model,
-        protected SelectionSet $selectionSet,
-        protected OperatorSet  $operatorSet,
-        protected ?string      $alias = null,
-
-    )
+    public function __construct(protected FieldNode $root, Context $context, Model|string $model = null)
     {
+        parent::__construct($root, $context);
+        $this->model = $model ?? $this->context->getModel($root->name->value);
+        $this->criteria = $this->acl->getCriteria($this->model);
     }
 
-    public function getName(): string
+    public function getCriteria(): Criteria
     {
-        return $this->alias ?? $this->name;
+        return $this->criteria;
     }
 
-    public static function setupForSubQuery(Criteria $criteria)
+    public static function parse(FieldNode $root, Context $context): QueryOperation
     {
-        $criteria->limit = null;
-        $criteria->offset = null;
-        $criteria->columns = [];
+        return new QueryOperation($root, $context);
     }
 
-    protected function applyJoinConditions(Criteria $criteria, AssociationMap $associationMap, Model|string $referenceModel)
+    public function getResults(): ?array
     {
-        $criteria->setModel($referenceModel);
-        $criteria->where(function ($sub) use ($associationMap, $referenceModel) {
-//            $sub->setModel($referenceModel);
-            foreach ($associationMap->conditions ?? [] as $condition) {
-                $sub->where(...$condition);
+        $rows = $this->getRawResults();
+        $result = $this->cleanResults($rows);
+        return $this->isSingle ? (empty($result) ? null : $result[0]) : $result;
+    }
+
+    protected function getRawResults(): array
+    {
+        if (is_null($this->root->selectionSet)) return [];
+
+        $this->applySelection($this->root->selectionSet->selections);
+
+        if (empty($this->selection)) return [];
+
+        $this->applyArguments($this->root->arguments);
+
+        $select = array_merge(array_filter(array_values($this->selection), fn($s) => $s), $this->forcedSelection);
+        $rows = $this->criteria->get($select);
+        $subResults = $this->getSubQueriesResults($rows);
+        if (empty($subResults)) return $rows->toArray();
+
+        return $rows->map(function ($row) use ($subResults) {
+            foreach ($subResults as $association => ['operation' => $operation,
+                     'rows' => $associatedRows,
+                     'key' => $key,
+                     'one' => $one]) {
+                $value = $operation->cleanResults($associatedRows[$row[$key] ?? ''] ?? []);
+                $value = ($one || $operation->isSingle) ? ($value[0] ?? null) : $value;
+                $row[$association] = $value;
             }
-        });
+            return $row;
+        })->toArray();
     }
 
-    protected function getFinalValue(array $row, Result $result): array
+    public function applySelection(NodeList $selections)
     {
-        return $this->operatorSet->pluckArgument ?
-            Arr::pluck($row, ($this->operatorSet->pluckArgument->value)($result)) :
-            $row;
-    }
-
-    protected function executeAssociatedQueries(Criteria $criteria, array &$rows, Result $result)
-    {
-        foreach ($this->selectionSet->getAssociatedQueries() as $associatedQuery) {
-            $associationMap = $associatedQuery->getAssociationMap();
-            $fromClassMap = $associationMap->fromClassMap;
-            $fromKey = $associationMap->fromKey;
-            //$fromIds = array_map(fn($row) => $row[$fromClassMap->keyAttributeName], $rows);
-            //ver como seria funcional para manter as chaves unicas
-            //$fromIds = array_map(fn($row) => $row[$fromKey], $rows);
-            $fromIds = [];
-            foreach ($rows as $row) {
-                $id = $row[$fromKey];
-                $fromIds[$id] = $id;
+        $attributes = $this->model::getClassMap()->getAttributesNames();
+        $associations = $this->model::getClassMap()->getAssociationsNames();
+        /** @var FieldNode $selectionNode */
+        foreach ($selections->getIterator() as $selectionNode) {
+            $field = $selectionNode->name->value;
+            $alias = $selectionNode->alias?->value;
+            $name = $this->getNodeName($selectionNode);
+            if ($selectionNode->arguments->count() > 0 &&
+                ($argument = $selectionNode->arguments->offsetGet(0))?->name->value == "expression") {
+                $expression = $this->context->getNodeValue($argument->value);
+                $this->selection[$field] = "$expression as $field";
+                return;
             }
-            $toKey = $associationMap->toKey;
-            $toClassMap = $associationMap->toClassMap;
-            $associatedCriteria = $toClassMap->getCriteria();
-            //$this->applyJoinConditions($associatedCriteria, $associationMap, $fromClassMap->model);
-            $cardinality = $associationMap->cardinality;
-            //$groupKey = $fromKey;
+            if ($field == "__typename") {
+                $this->selection["__typename"] = "'{$this->model::getName()}' as __typename";
+            }
+            if ($this->acl->isGrantedRead($this->model, $field)) {
+                if (in_array($field, $associations)) {
+                    $map = $this->model::getClassMap()->getAssociationMap($field);
+                    $this->selection[$name] = '';
+                    $this->forcedSelection[] = $map->fromKey;
+                    $this->subQueries[$this->getNodeName($selectionNode)] = [
+                        'operation' => new QueryOperation($selectionNode, $this->context, $map->toClassMap->model),
+                        'map' => $map,
+                        'name' => $this->getNodeName($selectionNode)
+                    ];
+                } else if (in_array($field, $attributes)) {
+                    $this->selection[$name] = $field . ($alias ? " as $alias" : "");
+                } else if ($field == "id") {
+                    $this->selection["id"] = "{$this->model::getKeyAttributeName()} as id";
+                }
+            }
+        }
+    }
+
+    protected function applyArguments(NodeList $arguments)
+    {
+        /** @var ArgumentNode $node */
+        foreach ($arguments->getIterator() as $node) {
+            $name = $node->name->value;
+            $value = $this->context->getNodeValue($node->value);
+            if (is_null($value)) continue;
+            if ($name == "where") {
+                ConditionArgument::applyArgumentWhere($this->context, $this->criteria, $value);
+            } else if ($name == "id") {
+                $this->isSingle = true;
+                $this->criteria->where($this->criteria->classMap->keyAttributeName, '=', $value);
+            } else if ($name == "single") {
+                $this->isSingle = boolval($value);
+            } else if ($name == "limit") {
+                $this->criteria->limit = $value;
+            } else if ($name == "offset") {
+                $this->criteria->offset = $value;
+            } else if ($name == "group" && is_array($value)) {
+                $this->criteria->groups = $value;
+            } else if ($name == "order" && is_array($value)) {
+                foreach ($value as $order)
+                    foreach ($order as $direction => $column)
+                        $this->criteria->orderBy($column, $direction);
+            } else if ($name == "pluck") {
+                $this->pluck = $value;
+            }
+        }
+    }
+
+    protected function getSubQueriesResults(\Illuminate\Support\Collection $parentRows): array
+    {
+        $associatedResults = [];
+        /**
+         * @var $operation QueryOperation
+         * @var $map AssociationMap
+         * @var $name string
+         */
+        foreach ($this->subQueries as ['operation' => $operation,
+                 'map' => $map,
+                 'name' => $name]) {
+            $fromIds = $parentRows->pluck($map->fromKey)->unique();
+            $toKey = $map->toKey;
+            $toClassMap = $map->toClassMap;
+            $fromKey = $map->fromKey;
+            $fromClassMap = $map->fromClassMap;
+            $associatedCriteria = $operation->getCriteria();
             $groupKey = $toKey;
-            if ($cardinality == Association::ONE) {
-//                $whereField = '_gql' . "." . $fromClassMap->keyAttributeName;
-                //$whereField = '_gql' . "." . $fromKey;
-                //$associatedCriteria->joinClass($fromClassMap->model, '_gql', $toKey, '=', '_gql' . '.' . $fromKey);
-                //$associatedCriteria->where($whereField, 'IN', $fromIds);
-                $associatedCriteria->where($toKey, 'IN', $fromIds);
-//                $associatedCriteria->select($fromKey);
-                $associatedCriteria->select($toKey);
+            if ($map->cardinality == Association::ONE) {
                 $associatedCriteria->distinct(true);
-            } else if ($cardinality == Association::MANY) {
-//                $associatedCriteria->where($fromKey, 'IN', $fromIds);
-//                $associatedCriteria->select($fromKey);
                 $associatedCriteria->where($toKey, 'IN', $fromIds);
-                $associatedCriteria->select($toKey);
-            } else if ($cardinality == Association::ASSOCIATIVE) {
-                $model = $toClassMap->model;
-                $model::associationMany('_gql', model: $fromClassMap->model, associativeTable: $associationMap->associativeTable);
-                $associatedCriteria->select('_gql' . '.' . $fromKey);
-//                $associatedCriteria->select('_gql' . '.' . $toKey);
-                $associatedCriteria->where('_gql' . '.' . $fromKey, 'IN', $fromIds);
-                $groupKey = $associationMap->fromClassMap->keyAttributeMap->columnName;
-            } else {
-                throw new EGraphQLException([$cardinality->value => 'Unhandled cardinality']);
+                $operation->forcedSelection[] = $toKey;
+            } else if ($map->cardinality == Association::MANY) {
+                $associatedCriteria->where($toKey, 'IN', $fromIds);
+                $operation->forcedSelection[] = $toKey;
+            } else if ($map->cardinality == Association::ASSOCIATIVE) {
+                $toClassMap->model::associationMany('_gql', model: $fromClassMap->model, associativeTable: $map->associativeTable);
+                $operation->forcedSelection[] = "_gql.$fromKey";
+                $associatedCriteria->where("_gql.$fromKey", "IN", $fromIds);
+                $groupKey = $fromClassMap->keyAttributeMap->columnName;
             }
-            $queryResult = $associatedQuery->getOperation()->executeFrom($associatedCriteria, $result, false);
-            $subRows = group_by($queryResult, $groupKey, $associatedQuery->getOperation()->selectionSet);
-            $associatedName = $associatedQuery->getName();
-            foreach ($rows as $index => $row) {
-                $value = $subRows[$row[$fromKey] ?? ''] ?? [];
-                if ($cardinality == Association::ONE) {
-                    $value = $value[0] ?? [];
-                }
-                $rows[$index][$associatedName] = $associatedQuery->getOperation()->getFinalValue($value, $result);
-            }
+
+            $rows = group_by($operation->getRawResults(), $groupKey);
+            $associatedResults[$name] = [
+                'operation' => $operation,
+                'rows' => $rows,
+                'key' => $fromKey,
+                'one' => $map->cardinality == Association::ONE
+            ];
         }
+        return $associatedResults;
     }
 
-    public function clearForcedSelection(array &$rows)
+    protected function cleanResults(array $rows): array
     {
-        if (!empty($this->selectionSet->forcedSelection)) {
-            foreach ($rows as &$row) {
-                foreach ($this->selectionSet->forcedSelection as $key) {
-                    if (!$this->selectionSet->isSelected($key)) {
-                        unset($row[$key]);
-                    }
-                }
-            }
+        if ($this->pluck)
+            return Arr::pluck($rows, $this->pluck);
+        if (!empty($this->forcedSelection)) {
+            $keys = array_keys($this->selection);
+            return Arr::map($rows, fn($row) => Arr::only($row, $keys));
         }
-    }
-
-    public function executeFrom(Criteria $criteria, Result $result, bool $addToResult = true): array
-    {
-        if (empty($this->selectionSet->fields())) return [];
-        $this->selectionSet->apply($criteria);
-        $this->operatorSet->apply($criteria, $result);
-        $rows = $criteria->get()->toArray();
-        $this->executeAssociatedQueries($criteria, $rows, $result);
-        if ($addToResult) {
-            $result->addCriteria($this->getName(), $criteria);
-        }
-        $this->clearForcedSelection($rows);
         return $rows;
-    }
-
-    public function execute(Result $result)
-    {
-        $criteria = $this->model::getCriteria();
-        $rows = $this->getFinalValue($this->executeFrom($criteria, $result), $result);
-        $this->selectionSet->format($rows);
-        $this::setupForSubQuery($criteria);
-        $result->addResult($this->name, $this->alias, $rows);
-    }
-
-    public function jsonSerialize(): mixed
-    {
-        return [
-            "name" => $this->name,
-            "alias" => $this->alias,
-            "type" => "query",
-            "model" => $this->model::getName(),
-            "selection" => $this->selectionSet->jsonSerialize(),
-            "operators" => $this->operatorSet->jsonSerialize()
-        ];
     }
 }

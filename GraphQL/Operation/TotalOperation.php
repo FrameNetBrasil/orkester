@@ -2,32 +2,42 @@
 
 namespace Orkester\GraphQL\Operation;
 
-use Orkester\GraphQL\Result;
-use Orkester\GraphQL\Value\GraphQLValue;
+use GraphQL\Language\AST\FieldNode;
+use Illuminate\Support\Arr;
+use Orkester\GraphQL\Context;
 
-class TotalOperation implements \JsonSerializable
+class TotalOperation extends AbstractOperation
 {
 
+    protected string $queryName;
+    protected QueryOperation $operation;
+
     public function __construct(
-        protected GraphQLValue $operation,
-        protected ?string       $alias
+        FieldNode $root,
+        Context   $context
     )
     {
+        parent::__construct($root, $context);
+        $arg = Arr::first($root->arguments, fn($arg) => $arg->name->value == "query");
+        $this->queryName = $this->context->getNodeValue($arg->value);
     }
 
-    public function execute(Result $result)
+    public function getQueryName(): string
     {
-        $criteria = $result->getCriteria(($this->operation)($result));
-        $criteria->select('id');
-        $result->addResult('__total', $this->alias, $criteria->count());
+        return $this->queryName;
     }
 
-    public function jsonSerialize(): mixed
+    public function setQueryOperation(QueryOperation $operation)
     {
-        return [
-            'name' => '__total',
-            'alias' => $this->alias,
-            'operation' => $this->operation->jsonSerialize()
-        ];
+        $this->operation = $operation;
     }
+
+    public function getResults(): int
+    {
+        $criteria = $this->operation->getCriteria()->newQuery();
+        $criteria->limit = null;
+        $criteria->offset = null;
+        return $criteria->count();
+    }
+
 }
