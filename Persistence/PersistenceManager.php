@@ -273,14 +273,14 @@ class PersistenceManager
         return static::$properties;
     }
 
-    public static function getCriteria(string $databaseName = null): Criteria
+    public static function getCriteria(string $databaseName = null, string|Model $model = null): Criteria
     {
         $databaseName ??= Manager::getOptions('db');
         $connection = self::$capsule->getConnection($databaseName);
         $connection->enableQueryLog();
         (new \ReflectionClass(get_class($connection)))
             ->getProperty('fetchMode')->setValue($connection, self::$fetchStyle);
-        $classMap = self::getClassMap(get_called_class());
+        $classMap = self::getClassMap($model);
         $container = Manager::getContainer();
         return $container->call(
             function (Logger $logger) use ($connection, $classMap) {
@@ -400,16 +400,19 @@ class PersistenceManager
 
     public static function beginTransaction(?string $databaseName = null)
     {
+        minfo("BEGIN TRANSACTION");
         static::getConnection($databaseName)->beginTransaction();
     }
 
     public static function commit(?string $databaseName = null)
     {
+        minfo("COMMIT");
         static::getConnection($databaseName)->commit();
     }
 
     public static function rollback(?string $databaseName = null)
     {
+        minfo("ROLLBACK");
         static::getConnection($databaseName)->rollBack();
     }
 

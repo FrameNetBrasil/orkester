@@ -2,49 +2,55 @@
 
 namespace Orkester\GraphQL\Operation;
 
-use Orkester\GraphQL\Operation\HelperOperation;
-use Orkester\Exception\EGraphQLValidationException;
-use Orkester\Exception\EValidationException;
-use Orkester\GraphQL\Result;
-use Orkester\GraphQL\Value\GraphQLValue;
-use Orkester\Persistence\Model;
+use GraphQL\Language\AST\ArgumentNode;
+use GraphQL\Language\AST\FieldNode;
+use GraphQL\Language\AST\NodeList;
+use Illuminate\Support\Arr;
+use Orkester\GraphQL\Context;
+use Orkester\Security\Privilege;
 
-class InsertOperation implements \JsonSerializable
+class InsertOperation extends AbstractWriteOperation
 {
-    public function __construct(
-        protected string         $name,
-        protected ?string        $alias,
-        protected Model|string   $model,
-        protected QueryOperation $query,
-        protected GraphQLValue   $object,
-    )
+
+    public function __construct(FieldNode $root, Context $context)
     {
+        $model = $context->getModel($root->name->value);
+        parent::__construct($root, $context, $model);
+        $this->readArguments($root->arguments);
     }
 
-    public function execute(Result $result)
+    protected function readArguments(NodeList $arguments): array
     {
-        $objects = HelperOperation::mapObjects($this->object, $result);
-        try {
-            $ids = [];
-            foreach ($objects as $object) {
-                $ids[] = $this->model::insert((object)$object);
+        /** @var ArgumentNode $argument */
+        foreach ($arguments->getIterator() as $argument) {
+            $value = $this->context->getNodeValue($argument->value);
+            if ($argument->name->value == "object") {
+                $rawObjects = [$value];
+                $this->isSingle = true;
+            } else if ($argument->name->value == "objects") {
+                $rawObjects = $value;
             }
-            $criteria = $this->model::getCriteria()->where($this->model::getKeyAttributeName(), 'IN', $ids);
-            $rows = $this->query->executeFrom($criteria, $result);
-            $result->addResult($this->name, $this->alias, $rows);
-        } catch (EValidationException $e) {
-            throw new EGraphQLValidationException($e->errors);
         }
+        return Arr::map($rawObjects ?? [], fn($o) => $this->readRawObject($o));
     }
 
-    public function jsonSerialize(): mixed
+    public function getResults()
     {
-        return [
-            "name" => $this->name,
-            "alias" => $this->alias,
-            "type" => "mutation",
-            "model" => $this->model::getName(),
-            "object" => $this->object->jsonSerialize(),
-        ];
+        if (!$this->acl->isGrantedPrivilege($this->model, Privilege::INSERT))
+            return null;
+        $objects = $this->readArguments($this->root->arguments);
+        $ids = [];
+
+        $validAttributes = $this->model::getClassMap()->getInsertAttributeNames();
+        foreach ($objects as $object) {
+            $data = $object['attributes'];
+            $this->writeAssociationsBefore($object['associations']['before'], $data);
+            $id = $this->insert($this->model, $data);
+            $this->writeAssociationsAfter($object['associations']['after'], $id);
+            $ids[] = $id;
+        }
+        return $this->executeQueryOperation($ids);
     }
+
+
 }

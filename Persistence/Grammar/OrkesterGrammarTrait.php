@@ -64,7 +64,7 @@ trait OrkesterGrammarTrait
                 $parts = explode('.', $resolved);
                 $column = count($parts) > 1 ? $parts[1] : $parts[0];
                 $column = $column == '*' ? '*' : "`$column`";
-                $result = count($parts) > 1 && $this->appendTablePrefix ?
+                $result = count($parts) > 1 && (!empty($this->context)) ?
                     "`$parts[0]`.$column" :
                     "$column";
             }
@@ -173,49 +173,49 @@ trait OrkesterGrammarTrait
         return $result;
     }
 
-    public function logSql(string $query, $values): string
-    {
-        if (!$this->isLogging) return $query;
-        $sql = $query;
-        $bindings = Arr::flatten($values, 1);
-        foreach ($bindings as $binding) {
-            $sql = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('\'%s\'', $binding)), $sql);
-        }
-        $this->logger->info($sql);
-        return $query;
-    }
-
-    public function compileSelect(Builder $query): string
-    {
-        $this->appendTablePrefix = true;
-        return $this->logSql(parent::compileSelect($query), $this->criteria->getBindings());
-    }
-
-    public function compileUpdate(Builder $query, array $values): string
-    {
-        $this->appendTablePrefix = false;
-        return $this->logSql(parent::compileUpdate($query, $values), $values);
-    }
-
-    public function compileDelete(Builder $query): string
-    {
-        $this->appendTablePrefix = false;
-        return $this->logSql(parent::compileDelete($query), $this->criteria->getBindings());
-    }
-
-    public function compileUpsert(Builder $query, array $values, array $uniqueBy, array $update): string
-    {
-        $this->appendTablePrefix = false;
-        $wasLogging = $this->isLogging;
-        $this->isLogging = false;
-        $sql = parent::compileUpsert($query, $values, $uniqueBy, $update);
-        $this->isLogging = $wasLogging;
-        return $this->logSql($sql, $values);
-    }
-
-    public function compileInsert(Builder $query, array $values): string
-    {
-        $this->appendTablePrefix = false;
-        return $this->logSql(parent::compileInsert($query, $values), $values);
-    }
+//    public function logSql(string $query, $values): string
+//    {
+//        if (!$this->isLogging) return $query;
+//        $sql = $query;
+//        $bindings = Arr::flatten($values, 1);
+//        foreach ($bindings as $binding) {
+//            $sql = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('\'%s\'', $binding)), $sql);
+//        }
+//        $this->logger->info($sql);
+//        return $query;
+//    }
+//
+//    public function compileSelect(Builder $query): string
+//    {
+//        $this->appendTablePrefix = true;
+//        return $this->logSql(parent::compileSelect($query), $this->criteria->getBindings());
+//    }
+//
+//    public function compileUpdate(Builder $query, array $values): string
+//    {
+//        $this->appendTablePrefix = false;
+//        return $this->logSql(parent::compileUpdate($query, $values), $values);
+//    }
+//
+//    public function compileDelete(Builder $query): string
+//    {
+//        $this->appendTablePrefix = false;
+//        return $this->logSql(parent::compileDelete($query), $this->criteria->getBindings());
+//    }
+//
+//    public function compileUpsert(Builder $query, array $values, array $uniqueBy, array $update): string
+//    {
+//        $this->appendTablePrefix = false;
+//        $wasLogging = $this->isLogging;
+//        $this->isLogging = false;
+//        $sql = parent::compileUpsert($query, $values, $uniqueBy, $update);
+//        $this->isLogging = $wasLogging;
+//        return $this->logSql($sql, $values);
+//    }
+//
+//    public function compileInsert(Builder $query, array $values): string
+//    {
+//        $this->appendTablePrefix = false;
+//        return $this->logSql(parent::compileInsert($query, $values), $values) ;
+//    }
 }

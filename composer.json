@@ -23,7 +23,7 @@
         "php-di/php-di": "6.4",
         "monolog/monolog": "^2.3",
         "aura/session": "^2.1",
-        "ramsey/uuid": "^4.2",
+        "ramsey/uuid": "^4.7",
         "php-ds/php-ds": "^1.4",
         "phpfastcache/phpfastcache": "^9",
         "composer/composer": "^2.2",

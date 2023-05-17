@@ -10,14 +10,12 @@ use Orkester\Exception\EGraphQLException;
 use Orkester\GraphQL\Argument\ConditionArgument;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
-use Orkester\Persistence\Model;
 use Orkester\Security\Privilege;
 
-class UpdateOperation extends AbstractWriteOperation
+class DeleteOperation extends AbstractWriteOperation
 {
 
-    protected Model|string $model;
-    protected array $setObject = [];
+    protected bool $valid = false;
 
     public function __construct(FieldNode $root, Context $context)
     {
@@ -25,32 +23,24 @@ class UpdateOperation extends AbstractWriteOperation
         parent::__construct($root, $context, $model);
     }
 
-    public function getResults(): ?array
+    public function getResults(): ?int
     {
-        if (!$this->acl->isGrantedPrivilege($this->model, Privilege::UPDATE))
+        if (!$this->acl->isGrantedPrivilege($this->model, Privilege::DELETE))
             return null;
+
         $criteria = $this->acl->getCriteria($this->model);
         $valid = $this->readArguments($this->root->arguments, $criteria);
 
         if (!$valid)
-            throw new EGraphQLException("No arguments found for update [{$this->getName()}]. Refusing to proceed.");
+            throw new EGraphQLException("No arguments found for delete [{$this->getName()}]. Refusing to proceed.");
 
-        $ids = [];
+        $ids = $criteria->get($this->model::getKeyAttributeName());
 
-        $classMap = $this->model::getClassMap();
-        $objects = $criteria->get($classMap->getInsertAttributeNames());
-
-        foreach ($objects as $object) {
-            $attributes = Arr::collapse([$object, $this->setObject['attributes']]);
-            $this->writeAssociationsBefore($this->setObject['associations']['before'], $attributes);
-            if (!empty($this->setObject['attributes'])) {
-                $this->updateByModel($this->model, $attributes, $object);
-            }
-            $id = $object[$classMap->keyAttributeName];
-            $this->writeAssociationsAfter($this->setObject['associations']['after'], $id);
-            $ids[] = $id;
+        $count = 0;
+        foreach ($ids as $id) {
+            $this->delete($this->model, $id);
         }
-        return $this->executeQueryOperation($ids);
+        return $count;
     }
 
     protected function readArguments(NodeList $arguments, Criteria $criteria): bool
@@ -59,7 +49,7 @@ class UpdateOperation extends AbstractWriteOperation
         /** @var ArgumentNode $argument */
         foreach ($arguments->getIterator() as $argument) {
             $value = $this->context->getNodeValue($argument->value);
-            if (empty($value)) continue;
+            if (!$value) continue;
             if ($argument->name->value == "id") {
                 $criteria->where($this->model::getKeyAttributeName(), '=', $value);
                 $this->isSingle = true;
@@ -67,8 +57,6 @@ class UpdateOperation extends AbstractWriteOperation
             } else if ($argument->name->value == "where") {
                 ConditionArgument::applyArgumentWhere($this->context, $criteria, $value);
                 $valid = true;
-            } else if ($argument->name->value == "set") {
-                $this->setObject = $this->readRawObject($value);
             }
         }
         return $valid;

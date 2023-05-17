@@ -87,6 +87,11 @@ class ClassMap
         return $this->associationMaps;
     }
 
+    public function getInsertAttributeNames(): array
+    {
+        return array_keys($this->insertAttributeMaps);
+    }
+
     public function addAttributeMap(AttributeMap $attributeMap)
     {
         $attributeMap->classMap = $this;

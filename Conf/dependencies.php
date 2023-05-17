@@ -9,14 +9,9 @@ use Monolog\Handler\WhatFailureGroupHandler;
 use Orkester\Manager;
 use Orkester\Services\OTraceFormatter;
 use Psr\Container\ContainerInterface;
-use Psr\Log\LoggerInterface;
 
-use function DI\create;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
-use Monolog\Processor\UidProcessor;
-
-use Orkester\Services\MLog;
 
 return function (ContainerBuilder $containerBuilder) {
     $containerBuilder->addDefinitions([
@@ -56,8 +51,8 @@ return function (ContainerBuilder $containerBuilder) {
                 (empty($conf['channel']) ? '' : "{$conf['channel']}_") .
                 Carbon::now()->format('Y_m_d_H') . '.log';
             $fileHandler =
-                (new StreamHandler($file, filePermission: 644))
-                    ->setFormatter(new LineFormatter($lineFormat, $dateFormat));
+                (new StreamHandler($file))
+                    ->setFormatter(new LineFormatter($lineFormat, $dateFormat, true));
             $handlers[] = $fileHandler;
 
             $groupHandler = new WhatFailureGroupHandler($handlers);

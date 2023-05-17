@@ -9,6 +9,7 @@ use GraphQL\Language\AST\NodeKind;
 use GraphQL\Language\AST\ObjectFieldNode;
 use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\VariableNode;
+use Illuminate\Support\Arr;
 use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\GraphQL\Parser\Parser;
 use Orkester\GraphQL\Value\ArrayValue;
@@ -17,58 +18,65 @@ use Orkester\GraphQL\Value\PrimitiveValue;
 use Orkester\GraphQL\Value\SubQueryValue;
 use Orkester\Manager;
 use Orkester\MVC\MModel;
+use Orkester\Persistence\Model;
 
 class Context
 {
 
+    public array $results = [];
     public array $fragments;
+    /**
+     * @var (Model|string)[]
+     */
+    protected array $models;
+    protected ?array $namedServices = [];
+    protected mixed $serviceResolver;
 
     public function __construct(
-        protected Configuration $configuration,
         protected array         $variables = [],
         FragmentDefinitionNode  ...$fragments
     )
     {
+        $configuration = require Manager::getConfPath() . '/graphql.php';
         $this->fragments = $fragments;
+        $this->models = $configuration['models'];
+        $this->namedServices = $configuration['services'];
+        $this->serviceResolver = $configuration['serviceResolver'] ?? null;
     }
 
-    protected function getPHPValue(Node $node): GraphQLValue
-    {
-        return match ($node->kind) {
-            NodeKind::BOOLEAN => new PrimitiveValue(boolval($node->value)),
-            NodeKind::INT => new PrimitiveValue(intval($node->value)),
-            NodeKind::NULL => new PrimitiveValue(null),
-            default => new PrimitiveValue($node->value)
-        };
-    }
-
-    public function getNodeValue(?Node $node): ?GraphQLValue
+    public function getNodeValue(?Node $node): mixed
     {
         if (is_null($node)) {
             return null;
         }
         if ($node instanceof ObjectValueNode) {
-            $fields = Parser::toAssociativeArray($node->fields, null);
-            if ($subquery = $fields['__subquery'] ?? false) {
-                return new SubQueryValue($this->getNodeValue($subquery), $this->getNodeValue($fields['field']));
-            } else {
-                foreach ($node->fields as $fieldNode) {
-                    $result[$fieldNode->name->value] = $this->getNodeValue($fieldNode);
-                }
-                return new ArrayValue(...$result ?? []);
+            $result = [];
+            foreach ($node->fields as $fieldNode) {
+                $result[$fieldNode->name->value] = $this->getNodeValue($fieldNode);
             }
+            return $result;
         } else if ($node instanceof ObjectFieldNode) {
             return $this->getNodeValue($node->value);
         } else if ($node instanceof VariableNode) {
-            return new PrimitiveValue($this->variables[$node->name->value] ?? null);
+            return $this->variables[$node->name->value] ?? null;
         } else if ($node instanceof ListValueNode) {
-            foreach ($node->values->getIterator() as $item) {
-                $values[] = $this->getNodeValue($item);
-            }
-            return new ArrayValue(...$values ?? []);
+            $result = [];
+            foreach ($node->values->getIterator() as $item)
+                $result[] = $this->getNodeValue($item);
+            return $result;
         } else {
             return $this->getPHPValue($node);
         }
+    }
+
+    protected function getPHPValue(Node $node): mixed
+    {
+        return match ($node->kind) {
+            NodeKind::BOOLEAN => boolval($node->value),
+            NodeKind::INT => intval($node->value),
+            NodeKind::NULL => null,
+            default => $node->value
+        };
     }
 
     public function getFragment(string $name): FragmentDefinitionNode
@@ -76,9 +84,27 @@ class Context
         return array_find($this->fragments, fn($f) => $f->name->value == $name);
     }
 
-    public function getConfiguration(): Configuration
+    public function getModel(string $name): string|Model
     {
-        return $this->configuration;
+        $key = $this->singularMap[$name] ?? $name;
+        if ($model = $this->models[$key] ?? false) {
+            return $model;
+        }
+        throw new EGraphQLNotFoundException($name, 'model');
     }
 
+    public function getService(string $name): callable
+    {
+        if ($name[0] == '_') {
+            $name = substr($name, 1);
+        }
+        if ([$class, $method] = $this->namedServices[$name] ?? false) {
+            $service = Manager::getContainer()->get($class);
+            return fn(...$args) => $service->$method(...$args);
+        }
+        if (is_callable($this->serviceResolver) && $service = ($this->serviceResolver)($name)) {
+            return $service;
+        }
+        throw new EGraphQLNotFoundException($name, 'service');
+    }
 }

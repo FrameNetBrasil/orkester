@@ -6,6 +6,6 @@ class EGraphQLNotFoundException extends EGraphQLException
 {
     public function __construct(string $name, string $kind)
     {
-        parent::__construct(['name' => $name, 'kind' => $kind], 404);
+        parent::__construct("$kind not found: $name");
     }
 }

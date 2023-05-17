@@ -2,45 +2,37 @@
 
 namespace Orkester\GraphQL;
 
-use Ds\Set;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\OperationDefinitionNode;
 use GraphQL\Language\Parser;
+use Illuminate\Support\Arr;
 use Monolog\Logger;
-use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLNotFoundException;
+use Orkester\GraphQL\Operation\AbstractOperation;
+use Orkester\GraphQL\Operation\AbstractWriteOperation;
+use Orkester\GraphQL\Operation\DeleteOperation;
+use Orkester\GraphQL\Operation\InsertOperation;
 use Orkester\GraphQL\Operation\QueryOperation;
 use Orkester\GraphQL\Operation\TotalOperation;
+use Orkester\GraphQL\Operation\UpdateOperation;
 use Orkester\GraphQL\Operation\UpsertOperation;
-use Orkester\GraphQL\Parser\DeleteParser;
-use Orkester\GraphQL\Parser\InsertParser;
-use Orkester\GraphQL\Parser\QueryParser;
-use Orkester\GraphQL\Parser\ServiceParser;
-use Orkester\GraphQL\Parser\TotalParser;
-use Orkester\GraphQL\Parser\UpdateAssociationParser;
-use Orkester\GraphQL\Parser\UpdateParser;
-use Orkester\GraphQL\Parser\UpsertParser;
 use Orkester\Manager;
+use Orkester\Persistence\PersistenceManager;
 
 class Executor
 {
     protected bool $isInstrospection = false;
     protected Context $context;
     protected array $operations;
-    protected Configuration $configuration;
     protected Logger $logger;
 
     public function __construct(
-        string        $query,
-        array         $variables = [],
-        Configuration $configuration = null,
-        Logger        $logger = null
+        string $query,
+        array  $variables = [],
+        Logger $logger = null
     )
     {
-        $this->aliases = new Set();
-        $this->configuration = $configuration ??
-            Configuration::fromArray(require Manager::getConfPath() . '/graphql.php');
         $this->logger = $logger ?? Manager::getContainer()->get(Logger::class)->withName('graphql');
         $this->operations = $this->parse($query, $variables);
     }
@@ -55,81 +47,82 @@ class Executor
                 $operationNodes[] = $definition;
             }
         }
-        $this->context = new Context($this->configuration, $variables, ...$fragmentNodes ?? []);
+        $this->context = new Context($variables, ...$fragmentNodes ?? []);
         return $this->parseOperations($operationNodes ?? [], $this->context);
     }
 
     protected function parseOperations(array $operationNodes, Context $context)
     {
+         $operations = [];
         /** @var OperationDefinitionNode $operationNode */
         foreach ($operationNodes as $operationNode) {
             if ($operationNode->operation === "query") {
                 /** @var FieldNode $operationRoot */
-                foreach ($operationNode->selectionSet->selections as $fieldNode)
-                    $operations[] = $this->parseQuery($fieldNode, $context);
+                /** @var FieldNode $fieldNode */
+                foreach ($operationNode->selectionSet->selections as $fieldNode) {
+                    if ($fieldNode->name->value == '__schema') {
+                        continue;
+                    }
+                    if ($fieldNode->name->value == '__total') {
+                        $operation = new TotalOperation($fieldNode, $context);
+                        $name = $operation->getQueryName();
+                        $queryOperation = Arr::first($operations, fn($op) => $op->getName() == $name);
+                        if (!$queryOperation)
+                            throw new EGraphQLNotFoundException($name, "operation");
+                        $operation->setQueryOperation($queryOperation);
+                        $operations[] = $operation;
+                    } else {
+                        $operations[] = new QueryOperation($fieldNode, $context);
+                    }
+                }
             } else if ($operationNode->operation === 'mutation') {
                 /** @var FieldNode $operationRoot */
                 foreach ($operationNode->selectionSet->selections as $fieldNode)
-                    $operations[] = $this->parseMutation($fieldNode, $context);
+                    $operations = array_merge($operations, $this->getMutationOperations($fieldNode, $context));
             } else {
-                throw new EGraphQLException(["unknown operation" => $operationNode->operation]);
+                throw new EGraphQLNotFoundException($operationNode->operation, 'operation_kind');
             }
         }
         return $operations ?? [];
     }
 
-    protected function parseQuery(FieldNode $root, Context $context)
+    /**
+     * @param FieldNode $root
+     * @param Context $context
+     * @return AbstractOperation[]
+     * @throws \Exception
+     */
+    protected function getMutationOperations(FieldNode $root, Context $context): array
     {
-        if ($root->name->value == '__total') {
-            $operation = TotalParser::fromNode($root, $context);
-        } else {
-            $model = $this->configuration->getModel($root->name->value);
-            $operation = QueryParser::fromNode($root, $model, $context);
-        }
-        $this->logger->info(json_encode($operation->jsonSerialize()));
-        return $operation;
-    }
-
-    protected function parseMutation(FieldNode $root, Context $context)
-    {
-        if (preg_match("/insert_([\w\d_]+)/", $root->name->value, $matches)) {
-            $model = $this->configuration->getModel($matches[1]);
-            $operation = InsertParser::fromNode($root, $model, $context);
-        } else if (preg_match("/upsert_([\w\d_]+)/", $root->name->value, $matches)) {
-            $model = $this->configuration->getModel($matches[1]);
-            $operation = UpsertParser::fromNode($root, $model, $context);
-        } else if (preg_match("/update_([\w\d_]+)_([\w\d]+)/", $root->name->value, $matches)) {
-            $model = $this->configuration->getModel($matches[1]);
-            $operation = UpdateAssociationParser::fromNode($root, $model, $matches[2], $context);
-        } else if (preg_match("/update_([\w\d_]+)/", $root->name->value, $matches)) {
-            $model = $this->configuration->getModel($matches[1]);
-            $operation = UpdateParser::fromNode($root, $model, $context);
-        } else if (preg_match("/delete_([\w\d_]+)/", $root->name->value, $matches)) {
-            $model = $this->configuration->getModel($matches[1]);
-            $operation = DeleteParser::fromNode($root, $model, $context);
-        } else if (preg_match("/service_([\w\d_]+)/", $root->name->value, $matches)) {
-            $service = $this->configuration->getService($matches[1]);
-            $operation = ServiceParser::fromNode($root, $context, $service);
-        } else {
-            throw new EGraphQLNotFoundException('operation', $root->name->value);
-        }
-        $this->logger->info(json_encode($operation->jsonSerialize()));
-        return $operation;
-    }
-
-    public function execute(): Result
-    {
-        $result = new Result($this->configuration);
-        foreach ($this->operations as $operation) {
-            $operation->execute($result);
-        }
-        return $result;
+        $class = match ($root->name->value) {
+            'insert' => InsertOperation::class,
+            'update' => UpdateOperation::class,
+            'upsert' => UpsertOperation::class,
+            'delete' => DeleteOperation::class,
+            default => null
+        };
+        $definitions = iterator_to_array($root->selectionSet->selections->getIterator());
+        return $class ?
+            Arr::map($definitions, fn($def) => new $class($def, $context)) :
+            [];
     }
 
     public static function run(string $query, $variables = []): array
     {
         $executor = new Executor($query, $variables);
-        $result = $executor->execute();
-        return $result->getResults();
+        return $executor->execute();
+    }
+
+    public function execute(): array
+    {
+        PersistenceManager::beginTransaction();
+        foreach ($this->operations as $operation) {
+            $this->context->results[$operation->getName()] = $operation->getResults();
+            if ($operation instanceof AbstractWriteOperation) {
+                //mdump($operation->getEvents());
+            }
+        }
+        PersistenceManager::rollback();
+        return $this->context->results;
     }
 }

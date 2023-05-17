@@ -8,13 +8,13 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Connection;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Arr;
-use Monolog\Logger;
+use Orkester\Exception\ValidationException;
+use Orkester\Manager;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
-use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Enum\Key;
-use Orkester\Manager;
+use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
@@ -24,76 +24,14 @@ class Model
 {
     public static ClassMap $classMap;
     public static Psr16Adapter $cachedClassMaps;
-    private static array $properties = [];
     public static Psr16Adapter $cachedProperties;
     public static Capsule $capsule;
-    private static array $classMaps = [];
     protected static int $fetchStyle;
+    private static array $properties = [];
+    private static array $classMaps = [];
 
 
     ///////////////
-
-    public static function getCriteria(string $databaseName = null): Criteria
-    {
-        $databaseName ??= Manager::getOptions('db');
-        $connection = PersistenceManager::$capsule->getConnection($databaseName);
-        $connection->enableQueryLog();
-        (new \ReflectionClass(get_class($connection)))
-            ->getProperty('fetchMode')->setValue($connection, PersistenceManager::$fetchStyle);
-
-        $classMap = PersistenceManager::getClassMap(get_called_class());
-        $container = Manager::getContainer();
-        return $container->call(
-            function (Logger $logger) use ($connection, $classMap) {
-                $criteria = new Criteria($connection, $logger->withName('criteria'));
-                return $criteria->setClassMap($classMap);
-            }
-        );
-    }
-
-
-    public function list(object|array|null $filter = null, array $select = [], array|string $order = ''): array
-    {
-        $criteria = $this->getCriteria();
-        if (!empty($select)) {
-            $criteria->select($select);
-        }
-        $criteria->filter($filter);
-        $criteria->order($order);
-        return $criteria->get()->toArray();
-    }
-
-    public function filter(array|null $filters, Criteria|null $criteria = null): Criteria
-    {
-        $criteria = $criteria ?? $this->getCriteria();
-        if (!empty($filters)) {
-            $filters = is_string($filters[0]) ? [$filters] : $filters;
-            foreach ($filters as [$field, $op, $value]) {
-                $criteria->where($field, $op, $value);
-            }
-        }
-        return $criteria;
-    }
-
-    public function one($conditions, array $select = []): object|null
-    {
-        $criteria = $this->getCriteria()->range(1, 1);
-        if (!empty($select)) {
-            $criteria->select($select);
-        }
-        $result = $this->filter($conditions, $criteria)->get()->toArray();
-        return empty($result) ? null : (object)$result[0];
-    }
-
-    public function find(int $id): object|array|null
-    {
-        return $this->getCriteria()->find($id);
-    }
-
-    ///////////////
-
-
-
 
     public static function init(array $dbConfigurations, int $fetchStyle): void
     {
@@ -118,46 +56,6 @@ class Model
         }
     }
 
-    public static function getFileName(): string
-    {
-        $rc = new \ReflectionClass(get_called_class());
-        return $rc->getFileName();
-    }
-
-    private static function getSignature(string $className): string
-    {
-        $fileName = self::getFileName();
-        $stat = stat($fileName);
-        $lastModification = $stat['mtime'];
-        return md5($className . $lastModification);
-    }
-
-    public static function getClassMap(string|Model $className = null): ClassMap
-    {
-        return PersistenceManager::getClassMap($className ?? static::class);
-//        $className ??= static::class;
-//        if (!isset(self::$classMaps[$className])) {
-//            $key = self::getSignature($className);
-//            $keyProps = self::getSignature($className . "props");
-//            if (self::$cachedClassMaps->has($key)) {
-//                self::$classMaps[$className] = self::$cachedClassMaps->get($key);
-//                self::$properties[$className] = self::$cachedProperties->get($keyProps);
-//            } else {
-//                self::$classMaps[$className] = new ClassMap($className);
-//                $className::map();
-//                self::$cachedClassMaps->set($key, self::$classMaps[$className], 300);
-//                self::$cachedProperties->set($keyProps, self::$properties[$className], 300);
-//            }
-//
-//        }
-//        return self::$classMaps[$className];
-    }
-
-    public static function getKeyAttributeName(): string
-    {
-        return PersistenceManager::getClassMap(get_called_class())->keyAttributeName;
-    }
-
     public static function map(): void
     {
     }
@@ -170,34 +68,6 @@ class Model
     public static function extends(string $className): void
     {
         PersistenceManager::$classMaps[get_called_class()]->superClassName = $className;
-    }
-
-    public static function attribute(
-        string              $name,
-        string              $field = '',
-        Type                $type = Type::STRING,
-        Key                 $key = Key::NONE,
-        string              $reference = '',
-        string              $alias = '',
-        string              $default = null,
-        bool                $nullable = true,
-        bool                $virtual = false,
-        string|Closure|null $validator = null,
-    ): void
-    {
-        $attributeMap = new AttributeMap($name);
-        $attributeMap->type = $type;
-        $attributeMap->columnName = $field ?: $name;
-        $attributeMap->alias = $alias ?: $name;
-        $attributeMap->reference = $reference;
-        $attributeMap->keyType = $key;
-        $attributeMap->idGenerator = ($key == Key::PRIMARY) ? 'identity' : '';
-        $attributeMap->default = $default;
-        $attributeMap->nullable = $nullable;
-        $attributeMap->validator = $validator;
-        $attributeMap->virtual = $virtual;
-        PersistenceManager::$classMaps[get_called_class()]->addAttributeMap($attributeMap);
-        PersistenceManager::$properties[get_called_class()]['attribute'][$name] = $type;
     }
 
     public static function associationOne(
@@ -229,6 +99,7 @@ class Model
             $k = explode(':', $key);
             $associationMap->fromKey = $k[0];
             $associationMap->toKey = $k[1];
+            $key = $k[0];
         } else {
             $associationMap->fromKey = $key;
             $associationMap->toKey = $toClassMap->keyAttributeMap?->name ?? $key;
@@ -246,6 +117,57 @@ class Model
         $associationMap->joinType = $join;
         $fromClassMap->addAssociationMap($associationMap);
         PersistenceManager::$properties[get_called_class()]['association'][$name] = $name;
+    }
+
+    ///////////////
+
+    public static function getClassMap(string|Model $className = null): ClassMap
+    {
+        return PersistenceManager::getClassMap($className ?? static::class);
+//        $className ??= static::class;
+//        if (!isset(self::$classMaps[$className])) {
+//            $key = self::getSignature($className);
+//            $keyProps = self::getSignature($className . "props");
+//            if (self::$cachedClassMaps->has($key)) {
+//                self::$classMaps[$className] = self::$cachedClassMaps->get($key);
+//                self::$properties[$className] = self::$cachedProperties->get($keyProps);
+//            } else {
+//                self::$classMaps[$className] = new ClassMap($className);
+//                $className::map();
+//                self::$cachedClassMaps->set($key, self::$classMaps[$className], 300);
+//                self::$cachedProperties->set($keyProps, self::$properties[$className], 300);
+//            }
+//
+//        }
+//        return self::$classMaps[$className];
+    }
+
+    public static function attribute(
+        string              $name,
+        string              $field = '',
+        Type                $type = Type::STRING,
+        Key                 $key = Key::NONE,
+        string              $reference = '',
+        string              $alias = '',
+        string              $default = null,
+        bool                $nullable = true,
+        bool                $virtual = false,
+        string|Closure|null $validator = null,
+    ): void
+    {
+        $attributeMap = new AttributeMap($name);
+        $attributeMap->type = $type;
+        $attributeMap->columnName = $field ?: $name;
+        $attributeMap->alias = $alias ?: $name;
+        $attributeMap->reference = $reference;
+        $attributeMap->keyType = $key;
+        $attributeMap->idGenerator = ($key == Key::PRIMARY) ? 'identity' : '';
+        $attributeMap->default = $default;
+        $attributeMap->nullable = $nullable;
+        $attributeMap->validator = $validator;
+        $attributeMap->virtual = $virtual;
+        PersistenceManager::$classMaps[get_called_class()]->addAttributeMap($attributeMap);
+        PersistenceManager::$properties[get_called_class()]['attribute'][$name] = $type;
     }
 
     public static function associationMany(
@@ -336,7 +258,6 @@ class Model
         return PersistenceManager::$properties;
     }
 
-
     public static function getAssociation(string $associationChain, int $id): array
     {
         $modelClass = get_called_class();
@@ -349,6 +270,17 @@ class Model
             ->toArray();
     }
 
+    public static function getCriteria(string $databaseName = null): Criteria
+    {
+        return PersistenceManager::getCriteria($databaseName, static::class);
+    }
+
+    public static function getConnection(?string $databaseName = null): Connection
+    {
+        $databaseName ??= Manager::getOptions('db');
+        return PersistenceManager::$capsule->getConnection($databaseName);
+    }
+
     public static function deleteAssociation(string $associationChain, int $id): array
     {
         $modelClass = get_called_class();
@@ -357,6 +289,13 @@ class Model
         return $model->getCriteria()
             ->select($associationChain . '.*')
             ->where('id', '=', $id)
+            ->delete();
+    }
+
+    public static function delete(int $id, array $returning = null): int
+    {
+        return static::getCriteria()
+            ->where(static::getClassMap()->keyAttributeName, '=', $id)
             ->delete();
     }
 
@@ -377,16 +316,25 @@ class Model
         }
     }
 
-    public static function delete(int $id): int
+    public static function upsert(array $data, array $uniqueBy, $updateColumns = null, array $returning = null): array
     {
-        return static::getCriteria()
-            ->where(static::getClassMap()->keyAttributeName, '=', $id)
-            ->delete();
+        $row = static::prepareWrite($data);
+        $criteria = static::getCriteria();
+        return $criteria->upsert($row, $uniqueBy, $updateColumns, $returning)[0];
     }
 
-    public static function transform(array &$row)
+    protected static function prepareWrite(array $data): array
     {
-        return $row;
+        $classMap = PersistenceManager::getClassMap(static::class);
+        $validAttributes = array_keys($classMap->insertAttributeMaps);
+        if (!empty($invalid = Arr::except($data, $validAttributes))) {
+            $invalidStr = implode(',', $invalid);
+            throw new \InvalidArgumentException("Invalid arguments: [$invalidStr]");
+        }
+        if (!empty($errors = static::validate($data))) {
+            throw new ValidationException($errors);
+        }
+        return static::transform($data);
     }
 
     public static function validate(array $row): array
@@ -394,50 +342,29 @@ class Model
         return [];
     }
 
-    protected static function prepareWrite(array $data, bool $strict = true): array
+    public static function transform(array &$row)
     {
-        $classMap = PersistenceManager::getClassMap(static::class);
-        $validAttributes = array_keys($classMap->insertAttributeMaps);
-        $rows = array_key_exists(0, $data) ? $data : [$data];
-        $accepted = [];
-        $errors = [];
-        foreach($rows as $row) {
-            $row = Arr::only($row, $validAttributes);
-            $err = static::validate($row);
-
-            if (empty($err)) {
-                $accepted[] = static::transform($row);
-            } else {
-                $errors[] = $err;
-            }
-        }
-        //if ($strict && !empty($errors)) {
-            //throw new \Exception("error");
-        //}
-        return $accepted;
+        return $row;
     }
 
-    public static function insert(array $data, bool $strict = true): ?int
+    public static function insert(array $data, array $returning = null): ?array
     {
-        $rows = static::prepareWrite($data, $strict);
+        $row = static::prepareWrite($data);
         $criteria = static::getCriteria();
-        $criteria->insert($rows);
-        return $criteria->getConnection()->getPdo()->lastInsertId();
+        return $criteria->insert($row, $returning)[0];
     }
 
-    public static function upsert(array $data, array|string $uniqueBy, $update = null, bool $strict = true): ?int
+    public static function update(array $data, array $returning = null): array
     {
-        $rows = static::prepareWrite($data, $strict);
-        $criteria = static::getCriteria();
-        $criteria->upsert($rows, $uniqueBy, $update);
-        return $criteria->getConnection()->getPdo()->lastInsertId();
+        $row = static::prepareWrite($data);
+        return static::getCriteria()
+            ->where(static::getKeyAttributeName(), '=', $row[static::getKeyAttributeName()])
+            ->update($row, $returning)[0];
     }
 
-    public static function update(array $data, bool $strict = true)
+    public static function getKeyAttributeName(): string
     {
-        $rows = static::prepareWrite($data, $strict);
-        $criteria = static::getCriteria();
-        $criteria->update($rows);
+        return PersistenceManager::getClassMap(get_called_class())->keyAttributeName;
     }
 
     public static function insertUsingCriteria(array $fields, Criteria $usingCriteria): ?int
@@ -469,22 +396,6 @@ class Model
         $parts = explode('\\', static::class);
         $className = $parts[count($parts) - 1];
         return substr($className, 0, strlen($className) - 5);
-    }
-
-    public static function getConnection(?string $databaseName = null): Connection
-    {
-        $databaseName ??= Manager::getOptions('db');
-        return PersistenceManager::$capsule->getConnection($databaseName);
-    }
-
-    public static function beginTransaction(?string $databaseName = null)
-    {
-        PersistenceManager::beginTransaction($databaseName);
-    }
-
-    public static function commit(?string $databaseName = null)
-    {
-        PersistenceManager::commit($databaseName);
     }
 
     public static function rollback(?string $databaseName = null)
@@ -524,12 +435,61 @@ class Model
         return $model->filter($params->filter, $criteria);
     }
 
+    public function filter(array|null $filters, Criteria|null $criteria = null): Criteria
+    {
+        $criteria = $criteria ?? $this->getCriteria();
+        if (!empty($filters)) {
+            $filters = is_string($filters[0]) ? [$filters] : $filters;
+            foreach ($filters as [$field, $op, $value]) {
+                $criteria->where($field, $op, $value);
+            }
+        }
+        return $criteria;
+    }
 
     public static function exists(array $conditions): bool
     {
         $modelClass = get_called_class();
         $model = new $modelClass();
         return !is_null($model->one($conditions));
+    }
+
+    public function one($conditions, array $select = []): object|null
+    {
+        $criteria = $this->getCriteria()->range(1, 1);
+        if (!empty($select)) {
+            $criteria->select($select);
+        }
+        $result = $this->filter($conditions, $criteria)->get()->toArray();
+        return empty($result) ? null : (object)$result[0];
+    }
+
+    public static function replaceAssociation(string $associationName, mixed $id, array $associatedIds): void
+    {
+        self::beginTransaction();
+        self::removeAssociation($associationName, $id, null);
+        self::appendAssociation($associationName, $id, $associatedIds);
+        self::commit();
+    }
+
+    public static function beginTransaction(?string $databaseName = null)
+    {
+        PersistenceManager::beginTransaction($databaseName);
+    }
+
+    public static function removeAssociation(string $associationName, mixed $id, ?array $associatedIds): void
+    {
+        $association = static::getManyToManyAssociation($associationName);
+        $modelClass = get_called_class();
+        $model = new $modelClass();
+        $criteria = $model->getCriteria();
+        $criteria
+            ->setClassMap(self::$classMaps["{$association->fromClassName}_$association->associativeTable"])
+            ->where($association->fromKey, '=', $id);
+        if (is_array($associatedIds)) {
+            $criteria->where($association->toKey, 'IN', $associatedIds);
+        }
+        $criteria->delete();
     }
 
     protected static function getManyToManyAssociation(string $associationName): AssociationMap
@@ -561,26 +521,38 @@ class Model
             ->upsert($columns, [$association->toKey, $association->fromKey]);
     }
 
-    public static function removeAssociation(string $associationName, mixed $id, ?array $associatedIds): void
+    public static function commit(?string $databaseName = null)
     {
-        $association = static::getManyToManyAssociation($associationName);
-        $modelClass = get_called_class();
-        $model = new $modelClass();
-        $criteria = $model->getCriteria();
-        $criteria
-            ->setClassMap(self::$classMaps["{$association->fromClassName}_$association->associativeTable"])
-            ->where($association->fromKey, '=', $id);
-        if (is_array($associatedIds)) {
-            $criteria->where($association->toKey, 'IN', $associatedIds);
-        }
-        $criteria->delete();
+        PersistenceManager::commit($databaseName);
     }
 
-    public static function replaceAssociation(string $associationName, mixed $id, array $associatedIds): void
+    private static function getSignature(string $className): string
     {
-        self::beginTransaction();
-        self::removeAssociation($associationName, $id, null);
-        self::appendAssociation($associationName, $id, $associatedIds);
-        self::commit();
+        $fileName = self::getFileName();
+        $stat = stat($fileName);
+        $lastModification = $stat['mtime'];
+        return md5($className . $lastModification);
+    }
+
+    public static function getFileName(): string
+    {
+        $rc = new \ReflectionClass(get_called_class());
+        return $rc->getFileName();
+    }
+
+    public function list(object|array|null $filter = null, array $select = [], array|string $order = ''): array
+    {
+        $criteria = $this->getCriteria();
+        if (!empty($select)) {
+            $criteria->select($select);
+        }
+        $criteria->filter($filter);
+        $criteria->order($order);
+        return $criteria->get()->toArray();
+    }
+
+    public function find(int $id): object|array|null
+    {
+        return $this->getCriteria()->find($id);
     }
 }
