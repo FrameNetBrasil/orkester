@@ -387,7 +387,7 @@ class Model
         $row = static::prepareWrite($data);
         return static::getCriteria()
             ->where(static::getKeyAttributeName(), '=', $row[static::getKeyAttributeName()])
-            ->update($row, $returning)[0];
+            ->update($row, $returning)[0] ?? [];
     }
 
     public static function getKeyAttributeName(): string
