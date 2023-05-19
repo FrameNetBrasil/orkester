@@ -8,6 +8,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Connection;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Orkester\Exception\ValidationException;
 use Orkester\Manager;
 use Orkester\Persistence\Criteria\Criteria;
@@ -245,6 +246,7 @@ class Model
                 $associationMap->fromKey = $k[0];
                 $associationMap->toKey = $k[1];
                 $keyAttribute = $k[0];
+                $key = $keyAttribute;
             } else {
                 $associationMap->fromKey = $keys;
                 $associationMap->toKey = $keys;
@@ -261,7 +263,7 @@ class Model
 
         $keyAttributeMap = $fromClassMap->getAttributeMap($keyAttribute);
         if (is_null($keyAttributeMap)) {
-            self::attribute(name: $key, key: Key::FOREIGN, type: Type::INTEGER, nullable: false);
+            static::attribute(name: $key, type: Type::INTEGER, key: Key::FOREIGN, nullable: false);
         } else {
             if ($key != $fromClassMap->keyAttributeMap->name) {
                 $keyAttributeMap->keyType = Key::FOREIGN;
@@ -284,8 +286,14 @@ class Model
         if ($cardinality == Association::ASSOCIATIVE) {
             $name = "{$associationMap->fromClassName}_$associationMap->associativeTable";
             $classMap = new ClassMap($name);
-            $classMap->addAttributeMap($toClassMap->getAttributeMap($associationMap->toKey));
-            $classMap->addAttributeMap($fromClassMap->getAttributeMap($associationMap->fromKey));
+            $toAttribute = clone($toClassMap->getAttributeMap($associationMap->toKey));
+            $toAttribute->columnName = $associationMap->toKey;
+
+            $fromAttribute = clone($fromClassMap->getAttributeMap($associationMap->fromKey));
+            $fromAttribute->columnName = $associationMap->fromKey;
+
+            $classMap->addAttributeMap($toAttribute);
+            $classMap->addAttributeMap($fromAttribute);
             PersistenceManager::$classMaps[$name] = $classMap;
             $classMap->tableName = $associationMap->associativeTable;
         }
@@ -464,32 +472,14 @@ class Model
         return !is_null(static::one($conditions));
     }
 
-    public static function replaceAssociation(string $associationName, mixed $id, array $associatedIds): void
-    {
-        self::beginTransaction();
-        self::removeAssociation($associationName, $id, null);
-        self::appendAssociation($associationName, $id, $associatedIds);
-        self::commit();
-    }
-
     public static function beginTransaction(?string $databaseName = null)
     {
         PersistenceManager::beginTransaction($databaseName);
     }
 
-    public static function removeAssociation(string $associationName, mixed $id, ?array $associatedIds): void
+    public static function commit(?string $databaseName = null)
     {
-        $association = static::getManyToManyAssociation($associationName);
-        $modelClass = get_called_class();
-        $model = new $modelClass();
-        $criteria = $model->getCriteria();
-        $criteria
-            ->setClassMap(self::$classMaps["{$association->fromClassName}_$association->associativeTable"])
-            ->where($association->fromKey, '=', $id);
-        if (is_array($associatedIds)) {
-            $criteria->where($association->toKey, 'IN', $associatedIds);
-        }
-        $criteria->delete();
+        PersistenceManager::commit($databaseName);
     }
 
     protected static function getManyToManyAssociation(string $associationName): AssociationMap
@@ -505,7 +495,7 @@ class Model
         return $association;
     }
 
-    public static function appendAssociation(string $associationName, mixed $id, array $associatedIds): void
+    public static function appendManyToMany(string $associationName, mixed $id, array $associatedIds): Collection
     {
         $association = static::getManyToManyAssociation($associationName);
         $columns = array_map(fn($aId) => [
@@ -514,14 +504,30 @@ class Model
         ],
             $associatedIds
         );
-        static::getCriteria()
-            ->setClassMap(self::$classMaps["{$association->fromClassName}_$association->associativeTable"])
-            ->upsert($columns, [$association->toKey, $association->fromKey]);
+        return static::getCriteria()
+            ->setClassMap(PersistenceManager::getClassMap("{$association->fromClassName}_$association->associativeTable"))
+            ->upsert($columns, [$association->toKey, $association->fromKey], null, [$association->toKey, $association->fromKey]);
     }
 
-    public static function commit(?string $databaseName = null)
+    public static function deleteManyToMany(string $associationName, mixed $id, ?array $associatedIds): void
     {
-        PersistenceManager::commit($databaseName);
+        $association = static::getManyToManyAssociation($associationName);
+        $criteria = static::getCriteria();
+        $criteria
+            ->setClassMap(PersistenceManager::getClassMap("{$association->fromClassName}_$association->associativeTable"))
+            ->where($association->fromKey, '=', $id);
+        if (is_array($associatedIds)) {
+            $criteria->where($association->toKey, 'IN', $associatedIds);
+        }
+        $criteria->delete();
+    }
+
+    public static function replaceAssociation(string $associationName, mixed $id, array $associatedIds): void
+    {
+        self::beginTransaction();
+        self::deleteManyToMany($associationName, $id, null);
+        self::appendManyToMany($associationName, $id, $associatedIds);
+        self::commit();
     }
 
     private static function getSignature(string $className): string
