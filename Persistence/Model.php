@@ -327,10 +327,13 @@ class Model
             ->delete();
     }
 
-    public static function delete(int $id, array $returning = null): int
+    public static function delete(int $id): int
     {
-        return static::getCriteria()
-            ->where(static::getClassMap()->keyAttributeName, '=', $id)
+        $classMap = self::getClassMap(get_called_class());
+        $key = $classMap->keyAttributeName;
+        $criteria = static::getCriteria();
+        return $criteria
+            ->where($key, '=', $id)
             ->delete();
     }
 
@@ -373,21 +376,32 @@ class Model
         return $row;
     }
 
-    public static function insert(array $data): ?int
+    public static function insert(array|object $data): ?int
     {
-        $row = static::prepareWrite($data);
+        $classMap = static::getClassMap(get_called_class());
         $criteria = static::getCriteria();
-        $keyAttributeName = static::getKeyAttributeName();
-        return $criteria->insert($row, [$keyAttributeName])->keyAttributeName;
+        if (is_object($data)) {
+            $array = (array)$data;
+            $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
+            $criteria->insert([$fields]);
+        } else {
+            $criteria->insert($data);
+        }
+        $lastInsertId = $criteria->getConnection()->getPdo()->lastInsertId();
+        return $lastInsertId;
     }
 
-    public static function update(array $data): ?int
+    public static function update(object $object)
     {
-        $row = static::prepareWrite($data);
-        $keyAttributeName = static::getKeyAttributeName();
-        return static::getCriteria()
-            ->where($keyAttributeName, '=', $row[$keyAttributeName])
-            ->update($row, [$keyAttributeName])->keyAttributeName;
+        $classMap = self::getClassMap(get_called_class());
+        $array = (array)$object;
+        $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
+        $key = $classMap->keyAttributeName;
+        // key must be present
+        if (isset($fields[$key])) {
+            $criteria = static::getCriteria();
+            $criteria->where($key, '=', $fields[$key])->update($fields);
+        }
     }
 
     public static function upsert(array $data, array $uniqueBy, $updateColumns = null): ?int
