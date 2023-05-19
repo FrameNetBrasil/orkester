@@ -41,7 +41,6 @@ class InsertOperation extends AbstractWriteOperation
         $objects = $this->readArguments($this->root->arguments);
         $ids = [];
 
-        $validAttributes = $this->model::getClassMap()->getInsertAttributeNames();
         foreach ($objects as $object) {
             $data = $object['attributes'];
             $this->writeAssociationsBefore($object['associations']['before'], $data);

@@ -2,8 +2,6 @@
 
 namespace Orkester\GraphQL\Argument;
 
-use GraphQL\Language\AST\NodeList;
-use GraphQL\Language\AST\ObjectFieldNode;
 use Illuminate\Support\Arr;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;

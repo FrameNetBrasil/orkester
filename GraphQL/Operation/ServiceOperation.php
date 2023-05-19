@@ -2,33 +2,42 @@
 
 namespace Orkester\GraphQL\Operation;
 
-use Orkester\GraphQL\Result;
+use GraphQL\Language\AST\ArgumentNode;
+use GraphQL\Language\AST\FieldNode;
+use Orkester\Exception\EGraphQLNotFoundException;
+use Orkester\GraphQL\Context;
 
-class ServiceOperation implements \JsonSerializable
+class ServiceOperation extends AbstractOperation
 {
 
-    public function __construct(
-        protected string  $name,
-        protected ?string $alias,
-        protected array   $arguments,
-        protected mixed   $service,
-    )
+    public function __construct(protected FieldNode $root, Context $context, protected $service = null)
     {
+        parent::__construct($root, $context);
+        if (is_null($this->service))
+            $this->service = $this->context->getService($root->name->value);
+            if (!$this->service) throw new EGraphQLNotFoundException($root->name->value, 'service');
     }
 
-    public function execute(Result $result)
+    public function getResults()
     {
-        $arguments = array_map(fn($arg) => $arg($result), $this->arguments);
-        $result->addResult($this->name, $this->alias, ($this->service)(...$arguments));
-    }
-
-    public function jsonSerialize(): mixed
-    {
-        return [
-            'name' => $this->name,
-            'alias' => $this->alias,
-            'arguments' => array_map(fn($arg) => $arg->jsonSerialize(), $this->arguments),
-            'service' => $this->service
-        ];
+        $arguments = [];
+        /**
+         * @var ArgumentNode $argumentNode
+         */
+        foreach ($this->root->arguments->getIterator() as $argumentNode) {
+            $arguments[$argumentNode->name->value] = $this->context->getNodeValue($argumentNode->value);
+        }
+        $result = ($this->service)(...$arguments);
+        if (is_array($result) && $this->root->selectionSet != null) {
+            $return = [];
+            /**
+             * @var FieldNode $fieldNode
+             */
+            foreach ($this->root->selectionSet->selections->getIterator() as $fieldNode) {
+                $return[$fieldNode->name->value] = $result[$fieldNode->name->value] ?? null;
+            }
+            return $return;
+        }
+        return $result;
     }
 }

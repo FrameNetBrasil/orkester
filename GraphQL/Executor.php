@@ -14,6 +14,7 @@ use Orkester\GraphQL\Operation\AbstractWriteOperation;
 use Orkester\GraphQL\Operation\DeleteOperation;
 use Orkester\GraphQL\Operation\InsertOperation;
 use Orkester\GraphQL\Operation\QueryOperation;
+use Orkester\GraphQL\Operation\ServiceOperation;
 use Orkester\GraphQL\Operation\TotalOperation;
 use Orkester\GraphQL\Operation\UpdateOperation;
 use Orkester\GraphQL\Operation\UpsertOperation;
@@ -71,6 +72,8 @@ class Executor
                             throw new EGraphQLNotFoundException($name, "operation");
                         $operation->setQueryOperation($queryOperation);
                         $operations[] = $operation;
+                    } else if ($service = $this->context->getService($fieldNode->name->value)) {
+                        $operations[] = new ServiceOperation($fieldNode, $context, $service);
                     } else {
                         $operations[] = new QueryOperation($fieldNode, $context);
                     }
@@ -99,6 +102,7 @@ class Executor
             'update' => UpdateOperation::class,
             'upsert' => UpsertOperation::class,
             'delete' => DeleteOperation::class,
+            'service' => ServiceOperation::class,
             default => null
         };
         $definitions = iterator_to_array($root->selectionSet->selections->getIterator());

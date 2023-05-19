@@ -155,7 +155,7 @@ class CriteriaBuilder extends Builder
         return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
     }
 
-    public function delete($id = null, array $returning = null)
+    public function delete($id = null, array $returning = null): Collection
     {
         // If an ID is passed to the method, we will set the where clause to check the
         // ID to let developers to simply and quickly remove a single row from this
@@ -168,6 +168,9 @@ class CriteriaBuilder extends Builder
 
         $sql = $this->grammar->compileDelete($this);
         $sql .= $this->getReturningSql($returning);
+        /**
+         * @var array $rows
+         */
         $rows = $this->connection->statement(
             $sql,
             $this->cleanBindings($this->grammar->prepareBindingsForDelete($this->bindings))

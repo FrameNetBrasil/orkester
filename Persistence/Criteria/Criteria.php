@@ -262,11 +262,6 @@ class Criteria extends CriteriaBuilder
         $this->parameters[$name] = $value;
     }
 
-    public function update(array $values, ?array $returning = null): \Illuminate\Support\Collection
-    {
-        return parent::update(Arr::only($values, array_keys($this->classMap->insertAttributeMaps)), $returning);
-    }
-
     public function chunkResult(string $fieldKey = '', string $fieldValue = '')
     {
         $newResult = [];
