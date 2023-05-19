@@ -7,8 +7,8 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Grammars\Grammar;
 use Illuminate\Database\Query\Processors\Processor;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Monolog\Logger;
 
 class CriteriaBuilder extends Builder
@@ -24,12 +24,43 @@ class CriteriaBuilder extends Builder
         parent::__construct($connection, $grammar, $processor);
     }
 
-    public function upsert(array $values, $uniqueBy, $update = null, array $returning = null)
+    protected function getReturningSql(?array $returning): string
+    {
+        if ($returning) {
+            $return = Arr::map($returning, fn($r) => $this->grammar->wrap($r));
+            $sql = " returning " . implode(',', $return);
+        }
+        return $sql ?? "";
+    }
+
+    public function logSql(string $query, $bindings)
+    {
+        $values = Arr::map(Arr::wrap($bindings), fn($b) => match (true) {
+            is_string($b) => "'$b'",
+            is_null($b) => 'NULL',
+            is_array($b) => implode(',', $b ),
+            default => $b
+        });
+        $sql = Str::replaceArray('?', $values, $query);
+        $this->logger->info($sql);
+    }
+
+    protected function runSelect(): array
+    {
+        $sql = $this->toSql();
+        $bindings = $this->getBindings();
+        $this->logSql($sql, $bindings);
+        return $this->connection->select(
+            $sql, $bindings, !$this->useWritePdo
+        );
+    }
+
+    public function upsert(array $values, $uniqueBy, $update = null, array $returning = null): Collection
     {
         if (empty($values)) {
-            return 0;
+            return Collection::empty();
         } elseif ($update === []) {
-            return (int)$this->insert($values);
+            return $this->insert($values);
         }
 
         if (!is_array(reset($values))) {
@@ -103,31 +134,6 @@ class CriteriaBuilder extends Builder
         );
         if (!$returning) return Collection::empty();
         return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
-    }
-
-    protected function getReturningSql(?array $returning): string
-    {
-        if ($returning) {
-            $return = Arr::map($returning, fn($r) => $this->grammar->wrap($r));
-            $sql = " returning " . implode(',', $return);
-        }
-        return $sql ?? "";
-    }
-
-    public function logSql(string $query, $bindings)
-    {
-        //$bindings = Arr::flatten($values, 1);
-        $values = Arr::map(Arr::wrap($bindings), fn($b) => match (true) {
-            is_string($b) => "'$b'",
-            is_null($b) => 'NULL',
-            default => $b
-        });
-        $sql = Str::replaceArray('?', $values, $query);
-//        foreach ($bindings as $binding) {
-//            if (is_null($binding)) continue;
-//            //$query = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('\'%s\'', $binding)), $query);
-//        }
-        $this->logger->info($sql);
     }
 
     public function update(array $values, array $returning = null): \Illuminate\Support\Collection

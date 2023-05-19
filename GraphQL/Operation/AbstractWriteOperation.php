@@ -6,7 +6,6 @@ use Carbon\Carbon;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
-use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLForbiddenException;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Enum\Association;
@@ -33,12 +32,20 @@ abstract class AbstractWriteOperation extends AbstractOperation
         }
     }
 
-    protected function insertAssociationOne(AssociationMap $map, array&$object)
+    protected function writeAssociationsAfter(array $associations, int $parentId)
     {
-        return $this->insertAssociation($map, [$object], null)[0];
+        foreach ($associations as $associationName => $association) {
+            $map = $this->model::getClassMap()->getAssociationMap($associationName);
+            $this->insertAssociationMany($map, $association, $parentId);
+        }
     }
 
-    protected function insertAssociation(AssociationMap $map, array $associationEntry, ?int $parentId): array
+    protected function insertAssociationOne(AssociationMap $map, array $object)
+    {
+        return $this->editAssociation($map, [$object], null)[0];
+    }
+
+    protected function editAssociation(AssociationMap $map, array $associationEntry, ?int $parentId): array
     {
         $model = $map->toClassMap->model;
         $ids = [];
@@ -60,14 +67,50 @@ abstract class AbstractWriteOperation extends AbstractOperation
                         $ids[] = $this->updateByKey($model, [$map->toKey => $parentId], $id);
                     }
                     continue;
+                } else if ($map->cardinality == Association::ASSOCIATIVE) {
+                    $this->appendManyToMany($model, $map, $parentId, $data);
+                    continue;
                 }
                 $ids = array_merge(
                     $ids,
                     array_filter($data, fn($d) => $this->isAllowed($model, $d))
                 );
+            } else if ($entry['mode'] == "delete") {
+                $data = is_array($entry['data']) ? $entry['data'] : [$entry['data']];
+                $this->deleteManyToMany($model, $map, $parentId, $data);
             }
         }
         return $ids;
+    }
+
+    protected function deleteAssociation(Model|string $model, array $ids, AssociationMap $map)
+    {
+        if ($map->cardinality == Association::MANY) {
+        }
+    }
+
+    protected function appendManyToMany(string|Model $model, AssociationMap $map, $id, array $associatedIds)
+    {
+        if (!$this->acl->isGrantedWrite($this->model, $id) ||
+            Arr::first($associatedIds, fn($aid) => !$this->acl->isGrantedWrite($model, $aid)) != null) {
+            throw new EGraphQLForbiddenException(Privilege::INSERT);
+        }
+        $collection = $this->model::appendManyToMany($map->name, $id, $associatedIds);
+        $this->createEvent(EventOperation::INSERT, null, $collection->toArray(), null, $map->associativeTable);
+    }
+
+    protected function deleteManyToMany(string|Model $model, AssociationMap $map, $id, array $associatedIds)
+    {
+        if (!$this->acl->isGrantedDelete($this->model, $id) ||
+            Arr::first($associatedIds, fn($aid) => !$this->acl->isGrantedDelete($model, $aid)) != null) {
+            throw new EGraphQLForbiddenException(Privilege::DELETE);
+        }
+        $old = Arr::map($associatedIds, fn($aid) => [
+            $map->fromKey => $id,
+            $map->toKey => $aid
+        ]);
+        $this->model::deleteManyToMany($map->name, $id, $associatedIds);
+        $this->createEvent(EventOperation::DELETE, $old, null, null, $map->associativeTable);
     }
 
     protected function upsert(string|Model $model, array $data, ?array $uniqueBy, ?array $updateColumns)
@@ -91,12 +134,12 @@ abstract class AbstractWriteOperation extends AbstractOperation
         return $row[$model::getKeyAttributeName()];
     }
 
-    protected function createEvent(EventOperation $event, ?array $old, ?array $new, string|Model $model = null)
+    protected function createEvent(EventOperation $event, ?array $old, ?array $new, string|Model $model = null, string $tableName = null)
     {
         $this->events[] = [
             'id' => Uuid::uuid7()->toString(),
             'created_at' => Carbon::now()->unix(),
-            'table' => ($model ?? $this->model)::getClassMap()->tableName,
+            'table' => $tableName ?? ($model ?? $this->model)::getClassMap()->tableName,
             'event' => [
                 'op' => $event->value,
                 'data' => [
@@ -112,7 +155,7 @@ abstract class AbstractWriteOperation extends AbstractOperation
     {
         if (!$this->acl->isGrantedPrivilege($model, Privilege::INSERT))
             throw new EGraphQLForbiddenException(Privilege::INSERT);
-        $row = $model::insert($data, $model::getClassMap()->getInsertAttributeNames());
+        $row = $model::insert($data, $model::getClassMap()->getAttributesNames());
         $this->createEvent(EventOperation::INSERT, null, $row, $model);
         return $row[$model::getKeyAttributeName()];
     }
@@ -153,19 +196,9 @@ abstract class AbstractWriteOperation extends AbstractOperation
         return $this->model::delete($id);
     }
 
-    protected function writeAssociationsAfter(array $associations, int $parentId)
-    {
-        foreach ($associations as $associationName => $association) {
-            $map = $this->model::getClassMap()->getAssociationMap($associationName);
-            $map->cardinality == Association::MANY ?
-                $this->insertAssociationMany($map, $association, $parentId) :
-                $this->insertAssociationAssociative($map, $association, $parentId);
-        }
-    }
-
     protected function insertAssociationMany(AssociationMap $map, array &$objects, $parentId): array
     {
-        return $this->insertAssociation($map, $objects, $parentId);
+        return $this->editAssociation($map, $objects, $parentId);
     }
 
     protected function insertAssociationAssociative(AssociationMap $map, array &$objects, $parentId): array
