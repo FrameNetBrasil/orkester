@@ -155,7 +155,7 @@ class CriteriaBuilder extends Builder
         return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
     }
 
-    public function delete($id = null, array $returning = null)
+    public function delete($id = null, array $returning = null): void
     {
         // If an ID is passed to the method, we will set the where clause to check the
         // ID to let developers to simply and quickly remove a single row from this
@@ -173,7 +173,7 @@ class CriteriaBuilder extends Builder
             $this->cleanBindings($this->grammar->prepareBindingsForDelete($this->bindings))
         );
         $this->logSql($sql, $this->bindings);
-
-        return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
+//        if (!$returning) return Collection::empty();
+//        return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
     }
 }
