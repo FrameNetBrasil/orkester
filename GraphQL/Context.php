@@ -9,15 +9,8 @@ use GraphQL\Language\AST\NodeKind;
 use GraphQL\Language\AST\ObjectFieldNode;
 use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\VariableNode;
-use Illuminate\Support\Arr;
 use Orkester\Exception\EGraphQLNotFoundException;
-use Orkester\GraphQL\Parser\Parser;
-use Orkester\GraphQL\Value\ArrayValue;
-use Orkester\GraphQL\Value\GraphQLValue;
-use Orkester\GraphQL\Value\PrimitiveValue;
-use Orkester\GraphQL\Value\SubQueryValue;
 use Orkester\Manager;
-use Orkester\MVC\MModel;
 use Orkester\Persistence\Model;
 
 class Context
@@ -93,7 +86,7 @@ class Context
         throw new EGraphQLNotFoundException($name, 'model');
     }
 
-    public function getService(string $name): callable
+    public function getService(string $name): callable|false
     {
         if ($name[0] == '_') {
             $name = substr($name, 1);
@@ -105,6 +98,6 @@ class Context
         if (is_callable($this->serviceResolver) && $service = ($this->serviceResolver)($name)) {
             return $service;
         }
-        throw new EGraphQLNotFoundException($name, 'service');
+        return false;
     }
 }

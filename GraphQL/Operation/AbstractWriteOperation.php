@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
+use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLForbiddenException;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Enum\Association;
@@ -76,17 +77,13 @@ abstract class AbstractWriteOperation extends AbstractOperation
                     array_filter($data, fn($d) => $this->isAllowed($model, $d))
                 );
             } else if ($entry['mode'] == "delete") {
+                if ($map->cardinality != Association::ASSOCIATIVE)
+                    throw new EGraphQLException("Delete association is only supported on Many to Many relationships");
                 $data = is_array($entry['data']) ? $entry['data'] : [$entry['data']];
                 $this->deleteManyToMany($model, $map, $parentId, $data);
             }
         }
         return $ids;
-    }
-
-    protected function deleteAssociation(Model|string $model, array $ids, AssociationMap $map)
-    {
-        if ($map->cardinality == Association::MANY) {
-        }
     }
 
     protected function appendManyToMany(string|Model $model, AssociationMap $map, $id, array $associatedIds)
@@ -113,27 +110,6 @@ abstract class AbstractWriteOperation extends AbstractOperation
         $this->createEvent(EventOperation::DELETE, $old, null, null, $map->associativeTable);
     }
 
-    protected function upsert(string|Model $model, array $data, ?array $uniqueBy, ?array $updateColumns)
-    {
-        $uniqueBy ??= [$model::getKeyAttributeName()];
-        $returning = $model::getClassMap()->getAttributesNames();
-        $updateColumns ??= $model::getClassMap()->getInsertAttributeNames();
-
-        if (Arr::has($data, $uniqueBy)) {
-            $oldCriteria = $model::getCriteria();
-            array_walk($uniqueBy, fn($u) => $oldCriteria->where($u, '=', $data[$u]));
-            $old = $oldCriteria->get()->first();
-
-            if (!$this->acl->isGrantedWrite($model, $old[$model::getKeyAttributeName()]))
-                throw new EGraphQLForbiddenException(Privilege::UPSERT);
-        }
-        if (!$this->acl->isGrantedPrivilege($model, Privilege::INSERT))
-            throw new EGraphQLForbiddenException(Privilege::UPSERT);
-        $row = $model::upsert($data, $uniqueBy, $updateColumns, $returning);
-        $this->createEvent(EventOperation::UPSERT, $old ?? null, $row, $model);
-        return $row[$model::getKeyAttributeName()];
-    }
-
     protected function createEvent(EventOperation $event, ?array $old, ?array $new, string|Model $model = null, string $tableName = null)
     {
         $this->events[] = [
@@ -155,8 +131,29 @@ abstract class AbstractWriteOperation extends AbstractOperation
     {
         if (!$this->acl->isGrantedPrivilege($model, Privilege::INSERT))
             throw new EGraphQLForbiddenException(Privilege::INSERT);
-        $row = $model::insert($data, $model::getClassMap()->getAttributesNames());
+        $row = $model::insertReturning($data, $model::getClassMap()->getAttributesNames());
         $this->createEvent(EventOperation::INSERT, null, $row, $model);
+        return $row[$model::getKeyAttributeName()];
+    }
+
+    protected function upsert(string|Model $model, array $data, ?array $uniqueBy, ?array $updateColumns)
+    {
+        $uniqueBy ??= [$model::getKeyAttributeName()];
+        $returning = $model::getClassMap()->getAttributesNames();
+        $updateColumns ??= $model::getClassMap()->getInsertAttributeNames();
+
+        if (Arr::has($data, $uniqueBy)) {
+            $oldCriteria = $model::getCriteria();
+            array_walk($uniqueBy, fn($u) => $oldCriteria->where($u, '=', $data[$u]));
+            $old = $oldCriteria->get()->first();
+
+            if (!$this->acl->isGrantedWrite($model, $old[$model::getKeyAttributeName()]))
+                throw new EGraphQLForbiddenException(Privilege::UPSERT);
+        }
+        if (!$this->acl->isGrantedPrivilege($model, Privilege::INSERT))
+            throw new EGraphQLForbiddenException(Privilege::UPSERT);
+        $row = $model::upsertReturning($data, $uniqueBy, $updateColumns, $returning);
+        $this->createEvent(EventOperation::UPSERT, $old ?? null, $row, $model);
         return $row[$model::getKeyAttributeName()];
     }
 
@@ -168,7 +165,7 @@ abstract class AbstractWriteOperation extends AbstractOperation
             ->where($model::getKeyAttributeName(), '=', $key)
             ->get()->first();
         $data = array_merge($old ?? [], $data);
-        $row = $model::update($data, $model::getClassMap()->getAttributesNames());
+        $row = $model::updateReturning($data, $model::getClassMap()->getAttributesNames());
         $this->createEvent(EventOperation::UPDATE, $old ?? null, $row, $model);
         return $row[$model::getKeyAttributeName()];
     }
@@ -178,22 +175,23 @@ abstract class AbstractWriteOperation extends AbstractOperation
         if (!$this->acl->isGrantedWrite($model, $data[$model::getKeyAttributeName()]))
             throw new EGraphQLForbiddenException(Privilege::WRITE_MODEL);
         $data = array_merge($old, $data);
-        $row = $model::update($data, $model::getClassMap()->getAttributesNames());
+        $row = $model::updateReturning($data, $model::getClassMap()->getAttributesNames());
         $this->createEvent(EventOperation::UPDATE, $old, $row, $model);
         return $row[$model::getKeyAttributeName()];
-    }
-
-    protected function isAllowed(Model|string $model, $row): bool
-    {
-        $id = is_array($row) ? $row[$model::getKeyAttributeName()] : $row;
-        return $this->acl->isGrantedWrite($model, $id);
     }
 
     protected function delete(string|Model $model, $id)
     {
         if (!$this->acl->isGrantedDelete($model, $id))
             throw new EGraphQLForbiddenException(Privilege::DELETE);
-        return $this->model::delete($id);
+        $deleted = $this->model::deleteReturning($id, $model::getClassMap()->getAttributesNames());
+        $this->createEvent(EventOperation::DELETE, $deleted, null, $model);
+    }
+
+    protected function isAllowed(Model|string $model, $row): bool
+    {
+        $id = is_array($row) ? $row[$model::getKeyAttributeName()] : $row;
+        return $this->acl->isGrantedWrite($model, $id);
     }
 
     protected function insertAssociationMany(AssociationMap $map, array &$objects, $parentId): array

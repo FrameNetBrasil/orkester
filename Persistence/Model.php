@@ -335,13 +335,6 @@ class Model
             ->delete();
     }
 
-    public static function delete(int $id, array $returning = null): int
-    {
-        return static::getCriteria()
-            ->where(static::getClassMap()->keyAttributeName, '=', $id)
-            ->delete();
-    }
-
     public static function save(object $object): ?int
     {
         $classMap = PersistenceManager::getClassMap(get_called_class());
@@ -386,24 +379,24 @@ class Model
         $row = static::prepareWrite($data);
         $criteria = static::getCriteria();
         $keyAttributeName = static::getKeyAttributeName();
-        return $criteria->insert($row, [$keyAttributeName])->keyAttributeName;
+        return static::insertReturning($data, [$keyAttributeName])[$keyAttributeName];
     }
 
     public static function update(array $data): ?int
     {
-        $row = static::prepareWrite($data);
         $keyAttributeName = static::getKeyAttributeName();
-        return static::getCriteria()
-            ->where($keyAttributeName, '=', $row[$keyAttributeName])
-            ->update($row, [$keyAttributeName])->keyAttributeName;
+        return static::updateReturning($data, [$keyAttributeName])[$keyAttributeName];
     }
 
     public static function upsert(array $data, array $uniqueBy, $updateColumns = null): ?int
     {
-        $row = static::prepareWrite($data);
         $keyAttributeName = static::getKeyAttributeName();
-        $criteria = static::getCriteria();
-        return $criteria->upsert($row, $uniqueBy, $updateColumns, [$keyAttributeName])->keyAttributeName;
+        return static::upsertReturning($data, $uniqueBy, $updateColumns, [$keyAttributeName])[$keyAttributeName];
+    }
+
+    public static function delete($id)
+    {
+        static::deleteReturning($id);
     }
 
     public static function insertReturning(array $data, array $returning = null): ?array
@@ -426,6 +419,12 @@ class Model
         $row = static::prepareWrite($data);
         $criteria = static::getCriteria();
         return $criteria->upsert($row, $uniqueBy, $updateColumns, $returning)[0];
+    }
+
+    public static function deleteReturning(int $id, array $returning = null): array
+    {
+        return static::getCriteria()
+            ->delete($id, $returning)[0];
     }
 
     public static function insertUsingCriteria(array $fields, Criteria $usingCriteria): ?int
