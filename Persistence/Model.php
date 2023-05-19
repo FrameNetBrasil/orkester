@@ -327,11 +327,11 @@ class Model
             ->delete();
     }
 
-    public static function delete(int $id): int
+    public static function delete(int $id): void
     {
         $key = static::getKeyAttributeName();
         $criteria = static::getCriteria();
-        return $criteria
+        $criteria
             ->where($key, '=', $id)
             ->delete();
     }
