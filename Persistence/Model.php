@@ -329,24 +329,21 @@ class Model
 
     public static function delete(int $id): int
     {
-        $classMap = self::getClassMap(get_called_class());
-        $key = $classMap->keyAttributeName;
+        $key = static::getKeyAttributeName();
         $criteria = static::getCriteria();
         return $criteria
             ->where($key, '=', $id)
             ->delete();
     }
 
-    public static function save(object $object): ?int
+    public static function save(array $data): ?int
     {
-        $classMap = PersistenceManager::getClassMap(get_called_class());
-        $array = (array)$object;
-        $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
-        $key = $classMap->keyAttributeName;
+        $fields = static::prepareWrite($data);
+        $key = static::getKeyAttributeName();
         $criteria = self::getCriteria();
         $criteria->upsert([$fields], [$key], array_keys($fields));
-        if ($object->$key) {
-            return $object->$key;
+        if (isset($data[$key])) {
+            return $data[$key];
         } else {
             return $criteria->getConnection()->getPdo()->lastInsertId();
         }
@@ -376,31 +373,25 @@ class Model
         return $row;
     }
 
-    public static function insert(array|object $data): ?int
+    public static function insert(array $data): ?int
     {
-        $classMap = static::getClassMap(get_called_class());
         $criteria = static::getCriteria();
-        if (is_object($data)) {
-            $array = (array)$data;
-            $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
-            $criteria->insert([$fields]);
-        } else {
-            $criteria->insert($data);
-        }
+        $fields = static::prepareWrite($data);
+        $criteria->insert([$fields]);
         $lastInsertId = $criteria->getConnection()->getPdo()->lastInsertId();
         return $lastInsertId;
     }
 
-    public static function update(object $object)
+    public static function update(array $data)
     {
-        $classMap = self::getClassMap(get_called_class());
-        $array = (array)$object;
-        $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
-        $key = $classMap->keyAttributeName;
+        $fields = static::prepareWrite($data);
+        $key = static::getKeyAttributeName();
         // key must be present
         if (isset($fields[$key])) {
             $criteria = static::getCriteria();
-            $criteria->where($key, '=', $fields[$key])->update($fields);
+            $criteria->where($key, '=', $fields[$key])->update([$fields]);
+        } else {
+            throw new \InvalidArgumentException("Invalid arguments for update.");
         }
     }
 
