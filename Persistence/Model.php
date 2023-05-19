@@ -322,6 +322,11 @@ class Model
         return PersistenceManager::$capsule->getConnection($databaseName);
     }
 
+    public static function getKeyAttributeName(): string
+    {
+        return PersistenceManager::getClassMap(get_called_class())->keyAttributeName;
+    }
+
     public static function deleteAssociation(string $associationChain, int $id): array
     {
         return static::getCriteria()
@@ -352,13 +357,6 @@ class Model
         }
     }
 
-    public static function upsert(array $data, array $uniqueBy, $updateColumns = null, array $returning = null): array
-    {
-        $row = static::prepareWrite($data);
-        $criteria = static::getCriteria();
-        return $criteria->upsert($row, $uniqueBy, $updateColumns, $returning)[0];
-    }
-
     protected static function prepareWrite(array $data): array
     {
         $classMap = PersistenceManager::getClassMap(static::class);
@@ -383,14 +381,39 @@ class Model
         return $row;
     }
 
-    public static function insert(array $data, array $returning = null): ?array
+    public static function insert(array $data): ?int
+    {
+        $row = static::prepareWrite($data);
+        $criteria = static::getCriteria();
+        $keyAttributeName = static::getKeyAttributeName();
+        return $criteria->insert($row, [$keyAttributeName])->keyAttributeName;
+    }
+
+    public static function update(array $data): ?int
+    {
+        $row = static::prepareWrite($data);
+        $keyAttributeName = static::getKeyAttributeName();
+        return static::getCriteria()
+            ->where($keyAttributeName, '=', $row[$keyAttributeName])
+            ->update($row, [$keyAttributeName])->keyAttributeName;
+    }
+
+    public static function upsert(array $data, array $uniqueBy, $updateColumns = null): ?int
+    {
+        $row = static::prepareWrite($data);
+        $keyAttributeName = static::getKeyAttributeName();
+        $criteria = static::getCriteria();
+        return $criteria->upsert($row, $uniqueBy, $updateColumns, [$keyAttributeName])->keyAttributeName;
+    }
+
+    public static function insertReturning(array $data, array $returning = null): ?array
     {
         $row = static::prepareWrite($data);
         $criteria = static::getCriteria();
         return $criteria->insert($row, $returning)[0] ?? [];
     }
 
-    public static function update(array $data, array $returning = null): array
+    public static function updateReturning(array $data, array $returning = null): array
     {
         $row = static::prepareWrite($data);
         return static::getCriteria()
@@ -398,9 +421,11 @@ class Model
             ->update($row, $returning)[0] ?? [];
     }
 
-    public static function getKeyAttributeName(): string
+    public static function upsertReturning(array $data, array $uniqueBy, $updateColumns = null, array $returning = null): array
     {
-        return PersistenceManager::getClassMap(get_called_class())->keyAttributeName;
+        $row = static::prepareWrite($data);
+        $criteria = static::getCriteria();
+        return $criteria->upsert($row, $uniqueBy, $updateColumns, $returning)[0];
     }
 
     public static function insertUsingCriteria(array $fields, Criteria $usingCriteria): ?int
