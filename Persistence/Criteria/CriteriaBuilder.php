@@ -92,10 +92,11 @@ class CriteriaBuilder extends Builder
          * @var array $rows
          */
         $rows = $this->connection->statement($sql, $bindings);
+        if (!$returning) return Collection::empty();
         return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
     }
 
-    public function insert(array $values, array $returning = null)
+    public function insert(array $values, array $returning = null): \Illuminate\Support\Collection
     {
         // Since every insert gets treated like a batch insert, we will make sure the
         // bindings are structured in a way that is convenient when building these
