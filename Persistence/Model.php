@@ -337,14 +337,12 @@ class Model
 
     public static function save(object $object): ?int
     {
-        $classMap = PersistenceManager::getClassMap(get_called_class());
-        $array = (array)$object;
-        $fields = Arr::only($array, array_keys($classMap->insertAttributeMaps));
-        $key = $classMap->keyAttributeName;
+        $fields = static::prepareWrite($data);
+        $key = static::getKeyAttributeName();
         $criteria = self::getCriteria();
         $criteria->upsert([$fields], [$key], array_keys($fields));
-        if ($object->$key) {
-            return $object->$key;
+        if (isset($data[$key])) {
+            return $data[$key];
         } else {
             return $criteria->getConnection()->getPdo()->lastInsertId();
         }
@@ -376,13 +374,12 @@ class Model
 
     public static function insert(array $data): ?int
     {
-        $row = static::prepareWrite($data);
         $criteria = static::getCriteria();
         $keyAttributeName = static::getKeyAttributeName();
         return static::insertReturning($data, [$keyAttributeName])[$keyAttributeName];
     }
 
-    public static function update(array $data): ?int
+    public static function update(array $data)
     {
         $keyAttributeName = static::getKeyAttributeName();
         return static::updateReturning($data, [$keyAttributeName])[$keyAttributeName];
