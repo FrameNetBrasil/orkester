@@ -176,7 +176,7 @@ class CriteriaBuilder extends Builder
             $this->cleanBindings($this->grammar->prepareBindingsForDelete($this->bindings))
         );
         $this->logSql($sql, $this->bindings);
-
-        return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
+       if (!$returning) return Collection::empty();
+       return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
     }
 }
