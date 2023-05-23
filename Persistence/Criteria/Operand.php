@@ -127,22 +127,20 @@ class Operand
                     if ($associationMap->cardinality == Association::ASSOCIATIVE) {
                         $toField = $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
                         $fromField = $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
-                        //$toField = $associationMap->toClassMap->keyAttributeName;
-                        //$fromField = $associationMap->fromClassMap->keyAttributeName;
                         $associativeTableName = $associationMap->associativeTable;
                         $associativeTableAlias = 'a' . ++$this->criteria->aliasCount;
                         $this->criteria->tableAlias[$associativeTableName] = $associativeTableAlias;
                         $this->criteria->generatedAliases->add($associativeTableAlias);
                         $joinType = ($i == $last) ? ($associationJoinType ?: $associationMap->joinType) : $associationMap->joinType;
                         match ($joinType) {
-                            Join::INNER => $this->criteria->join($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $toField, '=', $associativeTableAlias . '.' . $associationMap->fromKey),
-                            Join::LEFT => $this->criteria->leftJoin($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $toField, '=', $associativeTableAlias . '.' . $associationMap->fromKey),
-                            Join::RIGHT => $this->criteria->rigthJoin($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $toField, '=', $associativeTableAlias . '.' . $associationMap->fromKey),
+                            Join::INNER => $this->criteria->join($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
+                            Join::LEFT => $this->criteria->leftJoin($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
+                            Join::RIGHT => $this->criteria->rigthJoin($associativeTableName . ' as ' . $associativeTableAlias, $alias . '.' . $fromField, '=', $associativeTableAlias . '.' . $fromField),
                         };
                         match ($joinType) {
-                            Join::INNER => $this->criteria->join($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $associationMap->toKey, '=', $toAlias . '.' . $fromField),
-                            Join::LEFT => $this->criteria->leftJoin($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $associationMap->toKey, '=', $toAlias . '.' . $fromField),
-                            Join::RIGHT => $this->criteria->rigthJoin($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $associationMap->toKey, '=', $toAlias . '.' . $fromField)
+                            Join::INNER => $this->criteria->join($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $toField, '=', $toAlias . '.' . $toField),
+                            Join::LEFT => $this->criteria->leftJoin($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $toField, '=', $toAlias . '.' . $toField),
+                            Join::RIGHT => $this->criteria->rigthJoin($toTableName . ' as ' . $toAlias, $associativeTableAlias . '.' . $toField, '=', $toAlias . '.' . $toField)
                         };
                     } else {
                         $toField = $toAlias . '.' . $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
