@@ -91,7 +91,7 @@ class MModel
         return $object;
     }
 
-    public static function save(object $object, ClassMap $classMap = null): int
+    public static function save(object $object, ClassMap $classMap = null, bool $upsert = false): int
     {
         $classMap = $classMap ?? static::getClassMap();
         $errors = [];
@@ -124,9 +124,15 @@ class MModel
         if (!empty($errors)) {
             throw new EValidationException($errors);
         }
-        $pk = Manager::getPersistentManager()->saveObject($classMap, $object);
+        $pk = Manager::getPersistentManager()->saveObject($classMap, $object, $upsert);
         static::afterSave($object, $pk);
         return $pk;
+    }
+
+    public static function upsert(object $object)
+    {
+        $classMap = static::getClassMap();
+        return static::save($object, $classMap, true);
     }
 
     public static function beforeSave(object $object)
