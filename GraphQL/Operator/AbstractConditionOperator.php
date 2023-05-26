@@ -35,7 +35,7 @@ abstract class AbstractConditionOperator extends AbstractOperation
             'in' => 'IN',
             'nin' => 'NOT IN',
             'is_null' => $value ? 'IS NULL' : 'IS NOT NULL',
-            'like', 'contains' => 'LIKE',
+            'like', 'contains', 'startsWith' => 'LIKE',
             'nlike' => 'NOT LIKE',
             'regex' => 'RLIKE',
             default => null
@@ -48,6 +48,7 @@ abstract class AbstractConditionOperator extends AbstractOperation
         $modifiedValue = match ($operator) {
             'is_null' => null,
             'contains' => "%$realValue%",
+            'startsWith' => "$realValue%",
             default => $realValue
         };
         if (array_key_exists($key, $parameters)) {
