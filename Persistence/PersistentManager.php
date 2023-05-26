@@ -240,7 +240,7 @@ class PersistentManager
      *
      */
 
-    public function saveObject(ClassMap $classMap, object $object)
+    public function saveObject(ClassMap $classMap, object $object, bool $upsert = false)
     {
         $this->persistence->setDb($classMap);
         $persistentObject = $object;
@@ -254,7 +254,7 @@ class PersistentManager
             $classMap->setObjectUid($persistentObject);
             $hooks->onBeforeInsert($persistentObject);
             $statement = $this->persistence->getStatementForInsert($classMap, $persistentObject);
-            $commands[] = $statement->insert();
+            $commands[] = $upsert ? $statement->upsert() : $statement->insert();
             $this->execute($commands);
             $classMap->setPostObjectKey($persistentObject);
             $hooks->onAfterInsert($object, $classMap->getObjectKey($persistentObject));

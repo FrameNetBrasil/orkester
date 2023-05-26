@@ -291,6 +291,22 @@ class MSql
         return $this;
     }
 
+    public function upsert(?array $parameters = [])
+    {
+        if (count($parameters) > 0) {
+            $this->setParameters($parameters);
+        }
+        $tables = implode(',', $this->tables);
+        $columns = implode(',', $this->columns);
+        $values = implode(',', $this->paramKey);
+        $updateArray = array_map(fn ($column) => "{$column}=:{$column}", $this->columns);
+        $update = implode(',', $updateArray);
+        $sqlText = "INSERT INTO {$tables} ({$columns}) VALUES ({$values}) ON DUPLICATE KEY UPDATE {$update}";
+        $this->command = $sqlText;
+        $this->prepareAndBind();
+        return $this;
+    }
+
     public function insertFrom($sql)
     {
         $sqlText = 'INSERT INTO ' . implode(',', $this->tables) . ' ( ' . implode(',', $this->columns) . ' ) ';
