@@ -141,7 +141,7 @@ class Platform extends MySqlPlatform {
         else if ($type == 'date') {
             return Carbon::createFromFormat('Y-m-d', $value);
         } elseif ($type == 'timestamp' || $type == 'datetime') {
-            return Carbon::createFromFormat('Y-m-d H:i:s', $value);
+            return Carbon::createFromFormat('Y-m-d H:i:s', $value, 'GMT');
         } elseif ($type == 'time') {
             return Carbon::createFromFormat('H:i:s', $value);
         } elseif ($type == 'json') {
