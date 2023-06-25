@@ -52,6 +52,7 @@ class PersistenceManager
                 'charset' => $conf['charset'] ?? 'utf8',
                 'collation' => $conf['collate'] ?? 'utf8_unicode_ci',
                 'prefix' => $conf['prefix'] ?? '',
+                'options' => $conf['options'] ?? [],
             ], $name);
         }
     }
