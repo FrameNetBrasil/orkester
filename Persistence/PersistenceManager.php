@@ -9,12 +9,12 @@ use Illuminate\Database\Connection;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Arr;
 use Monolog\Logger;
+use Orkester\Manager;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
-use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Enum\Key;
-use Orkester\Manager;
+use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
@@ -274,14 +274,19 @@ class PersistenceManager
         return static::$properties;
     }
 
-    public static function getCriteria(string $databaseName = null, string|Model $model = null): Criteria
+    public static function getConnection(string $databaseName = null): Connection
     {
         $databaseName ??= Manager::getOptions('db');
         $connection = self::$capsule->getConnection($databaseName);
         $connection->enableQueryLog();
         (new \ReflectionClass(get_class($connection)))
             ->getProperty('fetchMode')->setValue($connection, self::$fetchStyle);
-        $classMap = self::getClassMap($model);
+        return $connection;
+    }
+
+    public static function getCriteriaForClassMap(ClassMap $classMap, string $databaseName = null)
+    {
+        $connection = static::getConnection($databaseName);
         $container = Manager::getContainer();
         return $container->call(
             function (Logger $logger) use ($connection, $classMap) {
@@ -289,6 +294,12 @@ class PersistenceManager
                 return $criteria->setClassMap($classMap);
             }
         );
+    }
+
+    public static function getCriteria(string $databaseName = null, string|Model $model = null): Criteria
+    {
+        $classMap = static::getClassMap($model);
+        return static::getCriteriaForClassMap($classMap, $databaseName);
     }
 
     public static function getAssociation(string $associationChain, int $id): array
@@ -391,12 +402,6 @@ class PersistenceManager
         $parts = explode('\\', static::class);
         $className = $parts[count($parts) - 1];
         return substr($className, 0, strlen($className) - 5);
-    }
-
-    public static function getConnection(?string $databaseName = null): Connection
-    {
-        $databaseName ??= Manager::getOptions('db');
-        return self::$capsule->getConnection($databaseName);
     }
 
     public static function beginTransaction(?string $databaseName = null)

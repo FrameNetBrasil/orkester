@@ -1,8 +1,8 @@
 <?php
 
-namespace Orkester\GraphQL\Operation;
+namespace Orkester\Persistence\Enum;
 
-enum EventOperation: string
+enum EventType: string
 {
     case UPDATE = "UPDATE";
     case UPSERT = "UPSERT";

@@ -4,15 +4,16 @@
 namespace Orkester\Exception;
 
 
-class ValidationException extends \InvalidArgumentException
+class UnknownFieldException extends \InvalidArgumentException
 {
     public function __construct(
         protected string $model,
-        protected array  $errors,
-        string           $message = 'Validation Error',
+        protected array  $fields,
+        string           $message = null,
         int              $code = 400
     )
     {
+        $message ??= "Unknown fields: " . implode(',', $this->fields);
         parent::__construct($message, $code);
     }
 
@@ -21,8 +22,8 @@ class ValidationException extends \InvalidArgumentException
         return $this->model;
     }
 
-    public function getErrors(): array
+    public function getFields(): array
     {
-        return $this->errors;
+        return $this->fields;
     }
 }

@@ -2,10 +2,6 @@
 
 namespace Orkester\Controllers;
 
-use Orkester\Exception\EGraphQLException;
-use Orkester\Exception\EGraphQLForbiddenException;
-use Orkester\Exception\EGraphQLNotFoundException;
-use Orkester\Exception\ValidationException;
 use Orkester\GraphQL\Executor;
 use Orkester\Manager;
 use Slim\Psr7\Request;
@@ -31,8 +27,11 @@ class MGraphQLController
     public function execute(): array
     {
         $executor = new Executor($this->query, $this->variables);
-        $data = $executor->execute();
-        return empty($errors ?? null) ? $data : ['errors' => $errors];
+        ['errors' => $errors, 'data' => $data] = $executor->execute();
+        $response = [];
+        if (!empty($errors)) $response['errors'] = $errors;
+        if (!empty($data)) $response['data'] = $data;
+        return $response;
     }
 
     public function send(mixed $content, int $httpCode): Response

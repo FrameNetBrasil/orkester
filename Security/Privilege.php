@@ -10,6 +10,4 @@ enum Privilege: string
     case DELETE = 'delete';
     case UPSERT = "upsert";
     case READ_FIELD = 'read_field';
-    case WRITE_MODEL = 'write_model';
-    case DELETE_MODEL = 'delete_model';
 }

@@ -5,11 +5,10 @@ namespace Orkester\GraphQL\Operation;
 use GraphQL\Language\AST\FieldNode;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
-use Orkester\Security\Acl;
+use Orkester\Security\Role;
 
 abstract class AbstractOperation
 {
-    protected Acl $acl;
     protected string $name;
     public bool $isSingle = false;
 
@@ -23,9 +22,8 @@ abstract class AbstractOperation
         return null;
     }
 
-    public function __construct(FieldNode $root, protected Context $context)
+    public function __construct(FieldNode $root, protected Context $context, protected Role $role)
     {
-        $this->acl = new Acl();
         $this->name = $this->getNodeName($root);
     }
 

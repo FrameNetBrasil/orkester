@@ -108,7 +108,7 @@ class Criteria extends Builder
     public function columnName(string $className, string $attribute)
     {
         //mdump('attribute to column = ' . $className . '.' . $attribute . PHP_EOL);
-        return ($attribute == '*') ? '*' : $this->maps[$className ?: $this->model]->getAttributeMap($attribute)?->columnName;
+        return ($attribute == '*') ? '*' : $this->maps[$className ?: $this->model]->getAttributeMap($attribute)?->columnName ?? $attribute;
     }
 
     public function getAttributeMap(string $attributeName, $className = ''): ?AttributeMap
@@ -328,7 +328,7 @@ class Criteria extends Builder
     protected function getReturningSql(?array $returning): string
     {
         if ($returning) {
-            $return = Arr::map($returning, fn($r) => $this->grammar->wrap($r));
+            $return = Arr::map($returning, fn($r) => $this->grammar->wrap($r, true));
             $sql = " returning " . implode(',', $return);
         }
         return $sql ?? "";
@@ -339,7 +339,7 @@ class Criteria extends Builder
         $values = Arr::map(Arr::wrap($bindings), fn($b) => match (true) {
             is_string($b) => "'$b'",
             is_null($b) => 'NULL',
-            is_array($b) => implode(',', $b ),
+            is_array($b) => implode(',', $b),
             default => $b
         });
         $sql = Str::replaceArray('?', $values, $query);
@@ -351,9 +351,7 @@ class Criteria extends Builder
         $sql = $this->toSql();
         $bindings = $this->getBindings();
         $this->logSql($sql, $bindings);
-        return $this->connection->select(
-            $sql, $bindings, !$this->useWritePdo
-        );
+        return $this->connection->select($sql, $bindings, !$this->useWritePdo);
     }
 
     public function upsert(array $values, $uniqueBy, $update = null, array $returning = null): Collection
@@ -394,7 +392,8 @@ class Criteria extends Builder
          */
         $rows = $this->connection->statement($sql, $bindings);
         if (!$returning) return Collection::empty();
-        return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
+        $valid = array_filter(array_keys($rows[0]), fn($k) => !is_int($k));
+        return collect(Arr::map($rows, fn($row) => Arr::only($row, $valid)));
     }
 
     public function insert(array $values, array $returning = null): \Illuminate\Support\Collection
@@ -435,25 +434,20 @@ class Criteria extends Builder
             $this->cleanBindings(Arr::flatten($values, 1))
         );
         if (!$returning) return Collection::empty();
-        return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
+        $valid = array_filter(array_keys($rows[0]), fn($k) => !is_int($k));
+        return collect(Arr::map($rows, fn($row) => Arr::only($row, $valid)));
     }
 
-    public function update(array $values, array $returning = null): \Illuminate\Support\Collection
+    public function update(array $values): bool
     {
         $this->applyBeforeQueryCallbacks();
 
         $sql = $this->grammar->compileUpdate($this, $values);
-        $sql .= $this->getReturningSql($returning);
         $bindings = $this->cleanBindings(
             $this->grammar->prepareBindingsForUpdate($this->bindings, $values)
         );
-        /**
-         * @var array $rows
-         */
-        $rows = $this->connection->statement($sql, $bindings);
         $this->logSql($sql, $bindings);
-        if (!$returning) return Collection::empty();
-        return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
+        return !!$this->connection->statement($sql, $bindings);
     }
 
     public function delete($id = null, array $returning = null): Collection
@@ -469,16 +463,18 @@ class Criteria extends Builder
 
         $sql = $this->grammar->compileDelete($this);
         $sql .= $this->getReturningSql($returning);
+        $bindings = $this->cleanBindings($this->grammar->prepareBindingsForDelete($this->bindings));
+        $this->logSql($sql, $bindings);
         /**
          * @var array $rows
          */
         $rows = $this->connection->statement(
             $sql,
-            $this->cleanBindings($this->grammar->prepareBindingsForDelete($this->bindings))
+            $bindings
         );
-        $this->logSql($sql, $this->bindings);
         if (!$returning) return Collection::empty();
-        return collect(Arr::map($rows, fn($row) => Arr::only($row, $returning)));
+        $valid = array_filter(array_keys($rows[0]), fn($k) => !is_int($k));
+        return collect(Arr::map($rows, fn($row) => Arr::only($row, $valid)));
     }
 
 }
