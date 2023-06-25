@@ -9,8 +9,10 @@ use GraphQL\Language\Parser;
 use Illuminate\Support\Arr;
 use Monolog\Logger;
 use Orkester\Exception\EGraphQLNotFoundException;
+use Orkester\Exception\ForbiddenException;
+use Orkester\Exception\UnknownFieldException;
+use Orkester\Exception\ValidationException;
 use Orkester\GraphQL\Operation\AbstractOperation;
-use Orkester\GraphQL\Operation\AbstractWriteOperation;
 use Orkester\GraphQL\Operation\DeleteOperation;
 use Orkester\GraphQL\Operation\InsertOperation;
 use Orkester\GraphQL\Operation\QueryOperation;
@@ -19,28 +21,34 @@ use Orkester\GraphQL\Operation\TotalOperation;
 use Orkester\GraphQL\Operation\UpdateOperation;
 use Orkester\GraphQL\Operation\UpsertOperation;
 use Orkester\Manager;
+use Orkester\Persistence\EventManager;
 use Orkester\Persistence\PersistenceManager;
+use Orkester\Security\Role;
+use ZMQ;
+use ZMQContext;
+use ZMQSocket;
 
 class Executor
 {
     protected bool $isInstrospection = false;
     protected Context $context;
-    protected array $operations;
+    protected Role $role;
     protected Logger $logger;
 
     public function __construct(
-        string $query,
-        array  $variables = [],
-        Logger $logger = null
+        protected string $query,
+        protected array  $variables = [],
+        Role             $role = null,
+        Logger           $logger = null
     )
     {
         $this->logger = $logger ?? Manager::getContainer()->get(Logger::class)->withName('graphql');
-        $this->operations = $this->parse($query, $variables);
+        $this->role ??= Manager::getContainer()->make('role');
     }
 
-    protected function parse(string $query, array $variables)
+    protected function parse()
     {
-        $document = Parser::parse($query);
+        $document = Parser::parse($this->query);
         foreach ($document->definitions as $definition) {
             if ($definition instanceof FragmentDefinitionNode) {
                 $fragmentNodes[] = $definition;
@@ -48,13 +56,20 @@ class Executor
                 $operationNodes[] = $definition;
             }
         }
-        $this->context = new Context($variables, ...$fragmentNodes ?? []);
-        return $this->parseOperations($operationNodes ?? [], $this->context);
+        $this->context = new Context($this->variables, ...$fragmentNodes ?? []);
+        return $this->parseOperations($operationNodes ?? [], $this->context, $this->role);
     }
 
-    protected function parseOperations(array $operationNodes, Context $context)
+
+    /**
+     * @param array $operationNodes
+     * @param Context $context
+     * @return AbstractOperation[]
+     * @throws EGraphQLNotFoundException
+     */
+    protected function parseOperations(array $operationNodes, Context $context): array
     {
-         $operations = [];
+        $operations = [];
         /** @var OperationDefinitionNode $operationNode */
         foreach ($operationNodes as $operationNode) {
             if ($operationNode->operation === "query") {
@@ -65,7 +80,7 @@ class Executor
                         continue;
                     }
                     if ($fieldNode->name->value == '__total') {
-                        $operation = new TotalOperation($fieldNode, $context);
+                        $operation = new TotalOperation($fieldNode, $context, $this->role);
                         $name = $operation->getQueryName();
                         $queryOperation = Arr::first($operations, fn($op) => $op->getName() == $name);
                         if (!$queryOperation)
@@ -73,17 +88,17 @@ class Executor
                         $operation->setQueryOperation($queryOperation);
                         $operations[] = $operation;
                     } else if ($service = $this->context->getService($fieldNode->name->value)) {
-                        $operations[] = new ServiceOperation($fieldNode, $context, $service);
+                        $operations[] = new ServiceOperation($fieldNode, $context, $this->role, $service);
                     } else {
-                        $operations[] = new QueryOperation($fieldNode, $context);
+                        $operations[] = new QueryOperation($fieldNode, $context, $this->role);
                     }
                 }
             } else if ($operationNode->operation === 'mutation') {
                 /** @var FieldNode $operationRoot */
                 foreach ($operationNode->selectionSet->selections as $fieldNode)
-                    $operations = array_merge($operations, $this->getMutationOperations($fieldNode, $context));
+                    $operations = array_merge($operations, $this->getMutationOperations($fieldNode, $context, $this->role));
             } else {
-                throw new EGraphQLNotFoundException($operationNode->operation, 'operation_kind');
+                throw new EGraphQLNotFoundException($operationNode->operation, 'operation');
             }
         }
         return $operations ?? [];
@@ -95,7 +110,7 @@ class Executor
      * @return AbstractOperation[]
      * @throws \Exception
      */
-    protected function getMutationOperations(FieldNode $root, Context $context): array
+    protected function getMutationOperations(FieldNode $root, Context $context, Role $role): array
     {
         $class = match ($root->name->value) {
             'insert' => InsertOperation::class,
@@ -107,7 +122,7 @@ class Executor
         };
         $definitions = iterator_to_array($root->selectionSet->selections->getIterator());
         return $class ?
-            Arr::map($definitions, fn($def) => new $class($def, $context)) :
+            Arr::map($definitions, fn($def) => new $class($def, $context, $role)) :
             [];
     }
 
@@ -120,13 +135,67 @@ class Executor
     public function execute(): array
     {
         PersistenceManager::beginTransaction();
-        foreach ($this->operations as $operation) {
-            $this->context->results[$operation->getName()] = $operation->getResults();
-            if ($operation instanceof AbstractWriteOperation) {
-                //mdump($operation->getEvents());
+        $errors = [];
+        try {
+            $operations = $this->parse();
+            foreach ($operations as $operation) {
+                try {
+                    $this->context->results[$operation->getName()] = $operation->getResults();
+                } catch (ValidationException $e) {
+                    $errors[] = [
+                        'message' => $e->getMessage(),
+                        'extensions' => [
+                            'type' => 'validation',
+                            'operation' => $operation->getName(),
+                            'model' => $e->getModel(),
+                            'errors' => $e->getErrors()
+                        ]
+                    ];
+                } catch (UnknownFieldException $e) {
+                    $errors[] = [
+                        'message' => "Unknown field: " . $e->getFields()[0],
+                        'extensions' => [
+                            'type' => 'unknown_field',
+                            'operation' => $operation->getName(),
+                            'model' => $e->getModel(),
+                            'field' => $e->getFields()[0]
+                        ]
+                    ];
+                }
             }
+        } catch (ForbiddenException $e) {
+            $errors[] = [
+                'message' => $e->getMessage(),
+                'extensions' => [
+                    'type' => 'forbidden',
+                    'privilege' => $e->getPrivilege(),
+                    'key' => $e->getKey()
+                ]
+            ];
+        } catch (EGraphQLNotFoundException $e) {
+            $errors[] = [
+                'message' => $e->getMessage(),
+                'extensions' => [
+                    'name' => $e->getName(),
+                    'kind' => $e->getKind()
+                ]
+            ];
+        } catch(\Exception $e) {
+            $errors[] = [
+                'message' => $e->getMessage()
+            ];
         }
-        PersistenceManager::rollback();
-        return $this->context->results;
+//        $socket =  new ZMQSocket(new ZMQContext(), ZMQ::SOCKET_PUSH, "MySock1");
+//        $socket->connect("tcp://172.25.0.2:5555");
+//        $events = EventManager::flush();
+//        foreach($events as $event) {
+//            $socket->send(json_encode($event));
+//        }
+//        mdump($events);
+        PersistenceManager::commit();
+        return [
+            'data' => $this->context->results,
+            'errors' => $errors
+        ];
     }
 }

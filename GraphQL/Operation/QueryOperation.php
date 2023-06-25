@@ -6,13 +6,16 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
+use Orkester\Exception\UnknownFieldException;
 use Orkester\GraphQL\Argument\ConditionArgument;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Model;
+use Orkester\Persistence\RestrictedModel;
 use Orkester\Security\Acl;
+use Orkester\Security\Role;
 
 class QueryOperation extends AbstractOperation
 {
@@ -25,24 +28,19 @@ class QueryOperation extends AbstractOperation
     /**
      * @var string[]
      */
-    protected Model|string $model;
+    protected RestrictedModel $model;
     protected array $subQueries = [];
 
-    public function __construct(protected FieldNode $root, Context $context, Model|string $model = null)
+    public function __construct(protected FieldNode $root, Context $context, Role $role, RestrictedModel $model = null)
     {
-        parent::__construct($root, $context);
-        $this->model = $model ?? $this->context->getModel($root->name->value);
-        $this->criteria = $this->acl->getCriteria($this->model);
+        parent::__construct($root, $context, $role);
+        $this->model = $model ?? $this->context->getModel($root->name->value)::getRestrictedModel($role);
+        $this->criteria = $this->model->getCriteria();
     }
 
     public function getCriteria(): Criteria
     {
         return $this->criteria;
-    }
-
-    public static function parse(FieldNode $root, Context $context): QueryOperation
-    {
-        return new QueryOperation($root, $context);
     }
 
     public function getResults(): ?array
@@ -82,8 +80,8 @@ class QueryOperation extends AbstractOperation
 
     public function applySelection(NodeList $selections)
     {
-        $attributes = $this->model::getClassMap()->getAttributesNames();
-        $associations = $this->model::getClassMap()->getAssociationsNames();
+        $attributes = $this->model->getClassMap()->getAttributesNames();
+        $associations = $this->model->getClassMap()->getAssociationsNames();
         /** @var FieldNode $selectionNode */
         foreach ($selections->getIterator() as $selectionNode) {
             $field = $selectionNode->name->value;
@@ -93,25 +91,28 @@ class QueryOperation extends AbstractOperation
                 ($argument = $selectionNode->arguments->offsetGet(0))?->name->value == "expression") {
                 $expression = $this->context->getNodeValue($argument->value);
                 $this->selection[$field] = "$expression as $field";
-                return;
+                continue;
             }
             if ($field == "__typename") {
-                $this->selection["__typename"] = "'{$this->model::getName()}' as __typename";
+                $this->selection["__typename"] = "'{$this->model->getName()}' as __typename";
+                continue;
             }
-            if ($this->acl->isGrantedRead($this->model, $field)) {
+            if ($this->model->isGrantedRead($field)) {
                 if (in_array($field, $associations)) {
-                    $map = $this->model::getClassMap()->getAssociationMap($field);
+                    $map = $this->model->getClassMap()->getAssociationMap($field);
                     $this->selection[$name] = '';
                     $this->forcedSelection[] = $map->fromKey;
                     $this->subQueries[$this->getNodeName($selectionNode)] = [
-                        'operation' => new QueryOperation($selectionNode, $this->context, $map->toClassMap->model),
+                        'operation' => new QueryOperation($selectionNode, $this->context, $this->role, $map->toClassMap->model::getRestrictedModel($this->role)),
                         'map' => $map,
                         'name' => $this->getNodeName($selectionNode)
                     ];
                 } else if (in_array($field, $attributes)) {
                     $this->selection[$name] = $field . ($alias ? " as $alias" : "");
                 } else if ($field == "id") {
-                    $this->selection["id"] = "{$this->model::getKeyAttributeName()} as id";
+                    $this->selection["id"] = "{$this->model->getKeyAttributeName()} as id";
+                } else {
+                    throw new UnknownFieldException($this->model->getName(), [$field]);
                 }
             }
         }

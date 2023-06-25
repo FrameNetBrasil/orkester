@@ -9,6 +9,7 @@ use Illuminate\Database\Connection;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Orkester\Exception\UnknownFieldException;
 use Orkester\Exception\ValidationException;
 use Orkester\Manager;
 use Orkester\Persistence\Criteria\Criteria;
@@ -19,6 +20,7 @@ use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
+use Orkester\Security\Role;
 use Phpfastcache\Helper\Psr16Adapter;
 
 class Model
@@ -30,6 +32,7 @@ class Model
     protected static int $fetchStyle;
     private static array $properties = [];
     private static array $classMaps = [];
+    protected static array $events = [];
 
     public static function getCriteria(string $databaseName = null): Criteria
     {
@@ -70,33 +73,34 @@ class Model
         return empty($result) ? null : $result[0];
     }
 
-    public static function find(int $id): object|array|null
+    public static function find(int $id, array $columns = null): ?array
     {
-        return static::getCriteria()->find($id);
+        $columns ??= static::getClassMap()->getAttributesNames();
+        return static::getCriteria()->find($id, $columns);
     }
 
-    public static function init(array $dbConfigurations, int $fetchStyle): void
-    {
-        self::$cachedClassMaps = Manager::getCache();
-        self::$cachedProperties = Manager::getCache();
-        self::$capsule = new Capsule();
-        self::$capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
-        self::$capsule->setAsGlobal();
-        self::$fetchStyle = $fetchStyle;
-        self::$capsule->setFetchMode($fetchStyle);
-        foreach ($dbConfigurations as $name => $conf) {
-            self::$capsule->addConnection([
-                'driver' => $conf['db'] ?? 'mysql',
-                'host' => $conf['host'] ?? 'localhost',
-                'database' => $conf['dbname'] ?? 'database',
-                'username' => $conf['user'] ?? 'root',
-                'password' => $conf['password'] ?? 'password',
-                'charset' => $conf['charset'] ?? 'utf8',
-                'collation' => $conf['collate'] ?? 'utf8_unicode_ci',
-                'prefix' => $conf['prefix'] ?? '',
-            ], $name);
-        }
-    }
+//    public static function init(array $dbConfigurations, int $fetchStyle): void
+//    {
+//        self::$cachedClassMaps = Manager::getCache();
+//        self::$cachedProperties = Manager::getCache();
+//        self::$capsule = new Capsule();
+//        self::$capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
+//        self::$capsule->setAsGlobal();
+//        self::$fetchStyle = $fetchStyle;
+//        self::$capsule->setFetchMode($fetchStyle);
+//        foreach ($dbConfigurations as $name => $conf) {
+//            self::$capsule->addConnection([
+//                'driver' => $conf['db'] ?? 'mysql',
+//                'host' => $conf['host'] ?? 'localhost',
+//                'database' => $conf['dbname'] ?? 'database',
+//                'username' => $conf['user'] ?? 'root',
+//                'password' => $conf['password'] ?? 'password',
+//                'charset' => $conf['charset'] ?? 'utf8',
+//                'collation' => $conf['collate'] ?? 'utf8_unicode_ci',
+//                'prefix' => $conf['prefix'] ?? '',
+//            ], $name);
+//        }
+//    }
 
     public static function map(): void
     {
@@ -286,14 +290,8 @@ class Model
         if ($cardinality == Association::ASSOCIATIVE) {
             $name = "{$associationMap->fromClassName}_$associationMap->associativeTable";
             $classMap = new ClassMap($name);
-            $toAttribute = clone($toClassMap->getAttributeMap($associationMap->toKey));
-            $toAttribute->columnName = $associationMap->toKey;
-
-            $fromAttribute = clone($fromClassMap->getAttributeMap($associationMap->fromKey));
-            $fromAttribute->columnName = $associationMap->fromKey;
-
-            $classMap->addAttributeMap($toAttribute);
-            $classMap->addAttributeMap($fromAttribute);
+            $classMap->addAttributeMap($toClassMap->getAttributeMap($associationMap->toKey));
+            $classMap->addAttributeMap($fromClassMap->getAttributeMap($associationMap->fromKey));
             PersistenceManager::$classMaps[$name] = $classMap;
             $classMap->tableName = $associationMap->associativeTable;
         }
@@ -307,15 +305,6 @@ class Model
         return PersistenceManager::$properties;
     }
 
-    public static function getAssociation(string $associationChain, int $id): array
-    {
-        return static::getCriteria()
-            ->select($associationChain . '.*')
-            ->where('id', '=', $id)
-            ->get()
-            ->toArray();
-    }
-
     public static function getConnection(?string $databaseName = null): Connection
     {
         $databaseName ??= Manager::getOptions('db');
@@ -325,6 +314,15 @@ class Model
     public static function getKeyAttributeName(): string
     {
         return PersistenceManager::getClassMap(get_called_class())->keyAttributeName;
+    }
+
+    public static function getAssociation(string $associationChain, int $id): array
+    {
+        return static::getCriteria()
+            ->select($associationChain . '.*')
+            ->where('id', '=', $id)
+            ->get()
+            ->toArray();
     }
 
     public static function deleteAssociation(string $associationChain, int $id): array
@@ -353,11 +351,10 @@ class Model
         $classMap = PersistenceManager::getClassMap(static::class);
         $validAttributes = array_keys($classMap->insertAttributeMaps);
         if (!empty($invalid = Arr::except($data, $validAttributes))) {
-            $invalidStr = implode(',', $invalid);
-            throw new \InvalidArgumentException("Invalid arguments: [$invalidStr]");
+            throw new UnknownFieldException(static::getName(), $invalid);
         }
         if (!empty($errors = static::validate($data))) {
-            throw new ValidationException($errors);
+            throw new ValidationException(static::getName(), $errors);
         }
         return static::transform($data);
     }
@@ -367,28 +364,29 @@ class Model
         return [];
     }
 
-    public static function transform(array $row)
+    public static function transform(array $row): array
     {
         return $row;
     }
 
     public static function insert(array $data): ?int
     {
-        $criteria = static::getCriteria();
         $keyAttributeName = static::getKeyAttributeName();
         return static::insertReturning($data, [$keyAttributeName])[$keyAttributeName];
     }
 
-    public static function update(array $data)
+    public static function update(array $data): bool
     {
-        $keyAttributeName = static::getKeyAttributeName();
-        return static::updateReturning($data, [$keyAttributeName])[$keyAttributeName];
+        $row = static::prepareWrite($data);
+        return static::getCriteria()
+            ->where(static::getKeyAttributeName(), '=', $row[static::getKeyAttributeName()])
+            ->update($row);
     }
 
     public static function upsert(array $data, array $uniqueBy, $updateColumns = null): ?int
     {
-        $keyAttributeName = static::getKeyAttributeName();
-        return static::upsertReturning($data, $uniqueBy, $updateColumns, [$keyAttributeName])[$keyAttributeName];
+        $keyAttributeColumn = static::getClassMap()->keyAttributeMap->columnName;
+        return static::upsertReturning($data, $uniqueBy, $updateColumns)[$keyAttributeColumn];
     }
 
     public static function delete($id)
@@ -401,14 +399,6 @@ class Model
         $row = static::prepareWrite($data);
         $criteria = static::getCriteria();
         return $criteria->insert($row, $returning)[0] ?? [];
-    }
-
-    public static function updateReturning(array $data, array $returning = null): array
-    {
-        $row = static::prepareWrite($data);
-        return static::getCriteria()
-            ->where(static::getKeyAttributeName(), '=', $row[static::getKeyAttributeName()])
-            ->update($row, $returning)[0] ?? [];
     }
 
     public static function upsertReturning(array $data, array $uniqueBy, $updateColumns = null, array $returning = null): array
@@ -434,15 +424,15 @@ class Model
         return $lastInsertId;
     }
 
-    public static function updateCriteria()
-    {
-        return static::getCriteria();
-    }
-
-    public static function deleteCriteria()
-    {
-        return static::getCriteria();
-    }
+//    public static function updateCriteria()
+//    {
+//        return static::getCriteria();
+//    }
+//
+//    public static function deleteCriteria()
+//    {
+//        return static::getCriteria();
+//    }
 
     public static function getName(): string
     {
@@ -451,10 +441,10 @@ class Model
         return substr($className, 0, strlen($className) - 5);
     }
 
-    public static function rollback(?string $databaseName = null)
-    {
-        PersistenceManager::rollback($databaseName);
-    }
+//    public static function rollback(?string $databaseName = null)
+//    {
+//        PersistenceManager::rollback($databaseName);
+//    }
 
     public static function transaction(callable $closure, ?string $databaseName = null): mixed
     {
@@ -493,15 +483,15 @@ class Model
         return !is_null(static::one($conditions));
     }
 
-    public static function beginTransaction(?string $databaseName = null)
-    {
-        PersistenceManager::beginTransaction($databaseName);
-    }
-
-    public static function commit(?string $databaseName = null)
-    {
-        PersistenceManager::commit($databaseName);
-    }
+//    public static function beginTransaction(?string $databaseName = null)
+//    {
+//        PersistenceManager::beginTransaction($databaseName);
+//    }
+//
+//    public static function commit(?string $databaseName = null)
+//    {
+//        PersistenceManager::commit($databaseName);
+//    }
 
     protected static function getManyToManyAssociation(string $associationName): AssociationMap
     {
@@ -525,9 +515,10 @@ class Model
         ],
             $associatedIds
         );
+        $classMap = PersistenceManager::getClassMap("{$association->fromClassName}_$association->associativeTable");
         return static::getCriteria()
-            ->setClassMap(PersistenceManager::getClassMap("{$association->fromClassName}_$association->associativeTable"))
-            ->upsert($columns, [$association->toKey, $association->fromKey], null, [$association->toKey, $association->fromKey]);
+            ->setClassMap($classMap)
+            ->upsert($columns, [$association->toKey, $association->fromKey], null, $classMap->getColumnsNames());
     }
 
     public static function deleteManyToMany(string $associationName, mixed $id, ?array $associatedIds): void
@@ -543,12 +534,12 @@ class Model
         $criteria->delete();
     }
 
-    public static function replaceAssociation(string $associationName, mixed $id, array $associatedIds): void
+    public static function replaceManyToMany(string $associationName, mixed $id, array $associatedIds): void
     {
-        self::beginTransaction();
+        PersistenceManager::beginTransaction();
         self::deleteManyToMany($associationName, $id, null);
         self::appendManyToMany($associationName, $id, $associatedIds);
-        self::commit();
+        PersistenceManager::commit();
     }
 
     private static function getSignature(string $className): string
@@ -564,4 +555,51 @@ class Model
         $rc = new \ReflectionClass(get_called_class());
         return $rc->getFileName();
     }
+
+    public static function getRestrictedModel(Role $role = null): RestrictedModel
+    {
+        $role ??= Manager::getContainer()->make("role");
+        return new RestrictedModel(static::class, $role);
+    }
+
+    public static function getCriteriaForRole(Role $role): Criteria
+    {
+        return self::getCriteria();
+    }
+
+    public static function isGrantedRead(Role $role, string $field): bool
+    {
+        return true;
+    }
+
+    public static function isGrantedWrite(Role $role, $id): bool
+    {
+        return true;
+    }
+
+    public static function isGrantedDelete(Role $role, $id): bool
+    {
+        return true;
+    }
+
+    public static function isGrantedInsert(Role $role): bool
+    {
+        return true;
+    }
+
+    public static function isGrantedUpdate(Role $role): bool
+    {
+        return true;
+    }
+
+    public static function isGrantedAssociationInsert(Role $role, string $association, $selfKey, $otherKey): bool
+    {
+        return true;
+    }
+
+    public static function isGrantedAssociationDelete(Role $role, string $association, $selfKey, $otherKey): bool
+    {
+        return true;
+    }
+
 }

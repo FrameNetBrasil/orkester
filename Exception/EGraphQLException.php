@@ -4,8 +4,13 @@ namespace Orkester\Exception;
 
 class EGraphQLException extends EOrkesterException
 {
-    public function __construct(string $message, array $extensions = [], int $code = 200)
+    public function __construct(string $message, protected array $extensions = [], int $code = 200)
     {
-        parent::__construct(json_encode(['message' => $message, 'extensions' => $extensions]), $code);
+        parent::__construct($message, $code);
+    }
+
+    public function getExtensions()
+    {
+        return $this->extensions;
     }
 }
