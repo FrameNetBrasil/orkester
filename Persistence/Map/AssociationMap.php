@@ -16,8 +16,6 @@ class AssociationMap
     public string $toClassName;
     public string $associativeTable;
     public Association $cardinality = Association::ONE;
-    public ?AttributeMap $fromAttributeMap;
-    public ?AttributeMap $toAttributeMap;
     public string $order = '';
     public Join $joinType = Join::INNER;
     public bool $autoAssociation = FALSE;

@@ -1,0 +1,15 @@
+version: '3.7'
+services:
+  trace:
+    build:
+        context: .
+    restart: unless-stopped
+    ports:
+      - "${TRACE_PORT}:${TRACE_PORT}"
+      - "${WS_PORT}:${WS_PORT}"
+    command:
+      - "0.0.0.0"
+      - "${TRACE_PORT}"
+      - "0.0.0.0"
+      - "${WS_PORT}"
+

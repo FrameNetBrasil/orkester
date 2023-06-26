@@ -4,20 +4,8 @@
 namespace Orkester\JsonApi;
 
 
-use JsonApiPhp\JsonApi\Attribute;
-use JsonApiPhp\JsonApi\DataDocument;
-use JsonApiPhp\JsonApi\EmptyRelationship;
-use JsonApiPhp\JsonApi\Link\RelatedLink;
-use JsonApiPhp\JsonApi\Link\SelfLink;
-use JsonApiPhp\JsonApi\Meta;
-use JsonApiPhp\JsonApi\NullData;
-use JsonApiPhp\JsonApi\ResourceCollection;
-use JsonApiPhp\JsonApi\ResourceIdentifier;
-use JsonApiPhp\JsonApi\ResourceIdentifierCollection;
-use JsonApiPhp\JsonApi\ResourceObject;
-use JsonApiPhp\JsonApi\ToOne;
 use Orkester\Manager;
-use Orkester\MVC\MModelMaestro;
+use Orkester\MVC\MModel;
 use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\ClassMap;
@@ -26,7 +14,7 @@ class Retrieve
 {
 
     public static function process(
-        MModelMaestro $model,
+        MModel $model,
         ?int          $id, //{resource}/{id}
         ?string       $association, //{resource}/{id}/{association}
         ?string       $relationship, //{resource}/relationships/{relationship}
@@ -125,7 +113,9 @@ class Retrieve
                 'greater' => [$field, '>', $value],
                 'greaterEquals' => [$field, '>=', $value],
                 'notEquals' => [$field, '<>', $value],
+                'neq' => [$field, '<>', $value],
                 'in' => [$field, 'IN', explode(',', $value)],
+                'nin' => [$field, 'NOT IN', explode(',',$value)],
                 default => [$field, '=', $value]
             };
         }
@@ -160,7 +150,7 @@ class Retrieve
     }
 
     public static function buildCriteria(
-        MModelMaestro $model,
+        MModel $model,
         string        $select,
         ?string       $sort,
         ?array        $filter,

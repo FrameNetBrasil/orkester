@@ -22,7 +22,7 @@ class MSession
     {
         $sessionFactory = new SessionFactory;
         $this->session = $sessionFactory->newInstance($_COOKIE);
-        $this->container = $this->session->getSegment('maestro-session');
+        $this->container = $this->session->getSegment('Orkester-session');
         $this->timestamp = 0;
     }
 
