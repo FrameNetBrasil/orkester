@@ -9,9 +9,8 @@ namespace Orkester\Persistence\Map;
 //use Orkester\Persistence\PersistentObject;
 //use Orkester\Utils\MUtil;
 
-use Orkester\Manager;
+use Illuminate\Support\Arr;
 use Orkester\Persistence\Criteria\Criteria;
-use Orkester\Persistence\Criteria\RetrieveCriteria;
 use Orkester\Persistence\Enum\Key;
 use Orkester\Persistence\Model;
 
@@ -78,12 +77,22 @@ class ClassMap
 //        //$this->superClassMap = $this->getManager()->getClassMap($superClassName);
 //    }
 
-    public function getAttributeMaps() : array {
+    /**
+     * @return AttributeMap[]
+     */
+    public function getAttributeMaps(): array
+    {
         return $this->attributeMaps;
     }
 
-    public function getAssociationMaps() : array {
+    public function getAssociationMaps(): array
+    {
         return $this->associationMaps;
+    }
+
+    public function getInsertAttributeNames(): array
+    {
+        return array_keys($this->insertAttributeMaps);
     }
 
     public function addAttributeMap(AttributeMap $attributeMap)
@@ -160,6 +169,40 @@ class ClassMap
     public function getCriteria(): Criteria
     {
         return $this->model::getCriteria();
+    }
+
+    protected $attributesNames = [];
+    protected $associationNames = [];
+
+    /**
+     * @return string[]
+     */
+    public function getAttributesNames(): array
+    {
+        if (empty($this->attributesNames))
+            $this->attributesNames = array_map(
+                fn($map) => $map->name,
+                $this->getAttributeMaps()
+            );
+        return $this->attributesNames;
+    }
+
+    public function getColumnsNames(): array
+    {
+        return Arr::map(
+            array_filter($this->attributeMaps, fn($map) => empty($map->reference)),
+            fn(AttributeMap $map) => $map->columnName . ($map->alias != $map->columnName ? " as $map->alias" : "")
+        );
+    }
+
+    public function getAssociationsNames(): array
+    {
+        if (empty($this->associationNames))
+            $this->associationNames = array_map(
+                fn($map) => $map->name,
+                $this->getAssociationMaps()
+            );
+        return $this->associationNames;
     }
 
 

@@ -2,13 +2,32 @@
 
 namespace Orkester\Exception;
 
-class ERuntimeException extends EOrkesterException
+use Orkester\Manager;
+use Throwable;
+
+class ERuntimeException extends BaseException
 {
-    public function __construct(string $msg = '', int $code = 0, string $goTo = '')
+    protected $message = 'Unknown exception'; // Exception message
+    protected $code = 0; // User-defined exception code
+    protected $goTo; // GoTo URL
+
+    public function __construct(string $message = '', int $code = 200, Throwable|null $previous = null)
     {
-        parent::__construct($msg, $code);
-        $this->goTo = $goTo;
-        $this->message = $msg;
+        if ($message == '') {
+            $message = get_class($this);
+        }
+        parent::__construct($message, $code);
+    }
+
+    public function __toString()
+    {
+        return get_class($this) . " '{$this->message}' at {$this->file}({$this->line})\n"
+            . "{$this->getTraceAsString()}";
+    }
+
+    public function log()
+    {
+        Manager::logError($this->message);
     }
 
 }

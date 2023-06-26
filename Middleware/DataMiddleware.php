@@ -16,7 +16,7 @@ class DataMiddleware implements Middleware
      */
     public function process(Request $request, RequestHandler $handler): Response
     {
-        mtrace('in data middleware');
+//        mtrace('in data middleware');
         $data =  (object)$request->getQueryParams();
         $body = $request->getParsedBody() ?? [];
         foreach($body as $name => $value){
@@ -25,25 +25,6 @@ class DataMiddleware implements Middleware
         $this->setData($data);
         $response = $handler->handle($request);
         return $response;
-    }
-
-    public function setPrimeVueFilters($data, $filters): bool
-    {
-        $data->filter = [];
-        foreach ($filters as $field => $condition) {
-            ['value' => $value, 'matchMode' => $matchMode] = $condition;
-            if (empty($value)) continue;
-            array_push($data->filter,
-                match ($matchMode) {
-                    'startsWith' => [$field, 'LIKE', "$value%"],
-                    'contains' => [$field, 'LIKE', "%$value%"],
-                    'endsWith' => [$field, 'LIKE', "%$value"],
-                    'notContains' => [$field, 'NOT LIKE', "%$value%"],
-                    'notEquals' => [$field, '<>', $value],
-                    default => [$field, '=', $value]
-                });
-        }
-        return true;
     }
 
     private function setData($values)
@@ -65,7 +46,6 @@ class DataMiddleware implements Middleware
                         '_end' => $data->pagination->end = $value,
                         '_embed' => $data->relationship->embed = $value,
                         '_expand' => $data->relationship->expand = $value,
-                        '_filter' => $this->setPrimeVueFilters($data, $value), // primevue
                         default => '',
                     };
                 } else {

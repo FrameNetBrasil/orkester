@@ -8,9 +8,12 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Monolog\Logger;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Grammar\MySqlGrammar;
+use Orkester\Persistence\Grammar\SQLiteGrammar;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
@@ -22,11 +25,6 @@ class Criteria extends Builder
     /** @var Connection */
     public $connection;
     public string|Model $model;
-    /**
-     * @var ClassMap[] $maps
-     */
-    private array $maps;
-    protected Logger $logger;
     public ClassMap $classMap;
     public $fieldAlias = [];
     public $tableAlias = [];
@@ -37,11 +35,19 @@ class Criteria extends Builder
     public $associationJoin = [];
     public $aliasCount = 0;
     public $parameters = [];
+    /**
+     * @var ClassMap[] $maps
+     */
+    private array $maps;
 
-    public function __construct(ConnectionInterface $connection, Logger $logger)
+    public function __construct(ConnectionInterface $connection, protected Logger $logger)
     {
-        parent::__construct($connection, new MySqlGrammar($this));
-        $this->logger = $logger;
+        $grammar = match (get_class($connection->getQueryGrammar())) {
+            \Illuminate\Database\Query\Grammars\MySqlGrammar::class => new MySqlGrammar($this),
+            \Illuminate\Database\Query\Grammars\SQLiteGrammar::class => new SQLiteGrammar($this),
+            default => throw new \InvalidArgumentException("Unknown database grammar")
+        };
+        parent::__construct($connection, $grammar);
         $this->generatedAliases = new Set();
     }
 
@@ -55,39 +61,6 @@ class Criteria extends Builder
         return $this;
     }
 
-    public function setModel(string $model)
-    {
-        $this->classMap = Model::getClassMap($model);
-        $this->model = $model;
-        $this->maps[$this->model] = $this->classMap;
-        $this->connection->table($this->tableName());
-        $this->from($this->tableName());
-        return $this;
-    }
-
-    public function getModel()
-    {
-        return $this->model;
-    }
-
-    public function newQuery()
-    {
-        return new static($this->connection, $this->logger);
-    }
-
-    public function addMapFor(string $className)
-    {
-        $classMap = PersistenceManager::getClassMap($className);
-        $this->maps[$className] = $classMap;
-    }
-
-    protected function registerClass($className)
-    {
-        if (!isset($this->maps[$className])) {
-            $this->addMapFor($className);
-        }
-    }
-
     public function tableName(string $className = '')
     {
         if ($className != '') {
@@ -99,10 +72,43 @@ class Criteria extends Builder
         return $tableName;
     }
 
+    protected function registerClass($className)
+    {
+        if (!isset($this->maps[$className])) {
+            $this->addMapFor($className);
+        }
+    }
+
+    public function addMapFor(string $className)
+    {
+        $classMap = PersistenceManager::getClassMap($className);
+        $this->maps[$className] = $classMap;
+    }
+
+    public function getModel()
+    {
+        return $this->model;
+    }
+
+    public function setModel(string $model)
+    {
+        $this->classMap = Model::getClassMap($model);
+        $this->model = $model;
+        $this->maps[$this->model] = $this->classMap;
+        $this->connection->table($this->tableName());
+        $this->from($this->tableName());
+        return $this;
+    }
+
+    public function newQuery()
+    {
+        return (new static($this->connection, $this->logger))->setModel($this->model);
+    }
+
     public function columnName(string $className, string $attribute)
     {
         //mdump('attribute to column = ' . $className . '.' . $attribute . PHP_EOL);
-        return ($attribute == '*') ? '*' : $this->maps[$className ?: $this->model]->getAttributeMap($attribute)?->columnName;
+        return ($attribute == '*') ? '*' : $this->maps[$className ?: $this->model]->getAttributeMap($attribute)?->columnName ?? $attribute;
     }
 
     public function getAttributeMap(string $attributeName, $className = ''): ?AttributeMap
@@ -136,30 +142,16 @@ class Criteria extends Builder
         return $this;
     }
 
-    public function alias($alias, string|Criteria $className = '')
+    public function filter(array|null $filters)
     {
-        if (is_string($className)) {
-            $this->classAlias[$alias] = $className;
-            $this->tableAlias[$alias] = $this->tableName($className);
-        } else if ($className instanceof Criteria) {
-            $this->criteriaAlias[$alias] = $className;
+        if (!empty($filters)) {
+            $filters = is_string($filters[0]) ? [$filters] : $filters;
+            foreach ($filters as [$field, $op, $value]) {
+                if (!is_null($value)) {
+                    $this->where($field, $op, $value);
+                }
+            }
         }
-        if ($className == '') {
-            $this->from($this->tableName($className), $alias);
-        }
-        return $this;
-    }
-
-    public function select($columns = ['*'])
-    {
-        $allColumns = ((is_array($columns) && ($columns[0] == '*')) || ((is_string($columns) && ($columns == '*'))));
-        if ($allColumns) {
-            $attributes = $this->maps[$this->model]->getAttributeMaps();
-            parent::select(array_keys($attributes));
-        } else {
-            parent::select($columns);
-        }
-        return $this;
     }
 
     public function where($attribute, $operator = null, $value = null, $boolean = 'and')
@@ -204,18 +196,6 @@ class Criteria extends Builder
         return $this;
     }
 
-    public function filter(array|null $filters)
-    {
-        if (!empty($filters)) {
-            $filters = is_string($filters[0]) ? [$filters] : $filters;
-            foreach ($filters as [$field, $op, $value]) {
-                if (!is_null($value)) {
-                    $this->where($field, $op, $value);
-                }
-            }
-        }
-    }
-
     public function order(array|string|null $orders)
     {
         if (!empty($orders)) {
@@ -239,6 +219,20 @@ class Criteria extends Builder
         return $this;
     }
 
+    public function alias($alias, string|Criteria $className = '')
+    {
+        if (is_string($className)) {
+            $this->classAlias[$alias] = $className;
+            $this->tableAlias[$alias] = $this->tableName($className);
+        } else if ($className instanceof Criteria) {
+            $this->criteriaAlias[$alias] = $className;
+        }
+        if ($className == '') {
+            $this->from($this->tableName($className), $alias);
+        }
+        return $this;
+    }
+
     public function joinSub($query, $as, $first, $operator = null, $second = null, $type = 'inner', $where = false)
     {
         $this->criteriaAlias[$as] = $query;
@@ -257,11 +251,6 @@ class Criteria extends Builder
         $this->parameters[$name] = null;
     }
 
-    public function setParameter(string $name, $value)
-    {
-        $this->parameters[$name] = $value;
-    }
-
     public function parameters(array $parameters)
     {
         foreach ($parameters as $p => $v) {
@@ -270,14 +259,9 @@ class Criteria extends Builder
         return $this;
     }
 
-    public function update(array $values)
+    public function setParameter(string $name, $value)
     {
-        parent::update(Arr::only($values, array_keys($this->classMap->insertAttributeMaps)));
-    }
-
-    public function getResult()
-    {
-        return $this->get();
+        $this->parameters[$name] = $value;
     }
 
     public function chunkResult(string $fieldKey = '', string $fieldValue = '')
@@ -294,6 +278,11 @@ class Criteria extends Builder
             }
         }
         return $newResult;
+    }
+
+    public function getResult()
+    {
+        return $this->get();
     }
 
     public function treeResult(string $group, string $node)
@@ -318,9 +307,174 @@ class Criteria extends Builder
         return $tree;
     }
 
-    public function plainSQL(string $command, array $params = []) {
+    public function plainSQL(string $command, array $params = [])
+    {
         $databaseName ??= \Orkester\Manager::getOptions('db');
         return $this->getConnection($databaseName)->select($command, $params);
+    }
+
+    public function select($columns = ['*'])
+    {
+        $allColumns = ((is_array($columns) && ($columns[0] == '*')) || ((is_string($columns) && ($columns == '*'))));
+        if ($allColumns) {
+            $attributes = $this->maps[$this->model]->getAttributeMaps();
+            parent::select(array_keys($attributes));
+        } else {
+            parent::select($columns);
+        }
+        return $this;
+    }
+
+    protected function getReturningSql(?array $returning): string
+    {
+        if ($returning) {
+            $return = Arr::map($returning, fn($r) => $this->grammar->wrap($r, true));
+            $sql = " returning " . implode(',', $return);
+        }
+        return $sql ?? "";
+    }
+
+    protected function logSql(string $query, $bindings)
+    {
+        $values = Arr::map(Arr::wrap($bindings), fn($b) => match (true) {
+            is_string($b) => "'$b'",
+            is_null($b) => 'NULL',
+            is_array($b) => implode(',', $b),
+            default => $b
+        });
+        $sql = Str::replaceArray('?', $values, $query);
+        $this->logger->info($sql);
+    }
+
+    protected function runSelect(): array
+    {
+        $sql = $this->toSql();
+        $bindings = $this->getBindings();
+        $this->logSql($sql, $bindings);
+        return $this->connection->select($sql, $bindings, !$this->useWritePdo);
+    }
+
+    public function upsert(array $values, $uniqueBy, $update = null, array $returning = null): Collection
+    {
+        if (empty($values)) {
+            return Collection::empty();
+        } elseif ($update === []) {
+            return $this->insert($values);
+        }
+
+        if (!is_array(reset($values))) {
+            $values = [$values];
+        } else {
+            foreach ($values as $key => $value) {
+                ksort($value);
+
+                $values[$key] = $value;
+            }
+        }
+
+        if (is_null($update)) {
+            $update = array_keys(reset($values));
+        }
+
+        $this->applyBeforeQueryCallbacks();
+
+        $bindings = $this->cleanBindings(array_merge(
+            Arr::flatten($values, 1),
+            collect($update)->reject(function ($value, $key) {
+                return is_int($key);
+            })->all()
+        ));
+        $sql = $this->grammar->compileUpsert($this, $values, (array)$uniqueBy, $update);
+        $sql = $sql . $this->getReturningSql($returning);
+        $this->logSql($sql, $bindings);
+        /**
+         * @var array $rows
+         */
+        $rows = $this->connection->statement($sql, $bindings);
+        if (!$returning) return Collection::empty();
+        $valid = array_filter(array_keys($rows[0]), fn($k) => !is_int($k));
+        return collect(Arr::map($rows, fn($row) => Arr::only($row, $valid)));
+    }
+
+    public function insert(array $values, array $returning = null): \Illuminate\Support\Collection
+    {
+        // Since every insert gets treated like a batch insert, we will make sure the
+        // bindings are structured in a way that is convenient when building these
+        // inserts statements by verifying these elements are actually an array.
+        if (empty($values)) {
+            return true;
+        }
+
+        if (!is_array(reset($values))) {
+            $values = [$values];
+        }
+
+        // Here, we will sort the insert keys for every record so that each insert is
+        // in the same order for the record. We need to make sure this is the case
+        // so there are not any errors or problems when inserting these records.
+        else {
+            foreach ($values as $key => $value) {
+                ksort($value);
+
+                $values[$key] = $value;
+            }
+        }
+
+        $this->applyBeforeQueryCallbacks();
+
+        // Finally, we will run this query against the database connection and return
+        // the results. We will need to also flatten these bindings before running
+        // the query so they are all in one huge, flattened array for execution.
+        $sql = $this->grammar->compileInsert($this, $values);
+        $sql .= $this->getReturningSql($returning);
+        $this->logSql($sql, $values);
+        /** @var array $rows */
+        $rows = $this->connection->insert(
+            $sql,
+            $this->cleanBindings(Arr::flatten($values, 1))
+        );
+        if (!$returning) return Collection::empty();
+        $valid = array_filter(array_keys($rows[0]), fn($k) => !is_int($k));
+        return collect(Arr::map($rows, fn($row) => Arr::only($row, $valid)));
+    }
+
+    public function update(array $values): bool
+    {
+        $this->applyBeforeQueryCallbacks();
+
+        $sql = $this->grammar->compileUpdate($this, $values);
+        $bindings = $this->cleanBindings(
+            $this->grammar->prepareBindingsForUpdate($this->bindings, $values)
+        );
+        $this->logSql($sql, $bindings);
+        return !!$this->connection->statement($sql, $bindings);
+    }
+
+    public function delete($id = null, array $returning = null): Collection
+    {
+        // If an ID is passed to the method, we will set the where clause to check the
+        // ID to let developers to simply and quickly remove a single row from this
+        // database without manually specifying the "where" clauses on the query.
+        if (!is_null($id)) {
+            $this->where($this->from . '.id', '=', $id);
+        }
+
+        $this->applyBeforeQueryCallbacks();
+
+        $sql = $this->grammar->compileDelete($this);
+        $sql .= $this->getReturningSql($returning);
+        $bindings = $this->cleanBindings($this->grammar->prepareBindingsForDelete($this->bindings));
+        $this->logSql($sql, $bindings);
+        /**
+         * @var array $rows
+         */
+        $rows = $this->connection->statement(
+            $sql,
+            $bindings
+        );
+        if (!$returning) return Collection::empty();
+        $valid = array_filter(array_keys($rows[0]), fn($k) => !is_int($k));
+        return collect(Arr::map($rows, fn($row) => Arr::only($row, $valid)));
     }
 
 }

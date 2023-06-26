@@ -7,7 +7,7 @@ use Slim\Psr7\Response;
 
 class MResultObject extends MResult
 {
-    public function __construct(object $object, int $code = 200)
+    public function __construct(object|array $object, int $code = 200)
     {
         mtrace('Executing MResultObject');
         parent::__construct($code);

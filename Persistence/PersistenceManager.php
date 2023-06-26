@@ -9,12 +9,12 @@ use Illuminate\Database\Connection;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Arr;
 use Monolog\Logger;
+use Orkester\Manager;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
-use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Enum\Key;
-use Orkester\Manager;
+use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
@@ -28,6 +28,9 @@ class PersistenceManager
     public static int $fetchStyle;
     public static ClassMap $classMap;
     public static array $properties = [];
+    /**
+     * @var ClassMap[]
+     */
     public static array $classMaps = [];
 
     public static function init(array $dbConfigurations, int $fetchStyle): void
@@ -49,6 +52,7 @@ class PersistenceManager
                 'charset' => $conf['charset'] ?? 'utf8',
                 'collation' => $conf['collate'] ?? 'utf8_unicode_ci',
                 'prefix' => $conf['prefix'] ?? '',
+                'options' => $conf['options'] ?? [],
             ], $name);
         }
     }
@@ -270,14 +274,19 @@ class PersistenceManager
         return static::$properties;
     }
 
-    public static function getCriteria(string $databaseName = null): Criteria
+    public static function getConnection(string $databaseName = null): Connection
     {
         $databaseName ??= Manager::getOptions('db');
         $connection = self::$capsule->getConnection($databaseName);
         $connection->enableQueryLog();
         (new \ReflectionClass(get_class($connection)))
             ->getProperty('fetchMode')->setValue($connection, self::$fetchStyle);
-        $classMap = self::getClassMap(get_called_class());
+        return $connection;
+    }
+
+    public static function getCriteriaForClassMap(ClassMap $classMap, string $databaseName = null)
+    {
+        $connection = static::getConnection($databaseName);
         $container = Manager::getContainer();
         return $container->call(
             function (Logger $logger) use ($connection, $classMap) {
@@ -285,6 +294,12 @@ class PersistenceManager
                 return $criteria->setClassMap($classMap);
             }
         );
+    }
+
+    public static function getCriteria(string $databaseName = null, string|Model $model = null): Criteria
+    {
+        $classMap = static::getClassMap($model);
+        return static::getCriteriaForClassMap($classMap, $databaseName);
     }
 
     public static function getAssociation(string $associationChain, int $id): array
@@ -389,24 +404,21 @@ class PersistenceManager
         return substr($className, 0, strlen($className) - 5);
     }
 
-    public static function getConnection(?string $databaseName = null): Connection
-    {
-        $databaseName ??= PersistenceManager::getOptions('db');
-        return self::$capsule->getConnection($databaseName);
-    }
-
     public static function beginTransaction(?string $databaseName = null)
     {
+        minfo("BEGIN TRANSACTION");
         static::getConnection($databaseName)->beginTransaction();
     }
 
     public static function commit(?string $databaseName = null)
     {
+        minfo("COMMIT");
         static::getConnection($databaseName)->commit();
     }
 
     public static function rollback(?string $databaseName = null)
     {
+        minfo("ROLLBACK");
         static::getConnection($databaseName)->rollBack();
     }
 
@@ -480,52 +492,4 @@ class PersistenceManager
     {
         return !is_null(static::one($conditions));
     }
-
-    protected static function getManyToManyAssociation(string $associationName): AssociationMap
-    {
-        $classMap = static::getClassMap();
-        $association = $classMap->getAssociationMap($associationName);
-        if (empty($association)) {
-            throw new \InvalidArgumentException("Unknown association: $associationName");
-        }
-        if (empty($association->associativeTable)) {
-            throw new \InvalidArgumentException("append association requires associative table");
-        }
-        return $association;
-    }
-
-    public static function appendAssociation(string $associationName, mixed $id, array $associatedIds): void
-    {
-        $association = static::getManyToManyAssociation($associationName);
-        $columns = array_map(fn($aId) => [
-            $association->toKey => $aId,
-            $association->fromKey => $id
-        ],
-            $associatedIds
-        );
-        static::getCriteria()
-            ->setClassMap(self::$classMaps["{$association->fromClassName}_$association->associativeTable"])
-            ->upsert($columns, [$association->toKey, $association->fromKey]);
-    }
-
-    public static function removeAssociation(string $associationName, mixed $id, ?array $associatedIds): void
-    {
-        $association = static::getManyToManyAssociation($associationName);
-        $criteria = static::getCriteria()
-            ->setClassMap(self::$classMaps["{$association->fromClassName}_$association->associativeTable"])
-            ->where($association->fromKey, '=', $id);
-        if (is_array($associatedIds)) {
-            $criteria->where($association->toKey, 'IN', $associatedIds);
-        }
-        $criteria->delete();
-    }
-
-    public static function replaceAssociation(string $associationName, mixed $id, array $associatedIds): void
-    {
-        self::beginTransaction();
-        self::removeAssociation($associationName, $id, null);
-        self::appendAssociation($associationName, $id, $associatedIds);
-        self::commit();
-    }
-
 }
