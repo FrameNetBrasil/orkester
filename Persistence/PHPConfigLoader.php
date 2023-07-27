@@ -102,7 +102,7 @@ class PHPConfigLoader extends PersistentConfigLoader
         $key = $attr['key'] ?? 'none';
         if ($key == 'primary') {
             $attr['type'] = 'integer';
-            $attr['idgenerator'] = 'identity';
+            $attr['idgenerator'] ??= 'identity';
         }
         $type = isset($attr['type']) ? strtolower($attr['type']) : 'string';
         $attributeMap->setType($type);
