@@ -240,36 +240,43 @@ class PersistentManager
      *
      */
 
-    public function saveObject(ClassMap $classMap, object $object, bool $upsert = false)
-    {
-        $this->persistence->setDb($classMap);
-        $persistentObject = $object;
-        //$persistentObject = $this->objectHandler($classMap, $object, 'save');
-        $commands = [];
-        $keyName = $classMap->getKeyAttributeName();
-        $keyValue = $classMap->getObjectKey($persistentObject);
-        $hooks = $classMap->getHookMap();
-        if ($keyValue == null) { // insert
-            $classMap->setObjectKey($persistentObject);
-            $classMap->setObjectUid($persistentObject);
-            $hooks->onBeforeInsert($persistentObject);
-            $statement = $this->persistence->getStatementForInsert($classMap, $persistentObject);
-            $commands[] = $upsert ? $statement->upsert() : $statement->insert();
-            $this->execute($commands);
-            $classMap->setPostObjectKey($persistentObject);
-            $hooks->onAfterInsert($object, $classMap->getObjectKey($persistentObject));
-        } else { // update
-            $hooks->onBeforeUpdate($persistentObject, $keyValue);
-            $statement = $this->persistence->getStatementForUpdate($classMap, $persistentObject);
-            $commands[] = $statement->update();
-            $this->execute($commands);
-            $hooks->onAfterUpdate($persistentObject, $keyValue);
-        }
-        $keyValue = $classMap->getObjectKey($persistentObject);
-        $object->$keyName = $keyValue;
-        $this->storeObjectInCache($classMap, $object);
-        return $keyValue;
-    }
+     public function saveObject(ClassMap $classMap, object $object, bool $upsert = false)
+     {
+         $this->persistence->setDb($classMap);
+         $persistentObject = $object;
+         //$persistentObject = $this->objectHandler($classMap, $object, 'save');
+         $commands = [];
+         $keyName = $classMap->getKeyAttributeName();
+         $keyValue = $classMap->getObjectKey($persistentObject);
+         $hooks = $classMap->getHookMap();
+         if ($upsert) {
+             $hooks->onBeforeInsert($persistentObject);
+             $statement = $this->persistence->getStatementForInsert($classMap, $persistentObject);
+             $commands[] = $statement->upsert();
+             $this->execute($commands);
+             $hooks->onAfterInsert($object, $classMap->getObjectKey($persistentObject));
+         }
+         else if ($keyValue == null) { // insert
+             $classMap->setObjectKey($persistentObject);
+             $classMap->setObjectUid($persistentObject);
+             $hooks->onBeforeInsert($persistentObject);
+             $statement = $this->persistence->getStatementForInsert($classMap, $persistentObject);
+             $commands[] = $statement->insert();
+             $this->execute($commands);
+             $classMap->setPostObjectKey($persistentObject);
+             $hooks->onAfterInsert($object, $classMap->getObjectKey($persistentObject));
+         } else { // update
+             $hooks->onBeforeUpdate($persistentObject, $keyValue);
+             $statement = $this->persistence->getStatementForUpdate($classMap, $persistentObject);
+             $commands[] = $statement->update();
+             $this->execute($commands);
+             $hooks->onAfterUpdate($persistentObject, $keyValue);
+         }
+         $keyValue = $classMap->getObjectKey($persistentObject);
+         $object->$keyName = $keyValue;
+         $this->storeObjectInCache($classMap, $object);
+         return $keyValue;
+     }
 
     private function storeObjectInCache(ClassMap $classMap, object $object): void
     {
