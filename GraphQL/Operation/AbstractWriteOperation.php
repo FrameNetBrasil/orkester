@@ -4,8 +4,8 @@ namespace Orkester\GraphQL\Operation;
 
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
-use Orkester\Api\AssociativeResourceInterface;
-use Orkester\Api\WritableResourceInterface;
+use Orkester\Resource\AssociativeResourceInterface;
+use Orkester\Resource\WritableResourceInterface;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\UnknownFieldException;
 use Orkester\GraphQL\Context;

@@ -18,7 +18,7 @@ class TotalOperation
         Context   $context,
     )
     {
-        $arg = Arr::first($root->arguments, fn($arg) => $arg->name->value == "query");
+        $arg = Arr::first($root->arguments, fn($arg) => $arg->name->value == "operation");
         $this->queryName = $context->getNodeValue($arg->value);
         $this->name = AbstractOperation::getNodeName($root);
     }

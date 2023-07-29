@@ -3,7 +3,7 @@
 namespace Orkester\GraphQL\Operation;
 
 use GraphQL\Language\AST\FieldNode;
-use Orkester\Api\ResourceInterface;
+use Orkester\Resource\ResourceInterface;
 use Orkester\GraphQL\Context;
 
 abstract class AbstractOperation

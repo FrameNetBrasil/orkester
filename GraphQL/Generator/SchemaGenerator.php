@@ -3,8 +3,8 @@
 namespace orkester\GraphQL\Generator;
 
 use Illuminate\Support\Arr;
-use Orkester\Api\ResourceInterface;
-use Orkester\Api\WritableResourceInterface;
+use Orkester\Resource\ResourceInterface;
+use Orkester\Resource\WritableResourceInterface;
 use Orkester\Manager;
 use Orkester\Persistence\Enum\Association;
 use Orkester\Persistence\Enum\Key;

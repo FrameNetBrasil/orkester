@@ -9,13 +9,13 @@ use GraphQL\Language\AST\NodeKind;
 use GraphQL\Language\AST\ObjectFieldNode;
 use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\VariableNode;
-use Orkester\Api\AssociativeResourceInterface;
-use Orkester\Api\ResourceInterface;
-use Orkester\Api\WritableResourceInterface;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\Manager;
 use Orkester\Persistence\Model;
+use Orkester\Resource\AssociativeResourceInterface;
+use Orkester\Resource\ResourceInterface;
+use Orkester\Resource\WritableResourceInterface;
 
 class Context
 {
