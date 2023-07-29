@@ -9,6 +9,10 @@ use GraphQL\Language\AST\NodeKind;
 use GraphQL\Language\AST\ObjectFieldNode;
 use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\VariableNode;
+use Orkester\Api\AssociativeResourceInterface;
+use Orkester\Api\ResourceInterface;
+use Orkester\Api\WritableResourceInterface;
+use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\Manager;
 use Orkester\Persistence\Model;
@@ -21,7 +25,7 @@ class Context
     /**
      * @var (Model|string)[]
      */
-    protected array $models;
+    protected array $resources;
     protected ?array $namedServices = [];
     protected mixed $serviceResolver;
 
@@ -30,9 +34,9 @@ class Context
         FragmentDefinitionNode  ...$fragments
     )
     {
-        $configuration = require Manager::getConfPath() . '/graphql.php';
+        $configuration = require Manager::getConfPath() . '/api.php';
         $this->fragments = $fragments;
-        $this->models = $configuration['models'];
+        $this->resources = $configuration['resources'];
         $this->namedServices = $configuration['services'];
         $this->serviceResolver = $configuration['serviceResolver'] ?? null;
     }
@@ -77,13 +81,21 @@ class Context
         return array_find($this->fragments, fn($f) => $f->name->value == $name);
     }
 
-    public function getModel(string $name): string|Model
+    public function getResource(string $name): ResourceInterface|WritableResourceInterface|AssociativeResourceInterface
     {
-        $key = $this->singularMap[$name] ?? $name;
-        if ($model = $this->models[$key] ?? false) {
-            return $model;
+        if ($model = $this->resources[$name] ?? false) {
+            return Manager::getContainer()->make($model);
         }
-        throw new EGraphQLNotFoundException($name, 'model');
+        throw new EGraphQLNotFoundException($name, 'resource');
+    }
+
+    public function tryGetResource(string $name): ResourceInterface | false
+    {
+        try {
+            return $this->getResource($name);
+        } catch(EGraphQLException) {
+            return false;
+        }
     }
 
     public function getService(string $name): callable|false

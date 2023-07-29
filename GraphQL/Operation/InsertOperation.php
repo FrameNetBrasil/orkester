@@ -3,22 +3,11 @@
 namespace Orkester\GraphQL\Operation;
 
 use GraphQL\Language\AST\ArgumentNode;
-use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
-use Orkester\Exception\ForbiddenException;
-use Orkester\GraphQL\Context;
-use Orkester\Security\Privilege;
-use Orkester\Security\Role;
 
 class InsertOperation extends AbstractWriteOperation
 {
-
-    public function __construct(FieldNode $root, Context $context, Role $role)
-    {
-        $model = $context->getModel($root->name->value);
-        parent::__construct($root, $context, $model, $role);
-    }
 
     protected function readArguments(NodeList $arguments): array
     {
@@ -37,16 +26,13 @@ class InsertOperation extends AbstractWriteOperation
 
     public function getResults()
     {
-        if (!$this->model->isGrantedInsert())
-            throw new ForbiddenException(Privilege::INSERT);
-
         $objects = $this->readArguments($this->root->arguments);
         $ids = [];
 
         foreach ($objects as $object) {
             $data = $object['attributes'];
             $this->writeAssociationsBefore($object['associations']['before'], $data);
-            $id = $this->model->insert($data);
+            $id = $this->resource->insert($data);
             $this->writeAssociationsAfter($object['associations']['after'], $id);
             $ids[] = $id;
         }

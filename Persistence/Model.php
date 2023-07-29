@@ -3,12 +3,9 @@
 namespace Orkester\Persistence;
 
 use Closure;
-use Illuminate\Container\Container as LaravelContainer;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Connection;
-use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Collection;
 use Orkester\Exception\UnknownFieldException;
 use Orkester\Exception\ValidationException;
 use Orkester\Manager;
@@ -20,7 +17,6 @@ use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
-use Orkester\Security\Role;
 use Phpfastcache\Helper\Psr16Adapter;
 
 class Model
@@ -269,7 +265,7 @@ class Model
         if (is_null($keyAttributeMap)) {
             static::attribute(name: $key, type: Type::INTEGER, key: Key::FOREIGN, nullable: false);
         } else {
-            if ($key != $fromClassMap->keyAttributeMap->name) {
+            if ($key != $fromClassMap->keyAttributeMap->name && $keyAttributeMap->keyType != Key::PRIMARY) {
                 $keyAttributeMap->keyType = Key::FOREIGN;
             }
         }
@@ -369,10 +365,12 @@ class Model
         return $row;
     }
 
-    public static function insert(array $data): ?int
+    public static function insert(array $data): int|string
     {
-        $keyAttributeName = static::getKeyAttributeName();
-        return static::insertReturning($data, [$keyAttributeName])[$keyAttributeName];
+        $row = static::prepareWrite($data);
+        $criteria = static::getCriteria();
+        $criteria->insert($row);
+        return $criteria->getConnection()->getPdo()->lastInsertId() ?? 0;
     }
 
     public static function update(array $data): bool
@@ -385,33 +383,14 @@ class Model
 
     public static function upsert(array $data, array $uniqueBy, $updateColumns = null): ?int
     {
-        $keyAttributeColumn = static::getClassMap()->keyAttributeMap->columnName;
-        return static::upsertReturning($data, $uniqueBy, $updateColumns)[$keyAttributeColumn];
+        $row = static::prepareWrite($data);
+        $criteria = static::getCriteria();
+        return $criteria->upsert($row, $uniqueBy, $updateColumns);
     }
 
     public static function delete($id)
     {
-        static::deleteReturning($id);
-    }
-
-    public static function insertReturning(array $data, array $returning = null): ?array
-    {
-        $row = static::prepareWrite($data);
-        $criteria = static::getCriteria();
-        return $criteria->insert($row, $returning)[0] ?? [];
-    }
-
-    public static function upsertReturning(array $data, array $uniqueBy, $updateColumns = null, array $returning = null): array
-    {
-        $row = static::prepareWrite($data);
-        $criteria = static::getCriteria();
-        return $criteria->upsert($row, $uniqueBy, $updateColumns, $returning)[0];
-    }
-
-    public static function deleteReturning(int $id, array $returning = null): array
-    {
-        return static::getCriteria()
-            ->delete($id, $returning)[0];
+        return static::getCriteria()->delete($id);
     }
 
     public static function insertUsingCriteria(array $fields, Criteria $usingCriteria): ?int
@@ -506,19 +485,19 @@ class Model
         return $association;
     }
 
-    public static function appendManyToMany(string $associationName, mixed $id, array $associatedIds): Collection
+    public static function appendManyToMany(string $associationName, mixed $id, array $associatedIds): int
     {
         $association = static::getManyToManyAssociation($associationName);
         $columns = array_map(fn($aId) => [
-            $association->toKey => $aId,
-            $association->fromKey => $id
-        ],
+                $association->toKey => $aId,
+                $association->fromKey => $id
+            ],
             $associatedIds
         );
         $classMap = PersistenceManager::getClassMap("{$association->fromClassName}_$association->associativeTable");
         return static::getCriteria()
             ->setClassMap($classMap)
-            ->upsert($columns, [$association->toKey, $association->fromKey], null, $classMap->getColumnsNames());
+            ->upsert($columns, [$association->toKey, $association->fromKey]);
     }
 
     public static function deleteManyToMany(string $associationName, mixed $id, ?array $associatedIds): void
@@ -556,50 +535,14 @@ class Model
         return $rc->getFileName();
     }
 
-    public static function getRestrictedModel(Role $role = null): RestrictedModel
+    public static function getAssociationMap(string $name): ?AssociationMap
     {
-        $role ??= Manager::getContainer()->make("role");
-        return new RestrictedModel(static::class, $role);
+        return static::getClassMap()->getAssociationMap($name);
     }
 
-    public static function getCriteriaForRole(Role $role): Criteria
+    public static function getApiDocs(): array
     {
-        return self::getCriteria();
-    }
-
-    public static function isGrantedRead(Role $role, string $field): bool
-    {
-        return true;
-    }
-
-    public static function isGrantedWrite(Role $role, $id): bool
-    {
-        return true;
-    }
-
-    public static function isGrantedDelete(Role $role, $id): bool
-    {
-        return true;
-    }
-
-    public static function isGrantedInsert(Role $role): bool
-    {
-        return true;
-    }
-
-    public static function isGrantedUpdate(Role $role): bool
-    {
-        return true;
-    }
-
-    public static function isGrantedAssociationInsert(Role $role, string $association, $selfKey, $otherKey): bool
-    {
-        return true;
-    }
-
-    public static function isGrantedAssociationDelete(Role $role, string $association, $selfKey, $otherKey): bool
-    {
-        return true;
+        return [];
     }
 
 }

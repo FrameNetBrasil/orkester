@@ -6,36 +6,30 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
-use Orkester\Exception\UnknownFieldException;
+use Orkester\Api\ResourceInterface;
 use Orkester\GraphQL\Argument\ConditionArgument;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
+use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Map\AssociationMap;
-use Orkester\Persistence\Model;
-use Orkester\Persistence\RestrictedModel;
-use Orkester\Security\Acl;
-use Orkester\Security\Role;
 
 class QueryOperation extends AbstractOperation
 {
     public Criteria $criteria;
-    protected Acl $acl;
     protected string $name;
     protected string $pluck = "";
     protected array $selection = [];
     protected array $forcedSelection = [];
-    /**
-     * @var string[]
-     */
-    protected RestrictedModel $model;
     protected array $subQueries = [];
 
-    public function __construct(protected FieldNode $root, Context $context, Role $role, RestrictedModel $model = null)
+    public function __construct(protected FieldNode $root, Context $context, protected ResourceInterface $resource)
     {
-        parent::__construct($root, $context, $role);
-        $this->model = $model ?? $this->context->getModel($root->name->value)::getRestrictedModel($role);
-        $this->criteria = $this->model->getCriteria();
+        parent::__construct($root, $context);
+        if ($this->root->name->value == "find") {
+            $this->isSingle = true;
+        }
+        $this->criteria = $this->resource->getCriteria();
     }
 
     public function getCriteria(): Criteria
@@ -80,8 +74,8 @@ class QueryOperation extends AbstractOperation
 
     public function applySelection(NodeList $selections)
     {
-        $attributes = $this->model->getClassMap()->getAttributesNames();
-        $associations = $this->model->getClassMap()->getAssociationsNames();
+        $classMap = $this->resource->getClassMap();
+        $attributes = $classMap->getAttributesNames();
         /** @var FieldNode $selectionNode */
         foreach ($selections->getIterator() as $selectionNode) {
             $field = $selectionNode->name->value;
@@ -94,26 +88,28 @@ class QueryOperation extends AbstractOperation
                 continue;
             }
             if ($field == "__typename") {
-                $this->selection["__typename"] = "'{$this->model->getName()}' as __typename";
+                $this->selection["__typename"] = "'{$this->resource->getName()}' as __typename";
                 continue;
             }
-            if ($this->model->isGrantedRead($field)) {
-                if (in_array($field, $associations)) {
-                    $map = $this->model->getClassMap()->getAssociationMap($field);
-                    $this->selection[$name] = '';
-                    $this->forcedSelection[] = $map->fromKey;
-                    $this->subQueries[$this->getNodeName($selectionNode)] = [
-                        'operation' => new QueryOperation($selectionNode, $this->context, $this->role, $map->toClassMap->model::getRestrictedModel($this->role)),
-                        'map' => $map,
-                        'name' => $this->getNodeName($selectionNode)
-                    ];
-                } else if (in_array($field, $attributes)) {
+            if ($field == "id") {
+                $this->selection["id"] = "{$classMap->keyAttributeName} as id";
+                continue;
+            }
+            if (in_array($field, $attributes)) {
+                if ($this->resource->isFieldReadable($field)) {
                     $this->selection[$name] = $field . ($alias ? " as $alias" : "");
-                } else if ($field == "id") {
-                    $this->selection["id"] = "{$this->model->getKeyAttributeName()} as id";
-                } else {
-                    throw new UnknownFieldException($this->model->getName(), [$field]);
                 }
+                continue;
+            }
+            if ($associatedResource = $this->resource->getAssociatedResource($field)) {
+                $this->selection[$name] = '';
+                $this->forcedSelection[] = $associatedResource[0]->fromKey;
+                $this->subQueries[$this->getNodeName($selectionNode)] = [
+                    'operation' => new QueryOperation($selectionNode, $this->context, $associatedResource[1]),
+                    'map' => $associatedResource[0],
+                    'name' => $this->getNodeName($selectionNode)
+                ];
+                continue;
             }
         }
     }
@@ -124,26 +120,64 @@ class QueryOperation extends AbstractOperation
         foreach ($arguments->getIterator() as $node) {
             $name = $node->name->value;
             $value = $this->context->getNodeValue($node->value);
-            if (is_null($value)) continue;
+            if (is_null($value))
+                continue;
+
             if ($name == "where") {
                 ConditionArgument::applyArgumentWhere($this->context, $this->criteria, $value);
-            } else if ($name == "id") {
+                continue;
+            }
+
+            if ($name == "having") {
+                ConditionArgument::applyArgumentHaving($this->context, $this->criteria, $value);
+                continue;
+            }
+
+            if ($name == "id") {
                 $this->isSingle = true;
                 $this->criteria->where($this->criteria->classMap->keyAttributeName, '=', $value);
-            } else if ($name == "single") {
+                continue;
+            }
+
+            if ($name == "single") {
                 $this->isSingle = boolval($value);
-            } else if ($name == "limit") {
+                continue;
+            }
+
+            if ($name == "limit") {
                 $this->criteria->limit = $value;
-            } else if ($name == "offset") {
+                continue;
+            }
+
+            if ($name == "offset") {
                 $this->criteria->offset = $value;
-            } else if ($name == "group" && is_array($value)) {
+                continue;
+            }
+
+            if ($name == "group" && is_array($value)) {
                 $this->criteria->groups = $value;
-            } else if ($name == "order" && is_array($value)) {
+                continue;
+            }
+
+            if ($name == "order" && is_array($value)) {
                 foreach ($value as $order)
                     foreach ($order as $direction => $column)
                         $this->criteria->orderBy($column, $direction);
-            } else if ($name == "pluck") {
+                continue;
+            }
+
+            if ($name == "pluck") {
                 $this->pluck = $value;
+                continue;
+            }
+
+            if ($name == "join") {
+                foreach($value as $entry) {
+                    foreach($entry as $type => $association) {
+                        $this->criteria->setAssociationType($association, Join::from($type));
+                    }
+                }
+                continue;
             }
         }
     }
