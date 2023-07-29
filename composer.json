@@ -29,13 +29,13 @@
         "composer/composer": "^2.2",
         "webonyx/graphql-php": "^14.11",
         "phpmyadmin/sql-parser": "^5.5",
-        "illuminate/database": "^8.0|^9.0",
-        "illuminate/events": "^8.0|^9.0",
+        "illuminate/database": "^10",
+        "illuminate/events": "^10",
         "greenlion/php-sql-parser": "^4.5",
         "guzzlehttp/guzzle": "^7.4",
         "vlucas/phpdotenv": "^5.4",
-        "ryangjchandler/standalone-blade": "*",
-        "illuminate/view": "9.35.1",
+        "ryangjchandler/standalone-blade": "^0",
+        "illuminate/view": "^10",
         "laminas/laminas-permissions-acl": "^2.14"
     },
     "autoload": {

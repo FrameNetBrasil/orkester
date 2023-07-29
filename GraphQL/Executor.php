@@ -6,8 +6,12 @@ use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\OperationDefinitionNode;
 use GraphQL\Language\Parser;
+use GraphQL\Type\Introspection;
+use GraphQL\Utils\BuildSchema;
 use Illuminate\Support\Arr;
 use Monolog\Logger;
+use Orkester\Api\WritableResourceInterface;
+use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\Exception\ForbiddenException;
 use Orkester\Exception\UnknownFieldException;
@@ -30,20 +34,17 @@ use ZMQSocket;
 
 class Executor
 {
-    protected bool $isInstrospection = false;
+    protected $introspectionResult;
     protected Context $context;
-    protected Role $role;
     protected Logger $logger;
 
     public function __construct(
         protected string $query,
         protected array  $variables = [],
-        Role             $role = null,
         Logger           $logger = null
     )
     {
         $this->logger = $logger ?? Manager::getContainer()->get(Logger::class)->withName('graphql');
-        $this->role ??= Manager::getContainer()->make('role');
     }
 
     protected function parse()
@@ -57,7 +58,7 @@ class Executor
             }
         }
         $this->context = new Context($this->variables, ...$fragmentNodes ?? []);
-        return $this->parseOperations($operationNodes ?? [], $this->context, $this->role);
+        return $this->parseOperations($operationNodes ?? [], $this->context);
     }
 
 
@@ -77,26 +78,37 @@ class Executor
                 /** @var FieldNode $fieldNode */
                 foreach ($operationNode->selectionSet->selections as $fieldNode) {
                     if ($fieldNode->name->value == '__schema') {
-                        continue;
+                        $contents = file_get_contents('schema.graphql');
+                        $schema = BuildSchema::build($contents);
+                        $this->introspectionResult = Introspection::fromSchema($schema);
+                        return [];
                     }
-                    if ($fieldNode->name->value == '__total') {
-                        $operation = new TotalOperation($fieldNode, $context, $this->role);
+                    if ($fieldNode->name->value == '_total') {
+                        $operation = new TotalOperation($fieldNode, $context);
                         $name = $operation->getQueryName();
                         $queryOperation = Arr::first($operations, fn($op) => $op->getName() == $name);
                         if (!$queryOperation)
                             throw new EGraphQLNotFoundException($name, "operation");
                         $operation->setQueryOperation($queryOperation);
                         $operations[] = $operation;
-                    } else if ($service = $this->context->getService($fieldNode->name->value)) {
-                        $operations[] = new ServiceOperation($fieldNode, $context, $this->role, $service);
-                    } else {
-                        $operations[] = new QueryOperation($fieldNode, $context, $this->role);
+                        continue;
+                    } 
+                    
+                    if ($resource = $this->context->tryGetResource($fieldNode->name->value)) {
+                        foreach($fieldNode->selectionSet->selections as $queryOperation) {
+                            $operations[] = new QueryOperation($queryOperation, $context, $resource);
+                        }
+                        continue;
+                    }
+
+                    if ($service = $this->context->getService($fieldNode->name->value)) {
+                        $operations[] = new ServiceOperation($fieldNode, $context, $service);
                     }
                 }
             } else if ($operationNode->operation === 'mutation') {
                 /** @var FieldNode $operationRoot */
                 foreach ($operationNode->selectionSet->selections as $fieldNode)
-                    $operations = array_merge($operations, $this->getMutationOperations($fieldNode, $context, $this->role));
+                    $operations = array_merge($operations, $this->getMutationOperations($fieldNode, $context));
             } else {
                 throw new EGraphQLNotFoundException($operationNode->operation, 'operation');
             }
@@ -110,20 +122,35 @@ class Executor
      * @return AbstractOperation[]
      * @throws \Exception
      */
-    protected function getMutationOperations(FieldNode $root, Context $context, Role $role): array
+    protected function getMutationOperations(FieldNode $root, Context $context): array
     {
-        $class = match ($root->name->value) {
-            'insert' => InsertOperation::class,
-            'update' => UpdateOperation::class,
-            'upsert' => UpsertOperation::class,
-            'delete' => DeleteOperation::class,
-            'service' => ServiceOperation::class,
-            default => null
-        };
-        $definitions = iterator_to_array($root->selectionSet->selections->getIterator());
-        return $class ?
-            Arr::map($definitions, fn($def) => new $class($def, $context, $role)) :
-            [];
+        $operations = [];
+        if ($root->name->value == "service") {
+            foreach($root->selectionSet->selections as $definition) {
+                if ($service = $context->getService($definition->name->value)) {
+                    $operations[] = new ServiceOperation($definition, $context, $service);
+                }
+            }
+            return $operations;
+        }
+
+        $resource = $context->getResource($root->name->value);
+        if (!$resource instanceof WritableResourceInterface) {
+            throw new EGraphQLException("Resource {$resource->getName()} is not writable");
+        }
+        /** @var FieldNode $definition */
+        foreach($root->selectionSet->selections as $definition) {
+            $class = match ($definition->name->value) {
+                'insert' => InsertOperation::class,
+                'update' => UpdateOperation::class,
+                'upsert' => UpsertOperation::class,
+                'delete' => DeleteOperation::class,
+                'service' => ServiceOperation::class,
+                default => null
+            };
+            $operations[] = new $class($definition, $context, $resource);
+        }
+        return $operations;
     }
 
     public static function run(string $query, $variables = []): array
@@ -134,10 +161,14 @@ class Executor
 
     public function execute(): array
     {
+
         PersistenceManager::beginTransaction();
         $errors = [];
         try {
             $operations = $this->parse();
+            if ($this->introspectionResult) {
+                return ['data' => $this->introspectionResult];
+            }
             foreach ($operations as $operation) {
                 try {
                     $this->context->results[$operation->getName()] = $operation->getResults();
@@ -192,7 +223,7 @@ class Executor
 //            $socket->send(json_encode($event));
 //        }
 //        mdump($events);
-        PersistenceManager::commit();
+        PersistenceManager::rollback();
         return [
             'data' => $this->context->results,
             'errors' => $errors

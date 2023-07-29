@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Container\Container as LaravelContainer;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Arr;
 use Monolog\Logger;
@@ -32,6 +33,7 @@ class PersistenceManager
      * @var ClassMap[]
      */
     public static array $classMaps = [];
+    protected static \SplObjectStorage $connectionCache;
 
     public static function init(array $dbConfigurations, int $fetchStyle): void
     {
@@ -42,6 +44,7 @@ class PersistenceManager
         self::$capsule->setAsGlobal();
         self::$fetchStyle = $fetchStyle;
         self::$capsule->setFetchMode($fetchStyle);
+        self::$connectionCache = new \SplObjectStorage();
         foreach ($dbConfigurations as $name => $conf) {
             self::$capsule->addConnection([
                 'driver' => $conf['db'] ?? 'mysql',
@@ -277,8 +280,20 @@ class PersistenceManager
     public static function getConnection(string $databaseName = null): Connection
     {
         $databaseName ??= Manager::getOptions('db');
+        
         $connection = self::$capsule->getConnection($databaseName);
         $connection->enableQueryLog();
+
+        if (!self::$connectionCache->contains($connection)) {
+            $connection->listen(function(QueryExecuted $event) use($connection) {
+                $rawSql = $connection->getQueryGrammar()->substituteBindingsIntoRawSql(
+                    $event->sql,
+                    $event->bindings
+                );
+                mdump($rawSql);
+            });
+            self::$connectionCache->attach($connection);
+        }
         (new \ReflectionClass(get_class($connection)))
             ->getProperty('fetchMode')->setValue($connection, self::$fetchStyle);
         return $connection;
@@ -406,14 +421,20 @@ class PersistenceManager
 
     public static function beginTransaction(?string $databaseName = null)
     {
-        minfo("BEGIN TRANSACTION");
-        static::getConnection($databaseName)->beginTransaction();
+        $connection = static::getConnection($databaseName);
+        if ($connection->transactionLevel() == 0) {
+            minfo("BEGIN TRANSACTION");
+        }
+        $connection->beginTransaction();
     }
 
     public static function commit(?string $databaseName = null)
     {
-        minfo("COMMIT");
-        static::getConnection($databaseName)->commit();
+        $connection = static::getConnection($databaseName);
+        if ($connection->transactionLevel() == 1) {
+            minfo("COMMIT");
+        }
+        $connection->commit();
     }
 
     public static function rollback(?string $databaseName = null)

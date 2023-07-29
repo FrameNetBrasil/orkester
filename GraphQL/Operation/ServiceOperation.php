@@ -6,14 +6,13 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\GraphQL\Context;
-use Orkester\Security\Role;
 
 class ServiceOperation extends AbstractOperation
 {
 
-    public function __construct(protected FieldNode $root, Context $context, Role $role, protected $service = null)
+    public function __construct(protected FieldNode $root, Context $context, protected $service = null)
     {
-        parent::__construct($root, $context, $role);
+        parent::__construct($root, $context);
         if (is_null($this->service))
             $this->service = $this->context->getService($root->name->value);
             if (!$this->service) throw new EGraphQLNotFoundException($root->name->value, 'service');
