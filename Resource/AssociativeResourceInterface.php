@@ -1,6 +1,6 @@
 <?php
 
-namespace Orkester\Api;
+namespace Orkester\Resource;;
 
 use Orkester\Persistence\Map\AssociationMap;
 

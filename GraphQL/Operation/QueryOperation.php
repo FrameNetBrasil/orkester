@@ -6,7 +6,7 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
-use Orkester\Api\ResourceInterface;
+use Orkester\Resource\ResourceInterface;
 use Orkester\GraphQL\Argument\ConditionArgument;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;

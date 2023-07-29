@@ -10,7 +10,7 @@ use GraphQL\Type\Introspection;
 use GraphQL\Utils\BuildSchema;
 use Illuminate\Support\Arr;
 use Monolog\Logger;
-use Orkester\Api\WritableResourceInterface;
+use Orkester\Resource\WritableResourceInterface;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\Exception\ForbiddenException;

@@ -1,12 +1,11 @@
 <?php
 
-namespace Orkester\Api;
+namespace Orkester\Resource;
 
 use JetBrains\PhpStorm\ArrayShape;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\ClassMap;
-use Orkester\Persistence\Model;
 
 interface ResourceInterface
 {
