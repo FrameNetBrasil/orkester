@@ -98,12 +98,12 @@ class Context
         }
     }
 
-    public function getService(string $name): callable|false
+    public function getService(string $name, string $type): callable|false
     {
         if ($name[0] == '_') {
             $name = substr($name, 1);
         }
-        if ([$class, $method] = $this->namedServices[$name] ?? false) {
+        if ([$class, $method] = $this->namedServices[$type][$name] ?? false) {
             $service = Manager::getContainer()->get($class);
             return fn(...$args) => $service->$method(...$args);
         }

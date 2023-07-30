@@ -6,8 +6,9 @@ use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
+use ReflectionMethod;
 
-abstract class BasicResource implements AssociativeResourceInterface
+abstract class BasicResource implements AssociativeResourceInterface, CustomOperationsInterface
 {
 
     public function __construct(protected string|Model $model)
@@ -63,15 +64,36 @@ abstract class BasicResource implements AssociativeResourceInterface
     public function upsert(array $data): int|string
     {
         $key = $this->model::getKeyAttributeName();
-        if (!$data[$key]) {
-            throw new \InvalidArgumentException("BasicResource requires primary key on upsert");
-        }
         $this->model::upsert($data, [$key]);
-        return $key;
+
+        return $data[$key] ?? $this->getCriteria()->getConnection()->getPdo()->lastInsertId();
     }
 
     public function delete(int|string $key): bool
     {
         return $this->model::delete($key);
+    }
+
+    protected function getCustomOperations(string $operation)
+    {
+        $custom = [];
+        $methods = (new \ReflectionClass(static::class))->getMethods( ReflectionMethod::IS_PUBLIC);
+        foreach($methods as $method) {
+            $name = $method->getName();
+            if (str_starts_with($name, $operation)) {
+                $custom[substr($name, strlen($operation))] = $name;
+            }
+        }
+        return $custom;
+    }
+
+    public function getQueries(): array
+    {
+        return $this->getCustomOperations('query');
+    }
+
+    public function getMutations(): array
+    {
+        return $this->getCustomOperations('mutation');
     }
 }

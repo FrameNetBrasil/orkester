@@ -21,11 +21,13 @@ class DeleteOperation extends AbstractWriteOperation
         if (!$valid)
             throw new EGraphQLException("No arguments found for delete [{$this->getName()}]. Refusing to proceed.");
 
-        $ids = $criteria->get($this->resource->getClassMap()->keyAttributeName);
+        $ids = $criteria->pluck($this->resource->getClassMap()->keyAttributeName);
 
         $count = 0;
         foreach ($ids as $id) {
-            $this->resource->delete($id);
+            if ($this->resource->delete($id)) {
+                $count++;
+            }
         }
         return $count;
     }

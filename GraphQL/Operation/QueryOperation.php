@@ -37,7 +37,7 @@ class QueryOperation extends AbstractOperation
         return $this->criteria;
     }
 
-    public function getResults(): ?array
+    public function getResults()
     {
         $rows = $this->getRawResults();
         $result = $this->cleanResults($rows);
@@ -76,6 +76,7 @@ class QueryOperation extends AbstractOperation
     {
         $classMap = $this->resource->getClassMap();
         $attributes = $classMap->getAttributesNames();
+        $associations = $classMap->getAssociationMaps();
         /** @var FieldNode $selectionNode */
         foreach ($selections->getIterator() as $selectionNode) {
             $field = $selectionNode->name->value;
@@ -101,12 +102,17 @@ class QueryOperation extends AbstractOperation
                 }
                 continue;
             }
-            if ($associatedResource = $this->resource->getAssociatedResource($field)) {
+            /** @var AssociationMap $associationMap */
+            if (
+                ($associationMap = Arr::first($associations, fn($m) => $m->name == $field)) &&
+                ($resource = $this->resource->getAssociatedResource($field))
+            ) {
+
                 $this->selection[$name] = '';
-                $this->forcedSelection[] = $associatedResource[0]->fromKey;
+                $this->forcedSelection[] = $associationMap->fromKey;
                 $this->subQueries[$this->getNodeName($selectionNode)] = [
-                    'operation' => new QueryOperation($selectionNode, $this->context, $associatedResource[1]),
-                    'map' => $associatedResource[0],
+                    'operation' => new QueryOperation($selectionNode, $this->context, $resource),
+                    'map' => $associationMap,
                     'name' => $this->getNodeName($selectionNode)
                 ];
                 continue;
@@ -178,6 +184,10 @@ class QueryOperation extends AbstractOperation
                     }
                 }
                 continue;
+            }
+
+            if ($name == "distinct") {
+                $this->criteria->distinct($value);
             }
         }
     }

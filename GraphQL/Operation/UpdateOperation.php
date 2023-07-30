@@ -28,12 +28,11 @@ class UpdateOperation extends AbstractWriteOperation
 
         foreach ($objects as $object) {
             $attributes = $this->setObject['attributes'];
-            $this->writeAssociationsBefore($this->setObject['associations']['before'], $attributes);
             $id = $object[$classMap->keyAttributeName];
             if (!empty($attributes)) {
                 $this->resource->update($attributes, $id);
             }
-            $this->writeAssociationsAfter($this->setObject['associations']['after'], $id);
+            $this->writeAssociations($this->setObject['associations'], $id);
             $ids[] = $id;
         }
         return $this->executeQueryOperation($ids);

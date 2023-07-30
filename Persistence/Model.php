@@ -390,7 +390,9 @@ class Model
 
     public static function delete($id)
     {
-        return static::getCriteria()->delete($id);
+        return static::getCriteria()
+            ->where(static::getKeyAttributeName(), '=', $id)
+            ->delete();
     }
 
     public static function insertUsingCriteria(array $fields, Criteria $usingCriteria): ?int

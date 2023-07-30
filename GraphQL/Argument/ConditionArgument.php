@@ -4,6 +4,7 @@ namespace Orkester\GraphQL\Argument;
 
 use Illuminate\Support\Arr;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Map\ClassMap;
@@ -53,7 +54,7 @@ class ConditionArgument
                 continue;
             }
 
-            if (in_array($key, $attributes)) {
+            if ($key == "id" || in_array($key, $attributes)) {
                 self::applyCondition($context, $criteria, $key, $prefix, $condition, $and);
                 continue;
             }
@@ -79,6 +80,27 @@ class ConditionArgument
         $value = $condition[$operator];
         if ($operator == "and" || $operator == "or") {
             $criteria->{$this->fn}(fn(Criteria $c) => self::applyArgumentsArray($context, $c, $field, $value, $prefix, $operator));
+            return;
+        }
+
+        if ($field == "id") {
+            $field = $criteria->getModel()::getKeyAttributeName();
+        }
+
+        if ($operator == "result_in" || $operator == "result_nin") {
+            $pos = strrpos($value, '.', -1);
+            [$key, $columnDot] = str_split($value, $pos);
+            $column = substr($columnDot, 1);
+            $results = Arr::get($context->results, $key);
+            if (is_null($results)) {
+                throw new EGraphQLNotFoundException($value, 'result');
+            }
+            $values = Arr::pluck($results, $column);
+
+            $operator == "result_nin" ?
+                $criteria->{$this->fn}($field, 'NOT IN', $values) :
+                $criteria->{$this->fn}($field, 'IN', $values);
+
             return;
         }
         $value = match ($operator) {
