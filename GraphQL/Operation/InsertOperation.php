@@ -31,9 +31,8 @@ class InsertOperation extends AbstractWriteOperation
 
         foreach ($objects as $object) {
             $data = $object['attributes'];
-            $this->writeAssociationsBefore($object['associations']['before'], $data);
             $id = $this->resource->insert($data);
-            $this->writeAssociationsAfter($object['associations']['after'], $id);
+            $this->writeAssociations($object['associations'], $id);
             $ids[] = $id;
         }
         return $this->executeQueryOperation($ids);

@@ -15,9 +15,8 @@ class UpsertOperation extends AbstractWriteOperation
         $objects = $this->readArguments($this->root->arguments);
         foreach ($objects as $object) {
             $attributes = $object['attributes'];
-            $this->writeAssociationsBefore($object['associations']['before'], $attributes);
             $id = $this->resource->upsert($attributes);
-            $this->writeAssociationsAfter($object['associations']['after'], $id);
+            $this->writeAssociations($object['associations'], $id);
             $ids[] = $id;
         }
         return $this->executeQueryOperation($ids);

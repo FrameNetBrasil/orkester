@@ -10,8 +10,7 @@ use Orkester\Persistence\Map\ClassMap;
 interface ResourceInterface
 {
 
-    #[ArrayShape([AssociationMap::class, ResourceInterface::class])]
-    public function getAssociatedResource(string $association): ?array;
+    public function getAssociatedResource(string $association): ?ResourceInterface;
 
     public function isFieldReadable(string $field): bool;
 

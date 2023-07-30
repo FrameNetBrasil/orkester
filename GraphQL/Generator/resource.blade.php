@@ -9,7 +9,7 @@ type {{ $typename }} {
         {{ $docs[$attribute['name']] }}
         """
     @endif
-    {{$attribute['name']}}: {{$attribute['type']}}@if(!$attribute['nullable'])!@endif
+{{$attribute['name']}}: {{$attribute['type']}}@if(!$attribute['nullable'])!@endif
 
 @endforeach
 @foreach ($associations as $association)
@@ -17,7 +17,7 @@ type {{ $typename }} {
         {{ $docs[$association['name']] }}
         """
     @endif
-    {{$association['name']}}(where: {{$association['type']}}Where pluck: String): @if ($association['cardinality'] == "one") {{ $association['type'] }}@if(!$association['nullable'])!@endif @else[{{ $association['type'] }}!]@endif
+{{$association['name']}}(where: {{$association['type']}}Where pluck: String): @if ($association['cardinality'] == "one") {{ $association['type'] }}@if(!$association['nullable'])!@endif @else[{{ $association['type'] }}!]@endif
 @endforeach
 
 }
@@ -45,9 +45,18 @@ type {{ $typename }}Resource {
         pluck: String
         having: {{ $typename }}Where
         join: [Join!]
+        distinct: Boolean
     ): [{{ $typename }}!]!
     find(
         id: ID
+        pluck: String
         where: {{ $typename }}Where
     ): {{ $typename }}
+@foreach ($operations as $operation)
+    {{ $operation['name'] }}@if(count($operation['parameters']) > 0)(
+    @foreach($operation['parameters'] as $parameter)
+        {{$parameter['name']}}: {{$parameter['type']}}{{$parameter['nullable'] ? '' : '!'}}
+    @endforeach{{')'}}
+    @endif: {{$operation['return']['type']}}{{$operation['return']['nullable'] ? '' : '!'}}
+@endforeach
 }

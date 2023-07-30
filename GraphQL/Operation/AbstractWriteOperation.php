@@ -4,12 +4,14 @@ namespace Orkester\GraphQL\Operation;
 
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
-use Orkester\Resource\AssociativeResourceInterface;
-use Orkester\Resource\WritableResourceInterface;
+use Illuminate\Support\Arr;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\UnknownFieldException;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Enum\Association;
+use Orkester\Persistence\Map\AssociationMap;
+use Orkester\Resource\AssociativeResourceInterface;
+use Orkester\Resource\WritableResourceInterface;
 
 abstract class AbstractWriteOperation extends AbstractOperation
 {
@@ -20,103 +22,91 @@ abstract class AbstractWriteOperation extends AbstractOperation
         parent::__construct($root, $context);
     }
 
-    protected function writeAssociationsBefore(array $associations, array &$attributes)
+    protected function writeAssociationAssociative(AssociationMap $map, array $entries, int|string $parentId)
     {
-        foreach ($associations as $associationData) {
-            $associationData['data'] = [$associationData['data']];
-            $attributes[$associationData['associationMap']->fromKey] =
-                $this->editAssociation($associationData, null)[0];
+        if (!$this->resource instanceof AssociativeResourceInterface)
+            throw new EGraphQLException("Associative operations not available for resource {$this->resource->getName()}");
+
+        foreach ($entries as $mode => $content) {
+            if ($mode == "append") {
+                $this->resource->appendAssociative($map, $parentId, $content);
+                continue;
+            }
+
+            if ($mode == "delete") {
+                $this->resource->deleteAssociative($map, $parentId, $content);
+                continue;
+            }
+
+            if ($mode == "replace") {
+                $this->resource->replaceAssociative($map, $parentId, $content);
+                continue;
+            }
         }
     }
 
-    protected function writeAssociationsAfter(array $associations, int $parentId)
+    protected function writeAssociationChild(AssociationMap $map, array $entries, int|string $parentId, WritableResourceInterface $associatedResource)
     {
-        foreach ($associations as $associationData) {
-            return $this->editAssociation($associationData, $parentId);
+        foreach ($entries as $mode => $content) {
+            if ($mode == "upsert") {
+                foreach ($content as $row) {
+                    $id = Arr::pull($row, 'id');
+                    $row[$map->toClassMap->keyAttributeName] = $id;
+                    $row[$map->toKey] = $parentId;
+                    $associatedResource->upsert($row);
+                }
+                continue;
+            }
+
+            if ($mode == "insert") {
+                foreach ($content as $row) {
+                    $row[$map->toKey] = $parentId;
+                    $associatedResource->insert($row);
+                }
+                continue;
+            }
+
+            if ($mode == "update") {
+                foreach ($content as $id) {
+                    $associatedResource->update([$map->toKey => $parentId], $id);
+                }
+                continue;
+            }
+
+            if ($mode == "delete") {
+                $setNull = $map->toClassMap->getAttributeMap($map->toKey)->nullable;
+
+                $validIds = $associatedResource->getCriteria()
+                    ->where($map->toKey, '=', $parentId)
+                    ->where($map->toClassMap->keyAttributeName, 'IN', $content)
+                    ->pluck($map->toClassMap->keyAttributeName);
+
+                foreach ($validIds as $id) {
+                    $setNull ?
+                        $associatedResource->update([$map->toKey => null], $id) :
+                        $associatedResource->delete($id);
+                }
+                continue;
+            }
         }
-        return [];
     }
 
-    protected function editAssociation(array $associationData, ?int $parentId): array
+    public function writeAssociations(array $associationData, int|string $parentId)
     {
-        [
-            'associationMap' => $map,
-            'resource' => $associatedResource
-        ] = $associationData;
+        foreach ($associationData as ['associationMap' => $map,
+                 'associatedResourceKey' => $key,
+                 'operations' => $operations]) {
 
-        if (!$associatedResource instanceof WritableResourceInterface) {
-            throw new EGraphQLException("Resource {$associatedResource->getName()} is not writable");
+            if ($map->cardinality == Association::ASSOCIATIVE) {
+                $this->writeAssociationAssociative($map, $operations, $parentId);
+                return;
+            }
+
+            $resource = $this->context->getResource($key);
+            if (!$resource instanceof WritableResourceInterface)
+                throw new EGraphQLException("Resource {$resource->getName()} is not writable");
+            $this->writeAssociationChild($map, $operations, $parentId, $resource);
         }
-
-        $ids = [];
-        foreach ($associationData['data'] as $entry) {
-            if ($entry['mode'] == "upsert") {
-                foreach ($entry['data'] as &$row) {
-                    $row[$map->toKey] ??= $parentId;
-                    $ids[] = $associatedResource->upsert($row);
-                }
-                continue;
-            }
-
-            if ($entry['mode'] == "insert") {
-                foreach ($entry['data'] as $row) {
-                    $row[$map->toKey] ??= $parentId;
-                    $ids[] = $associatedResource->insert($row);
-                }
-                continue;
-            }
-
-            if ($entry['mode'] == "append" || $entry['mode'] == "update") {
-                $data = is_array($entry['data']) ? $entry['data'] : [$entry['data']];
-                if ($map->cardinality == Association::MANY) {
-                    foreach ($data as $id) {
-                        $ids[] = $associatedResource->update([
-                            $map->toKey => $parentId
-                        ], $id);
-                    }
-                    continue;
-                }
-                if ($map->cardinality == Association::ASSOCIATIVE) {
-                    if ($this->resource instanceof AssociativeResourceInterface) {
-                        $this->resource->appendAssociative($map, $parentId, $data);
-                    }
-                    continue;
-                }
-                $associatedClassMap = $associatedResource->getClassMap();
-                $ids = array_merge(
-                    $ids,
-                    array_map(
-                        fn ($d) => is_array($d) ? $d[$associatedClassMap->keyAttributeName] : $d,
-                        $data
-                    )
-                );
-                continue;
-            }
-
-            if ($entry['mode'] == "delete") {
-                if ($map->cardinality != Association::ASSOCIATIVE)
-                    throw new EGraphQLException("Delete association is only supported on Many to Many relationships");
-                if (!array_key_exists(0, $entry['data']))
-                    throw new EGraphQLException("Delete association data must be an array");
-                if (!$this->resource instanceof AssociativeResourceInterface) {
-                    throw new EGraphQLException("Invalid Resource implementation");
-                }
-                $this->resource->deleteAssociative($map, $parentId, $entry['data']);
-                continue;
-            }
-
-            if ($entry['mode'] == "replace") {
-                if ($map->cardinality != Association::ASSOCIATIVE)
-                    throw new EGraphQLException("Replace association is only supported on Many to Many relationships");
-                if (!array_key_exists(0, $entry['data']))
-                    throw new EGraphQLException("Replace association data must be an array");
-                if (!$this->resource instanceof AssociativeResourceInterface) {
-                    throw new EGraphQLException("Invalid Resource implementation");
-                }
-                $this->resource->replaceAssociative($map, $parentId, $entry['data']);
-            }
-        }
-        return $ids;
     }
 
     protected function executeQueryOperation(?array $ids): ?array
@@ -136,13 +126,10 @@ abstract class AbstractWriteOperation extends AbstractOperation
     {
         $classMap = $this->resource->getClassMap();
         $attributes = $classMap->getAttributesNames();
-
+        $associations = $classMap->getAssociationMaps();
         $object = [
             'attributes' => [],
-            'associations' => [
-                'before' => [],
-                'after' => [],
-            ]
+            'associations' => []
         ];
         foreach ($rawObject as $key => $value) {
             if ($key == "id") {
@@ -155,14 +142,17 @@ abstract class AbstractWriteOperation extends AbstractOperation
                 continue;
             }
 
-            if ($associatedResource = $this->resource->getAssociatedResource($key)) {
-                $cardinalityKey =
-                    $associatedResource[0]->cardinality == Association::ONE
-                        ? 'before' : 'after';
-                $object['associations'][$cardinalityKey][] = [
-                    'resource' => $associatedResource[1],
-                    'associationMap'=> $associatedResource[0],
-                    'data' => $value
+            /** @var AssociationMap $associationMap */
+            if ($associationMap = Arr::first($associations, fn($m) => $m->name == $key)) {
+                if ($associationMap->cardinality == Association::ONE) {
+                    $object['attributes'][$associationMap->fromKey] = $value['id'];
+                    continue;
+                }
+
+                $object['associations'][] = [
+                    'associatedResourceKey' => $key,
+                    'associationMap' => $associationMap,
+                    'operations' => $value
                 ];
                 continue;
             }
