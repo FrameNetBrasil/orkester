@@ -329,7 +329,7 @@ class Model
             ->delete();
     }
 
-    public static function save(object $data): ?int
+    public static function save(array $data): ?int
     {
         $fields = static::prepareWrite($data);
         $key = static::getKeyAttributeName();
