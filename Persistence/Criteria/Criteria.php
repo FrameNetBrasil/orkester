@@ -33,6 +33,7 @@ class Criteria extends Builder
     public $associationJoin = [];
     public $aliasCount = 0;
     public $parameters = [];
+    public $aliasTable = NULL;
     /**
      * @var ClassMap[] $maps
      */
@@ -227,9 +228,17 @@ class Criteria extends Builder
             $this->criteriaAlias[$alias] = $className;
         }
         if ($className == '') {
-            $this->from($this->tableName($className), $alias);
+            $tableName = $this->tableName($className);
+            $this->tableAlias[$alias] = $tableName;
+            $this->aliasTable = $alias;
+            $this->from($tableName, $alias);
         }
         return $this;
+    }
+
+    public function aliasTable(): string|null
+    {
+        return $this->aliasTable;
     }
 
     public function joinSub($query, $as, $first, $operator = null, $second = null, $type = 'inner', $where = false)
