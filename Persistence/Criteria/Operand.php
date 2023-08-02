@@ -47,6 +47,14 @@ class Operand
         return $this->resolveOperandPath();
     }
 
+    private function reasolveFieldForMainTable(string $tableName, string $attributeName): string {
+        return $tableName . '.' . ($this->criteria->columnName('', $attributeName) ?? $attributeName);
+    }
+
+    private function reasolveFieldForClass(string $classAlias, string $attributeName): string {
+        return $classAlias . '.' . ($this->criteria->columnName($this->criteria->classAlias[$classAlias], $attributeName) ?? $attributeName);
+    }
+
     public function resolveOperandPath()
     {
         $field = '';
@@ -57,19 +65,20 @@ class Operand
         $tableName = $this->criteria->aliasTable() ?? $this->criteria->tableName();
         // if x == table
         if ($parts[0] == $tableName) {
-            $field = $parts[0] . '.' . ($this->criteria->columnName('', $parts[1]) ?? $parts[1]);
+            $field = $this->reasolveFieldForMainTable($tableName, $parts[1]);
         } else
             // if x = alias for a class, get the column name referent to that class
             if (isset($this->criteria->classAlias[$parts[0]])) {
-                $field = $parts[0] . '.' . $this->criteria->columnName($this->criteria->classAlias[$parts[0]], $parts[1]);
+                $field = $this->reasolveFieldForClass($parts[0], $parts[1]);
             } else
                 // if x = alias for another criteria, keep field = "x.y"
                 if (isset($this->criteria->criteriaAlias[$parts[0]])) {
                     $field = "{$parts[0]}.{$parts[1]}";
                 } else
-                    // if x = alias artificially generated, keep field = "x.y"
-                    if ($this->criteria->generatedAliases->contains($parts[0])) {
-                        $field = "{$parts[0]}.{$parts[1]}";
+                    // if x has an alias artificially generated, field = "alias.y"
+                    if (isset($this->criteria->tableAlias[$parts[0]])) {
+                        $alias = $this->criteria->tableAlias[$parts[0]];
+                        $field = "{$alias}.{$parts[1]}";
                     }
         // if field still "", field is an association.chain
         if ($field == '') {
@@ -79,7 +88,7 @@ class Operand
 //            mdump($chain);
             // join type defined for the last piece of chain
             $associationJoinType = $this->criteria->associationJoin[$chain] ?? null;
-            $leftTableName = $tableName;
+            $rightAlias = $leftTableName = $tableName;
             // joinIndex is used to create an exclusive alias for each association
             $joinIndex = '';
             // last association
@@ -158,7 +167,8 @@ class Operand
             }
             // all field from the chain
             if ($parts[$n] == '*') {
-                $field = $leftTableName . '.' . $parts[$n];
+                //$field = $leftTableName . '.' . $parts[$n];
+                $field = $rightAlias . '.' . $parts[$n];
             } else { // specific field from the chain
                 $attributeMap = $this->criteria->getAttributeMap($parts[$n], $baseClass);
                 if ($attributeMap->reference != '') {
@@ -166,7 +176,8 @@ class Operand
                     $this->field = str_replace($parts[$n], $attributeMap->reference, $this->field);
                     $field = $this->resolveOperand();
                 } else {
-                    $field = $leftTableName . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
+                    //$field = $leftTableName . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
+                    $field = $rightAlias . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
                     if ($parts[$n] == 'id') {
                         $field .= " id";
                     }
