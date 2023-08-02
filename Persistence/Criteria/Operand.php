@@ -103,7 +103,7 @@ class Operand
                 $rightTableName = $this->criteria->tableName($associationMap->toClassName);
                 // is there an alias for this joinIndex? If so, use it; if no, create one
                 if (!isset($this->criteria->tableAlias[$joinIndex])) {
-                    $this->criteria->tableAlias[$joinIndex] = $associationName . '_' . ++$this->criteria->aliasCount;
+                    $this->criteria->tableAlias[$joinIndex] = $associationName . '_' . ++Criteria::$aliasCount;
                     $this->criteria->generatedAliases[] = $this->criteria->tableAlias[$joinIndex];
                 }
                 $rightAlias = $this->criteria->tableAlias[$joinIndex];
@@ -114,7 +114,7 @@ class Operand
                         $rightField = $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
                         $leftField = $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
                         $associativeTableName = $associationMap->associativeTable;
-                        $associativeTableAlias = 'a' . ++$this->criteria->aliasCount;
+                        $associativeTableAlias = 'a' . ++Criteria::$aliasCount;
                         // register the alias for the associative table
                         $this->criteria->tableAlias[$associativeTableName] = $associativeTableAlias;
                         $this->criteria->generatedAliases->add($associativeTableAlias);
