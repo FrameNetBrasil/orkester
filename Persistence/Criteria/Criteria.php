@@ -108,7 +108,8 @@ class Criteria extends Builder
     public function columnName(string $className, string $attribute)
     {
         //mdump('attribute to column = ' . $className . '.' . $attribute . PHP_EOL);
-        return ($attribute == '*') ? '*' : $this->maps[$className ?: $this->model]->getAttributeMap($attribute)?->columnName ?? $attribute;
+        //return ($attribute == '*') ? '*' : $this->maps[$className ?: $this->model]->getAttributeMap($attribute)?->columnName ?? $attribute;
+        return ($attribute == '*') ? '*' : $this->getAttributeMap($attribute, $className ?: $this->model)?->columnName ?? $attribute;
     }
 
     public function getAttributeMap(string $attributeName, $className = ''): ?AttributeMap

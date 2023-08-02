@@ -47,13 +47,38 @@ class Operand
         return $this->resolveOperandPath();
     }
 
-    private function reasolveFieldForMainTable(string $tableName, string $attributeName): string {
+    private function reasolveFieldForMainTable(string $tableName, string $attributeName): string
+    {
         return $tableName . '.' . ($this->criteria->columnName('', $attributeName) ?? $attributeName);
     }
 
-    private function reasolveFieldForClass(string $classAlias, string $attributeName): string {
+    private function reasolveFieldForClass(string $classAlias, string $attributeName): string
+    {
         return $classAlias . '.' . ($this->criteria->columnName($this->criteria->classAlias[$classAlias], $attributeName) ?? $attributeName);
     }
+
+    protected function resolveJoin(Join $associationJoinType, string $leftAlias, string $leftField, string $rightAlias, string $rightField)
+    {
+        match ($associationJoinType) {
+            Join::INNER => $this->criteria->join($rightAlias, "{$leftAlias}.{$leftField}", '=', "{$rightAlias}.{$rightField}"),
+            Join::LEFT => $this->criteria->leftJoin($rightAlias, "{$leftAlias}.{$leftField}", '=', "{$rightAlias}.{$rightField}"),
+            Join::RIGHT => $this->criteria->rigthJoin($rightAlias, "{$leftAlias}.{$leftField}", '=', "{$rightAlias}.{$rightField}"),
+        };
+    }
+
+    protected function resolveAssociationJoin(AssociationMap $associationMap, Join $associationJoinType, string $leftAlias, string $rightAlias)
+    {
+        $leftField = $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
+        $rightField = $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
+        if ($associationMap->cardinality == Association::ASSOCIATIVE) {
+            $associativeTableAlias = $associationMap->associativeTable . ' as ' . 'a' . ++Criteria::$aliasCount;
+            $this->resolveJoin($associationJoinType, $leftAlias, $leftField, $associativeTableAlias, $leftField);
+            $this->resolveJoin($associationJoinType, $associativeTableAlias, $rightField, $rightAlias, $rightField);
+        } else {
+            $this->resolveJoin($associationJoinType, $leftAlias, $leftField, $rightAlias, $rightField);
+        }
+    }
+
 
     public function resolveOperandPath()
     {
@@ -80,105 +105,56 @@ class Operand
                         $alias = $this->criteria->tableAlias[$parts[0]];
                         $field = "{$alias}.{$parts[1]}";
                     }
-        // if field still "", field is an association.chain
+        // if field still "", field is an association chain:
+        //    associationName.attributeName
+        //    associationName.associationName.attributeName
+        //    associationName.associationName.associationName.attributeName
+        //    ....
         if ($field == '') {
-            $n = count($parts) - 1;
-            // remove fieldName from chain - keep just the associations
-            $chain = implode('.', array_slice($parts, 0, -1));
-//            mdump($chain);
-            // join type defined for the last piece of chain
-            $associationJoinType = $this->criteria->associationJoin[$chain] ?? null;
-            $rightAlias = $leftTableName = $tableName;
-            // joinIndex is used to create an exclusive alias for each association
-            $joinIndex = '';
-            // last association
-            $last = $n - 1;
-            // baseClass is the class the association refers to
-            $baseClass = '';
-            for ($i = 0; $i < $n; $i++) {
-                $associationName = $parts[$i];
-                // an exclusive index is created by association_names concatenation
-                // the alias is kept at criteria, because it can be reused in the same command
-                $joinIndex .= $associationName;
-                // get the associationMap based on current baseClass
-                $associationMap = $this->criteria->getAssociationMap($associationName, $baseClass);
-                // associationMap MUST exist
-                if (is_null($associationMap)) {
-                    throw new \InvalidArgumentException("Association not found: $chain");
+            $attributeName = array_pop($parts);
+            $currentClass = ''; // empty for the criteria class
+            $currentAlias = $tableName;
+            foreach ($parts as $i => $associationName) {
+                if ($i == 0) {
+                    $chain = $associationName;
+                } else {
+                    $chain .= '.' . $associationName;
                 }
-//                if ($resolvedSubset = $this->resolveSubsetAssociation($associationMap, $parts)) {
-//                    return $resolvedSubset;
-//                }
-                $rightTableName = $this->criteria->tableName($associationMap->toClassName);
-                // is there an alias for this joinIndex? If so, use it; if no, create one
-                if (!isset($this->criteria->tableAlias[$joinIndex])) {
-                    $this->criteria->tableAlias[$joinIndex] = $associationName . '_' . ++Criteria::$aliasCount;
-                    $this->criteria->generatedAliases[] = $this->criteria->tableAlias[$joinIndex];
-                }
-                $rightAlias = $this->criteria->tableAlias[$joinIndex];
-                // if this join was not created yet
-                if (!isset($this->criteria->listJoin[$joinIndex])) {
-                    // association ASSOCIATIVE needs an intermediate join
-                    if ($associationMap->cardinality == Association::ASSOCIATIVE) {
-                        $rightField = $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
-                        $leftField = $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
-                        $associativeTableName = $associationMap->associativeTable;
-                        $associativeTableAlias = 'a' . ++Criteria::$aliasCount;
-                        // register the alias for the associative table
-                        $this->criteria->tableAlias[$associativeTableName] = $associativeTableAlias;
-                        $this->criteria->generatedAliases->add($associativeTableAlias);
-                        // for the last piece of chain, uses $associationJoinType; else uses the join type defined on associationMap
-                        $joinType = ($i == $last) ? ($associationJoinType ?: $associationMap->joinType) : $associationMap->joinType;
-                        // the join left-associative
-                        $right = $associativeTableName . ' as ' . $associativeTableAlias;
-                        $leftOperand = $leftTableName . '.' . $leftField;
-                        $rightOperand = $associativeTableAlias . '.' . $leftField;
-                        match ($joinType) {
-                            Join::INNER => $this->criteria->join($right, $leftOperand, '=', $rightOperand),
-                            Join::LEFT => $this->criteria->leftJoin($right, $leftOperand, '=', $rightOperand),
-                            Join::RIGHT => $this->criteria->rigthJoin($right, $leftOperand, '=', $rightOperand),
-                        };
-                        // the join associative-right
-                        $right = $rightTableName . ' as ' . $rightAlias;
-                        $leftOperand = $associativeTableAlias . '.' . $rightField;
-                        $rightOperand = $rightAlias . '.' . $rightField;
-                        match ($joinType) {
-                            Join::INNER => $this->criteria->join($right, $leftOperand, '=', $rightOperand),
-                            Join::LEFT => $this->criteria->leftJoin($right, $leftOperand, '=', $rightOperand),
-                            Join::RIGHT => $this->criteria->rigthJoin($right, $leftOperand, '=', $rightOperand),
-                        };
-                    } else { // associations oneToMany
-                        $rightField = $rightAlias . '.' . $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
-                        $leftField = $leftTableName . '.' . $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
-                        // for the last piece of chain, uses $associationJoinType; else uses the join type defined on associationMap
-                        $joinType = ($i == $last) ? ($associationJoinType ?: $associationMap->joinType) : $associationMap->joinType;
-                        match ($joinType) {
-                            Join::INNER => $this->criteria->join($rightTableName . ' as ' . $rightAlias, $leftField, '=', $rightField),
-                            Join::LEFT => $this->criteria->leftJoin($rightTableName . ' as ' . $rightAlias, $leftField, '=', $rightField),
-                            Join::RIGHT => $this->criteria->rightJoin($rightTableName . ' as ' . $rightAlias, $leftField, '=', $rightField),
-                        };
+                // just create the join for this chain if it wasn't set yet
+                if (!isset($this->criteria->listJoin[$chain])) {
+                    // get the associationMap based on current Class
+                    $associationMap = $this->criteria->getAssociationMap($associationName, $currentClass);
+                    // associationMap MUST exist
+                    if (is_null($associationMap)) {
+                        throw new \InvalidArgumentException("Association not found: $chain");
                     }
-                    // register this join
-                    $this->criteria->listJoin[$joinIndex] = $leftTableName;
+                    // join type for this chain otherwise INNER
+                    $associationJoinType = $associationMap->joinType ?? $this->criteria->associationJoin[$chain] ?? Join::INNER;
+                    // is there an alias for this chain? If so, use it; if no, create one
+                    if (!isset($this->criteria->tableAlias[$chain])) {
+                        $this->criteria->tableAlias[$chain] = $associationName . '_' . ++Criteria::$aliasCount;
+                    }
+                    $associationAlias = $this->criteria->tableAlias[$chain];
+                    $this->resolveAssociationJoin($associationMap, $associationJoinType, $currentAlias, $associationAlias);
+                    // forward
+                    $currentClass = $associationMap->toClassName;
+                    $currentAlias = $associationAlias;
+                    // register this chain
+                    $this->criteria->listJoin[$chain] = $chain;
                 }
-                // step forward
-                $baseClass = $associationMap->toClassName;
-                $leftTableName = $rightTableName;
             }
-            // all field from the chain
-            if ($parts[$n] == '*') {
-                //$field = $leftTableName . '.' . $parts[$n];
-                $field = $rightAlias . '.' . $parts[$n];
+            // all fields from the chain
+            if ($attributeName == '*') {
+                $field = $currentAlias . '.' . $parts[$n];
             } else { // specific field from the chain
-                $attributeMap = $this->criteria->getAttributeMap($parts[$n], $baseClass);
+                $attributeMap = $this->criteria->getAttributeMap($attributeName, $currentClass);
                 if ($attributeMap->reference != '') {
                     // field is a reference for another chain - resolve recursively
-                    $this->field = str_replace($parts[$n], $attributeMap->reference, $this->field);
+                    $this->field = str_replace($attributeName, $attributeMap->reference, $this->field);
                     $field = $this->resolveOperand();
                 } else {
-                    //$field = $leftTableName . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
-                    $field = $rightAlias . '.' . $this->criteria->columnName($baseClass, $parts[$n]);
-                    if ($parts[$n] == 'id') {
+                    $field = $currentAlias . '.' . $this->criteria->columnName($currentClass, $attributeName);
+                    if ($attributeName == 'id') {
                         $field .= " id";
                     }
                 }
