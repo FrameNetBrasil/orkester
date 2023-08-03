@@ -155,23 +155,21 @@ class Criteria extends Builder
         }
     }
 
-    public function where($attribute, $operator = null, $value = null, $boolean = 'and')
+    public function where($column, $operator = null, $value = null, $boolean = 'and'): static
     {
-        if ($attribute instanceof Closure) {
-            return parent::where($attribute, $operator, $value, $boolean);
+        if ($column instanceof Closure) {
+            return parent::where($column, $operator, $value, $boolean);
         }
-        if (is_array($attribute)) {
-            return parent::where($attribute, $operator, $value, $boolean);
+        if (is_array($column)) {
+            return parent::where($column, $operator, $value, $boolean);
         }
         if ($value instanceof Criteria) {
-            $type = 'Sub';
-            $column = $attribute;
-            $query = $value;
-            $boolean = 'and';
-            $this->wheres[] = compact(
-                'type', 'column', 'operator', 'query', 'boolean'
+            $this->where($column, $operator,
+                fn($query) => Arr::map(
+                    get_object_vars($query),
+                    fn($_, $property) => $query->$property = $value->$property
+                )
             );
-            $this->addBinding($query->getBindings(), 'where');
         } else {
             $uOp = strtoupper($operator ?? "");
             if ($uOp == 'STARTSWITH') {
@@ -183,15 +181,15 @@ class Criteria extends Builder
             }
             $uValue = is_string($value) ? strtoupper($value) : $value;
             if (($uValue === 'NULL') || is_null($value)) {
-                $this->whereNull($attribute);
+                $this->whereNull($column);
             } else if ($uValue === 'NOT NULL') {
-                $this->whereNotNull($attribute);
+                $this->whereNotNull($column);
             } else if ($uOp === 'IN') {
-                $this->whereIN($attribute, $value);
+                $this->whereIn($column, $value);
             } else if ($uOp === 'NOT IN') {
-                $this->whereNotIN($attribute, $value);
+                $this->whereNotIn($column, $value);
             } else {
-                parent::where($attribute, $operator, $value, $boolean);
+                parent::where($column, $operator, $value, $boolean);
             }
         }
         return $this;
