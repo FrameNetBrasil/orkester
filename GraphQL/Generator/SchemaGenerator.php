@@ -3,16 +3,15 @@
 namespace orkester\GraphQL\Generator;
 
 use Illuminate\Support\Arr;
-use Orkester\Resource\CustomOperationsInterface;
-use Orkester\Resource\ResourceInterface;
-use Orkester\Resource\WritableResourceInterface;
 use Orkester\Manager;
-use Orkester\Persistence\Enum\Association;
 use Orkester\Persistence\Enum\Key;
 use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
+use Orkester\Resource\CustomOperationsInterface;
+use Orkester\Resource\ResourceInterface;
+use Orkester\Resource\WritableResourceInterface;
 use ReflectionIntersectionType;
 use ReflectionNamedType;
 use ReflectionUnionType;
@@ -22,19 +21,18 @@ class SchemaGenerator
 {
 
     protected Blade $blade;
+    protected array $conf;
 
     public static function generateAll(): string
     {
-        $conf = require Manager::getConfPath() . '/api.php';
-
         $instance = new self();
         $resources = Arr::mapWithKeys(
-            $conf['resources'],
+            $instance->conf['resources'],
             fn($resource, $key) => [$key => Manager::getContainer()->make($resource)]
         );
         $writableResources = Arr::where($resources, fn($r) => $r instanceof WritableResourceInterface);
 
-        $services = $instance->readServices($conf['services']);
+        $services = $instance->readServices($instance->conf['services']);
 
         $base = $instance->generateBaseDeclarations($resources, $writableResources, $services);
         $readSchemas = Arr::map($resources, fn($r, $k) => $instance->generateResourceSchema($r, $k));
@@ -43,13 +41,77 @@ class SchemaGenerator
         return $base . PHP_EOL . implode(PHP_EOL, $readSchemas) . implode(PHP_EOL, $writeSchemas);
     }
 
+    public function writeAllResourceSchemas(string $outputDir)
+    {
+        foreach(array_keys($this->conf['resources']) as $resourceName) {
+            $this->writeResourceSchema($resourceName, $outputDir);
+        }
+    }
+
+    public function writeResourceSchema(string $resourceName, string $outputDir)
+    {
+        $resource = Manager::getContainer()->make($this->conf['resources'][$resourceName]);
+        $read = $this->generateResourceSchema($resource);
+        $write = $resource instanceof WritableResourceInterface ? $this->generateWritableResourceSchema($resource) : '';
+        $content = $read . PHP_EOL . $write;
+        if (!file_exists($outputDir)) {
+            mkdir($outputDir, recursive: true);
+        }
+        file_put_contents("$outputDir/$resourceName.schema.graphql", $content);
+    }
+
+    public function writeServiceSchema(string $outputDir)
+    {
+        $content = $this->generateServiceDeclarations($this->conf['services']);
+        if (!file_exists($outputDir)) {
+            mkdir($outputDir, recursive: true);
+        }
+        file_put_contents("$outputDir/services.schema.graphql", $content);
+    }
+
+    public function writeOperationSchema(string $outputDir)
+    {
+        $resources = Arr::mapWithKeys(
+            $this->conf['resources'],
+            fn($resource, $key) => [$key => Manager::getContainer()->make($resource)]
+        );
+        $writableResources = Arr::where($resources, fn($r) => $r instanceof WritableResourceInterface);
+
+        $services = $this->readServices($this->conf['services']);
+        $content = $this->generateBaseDeclarations($resources, $writableResources, $services);
+        if (!file_exists($outputDir)) {
+            mkdir($outputDir, recursive: true);
+        }
+        file_put_contents("$outputDir/operation.schema.graphql", $content);
+    }
+
+    public static function generateSchemaFile(string $baseDir, string $outputPath)
+    {
+        $orkester = file_get_contents(__DIR__ . '/orkester.schema.graphql');
+        $operations = file_get_contents($baseDir . '/operation.schema.graphql');
+        $services = file_get_contents($baseDir . '/services.schema.graphql');
+        $resources = Arr::map(
+            glob("$baseDir/resources/*.schema.graphql") ?? [],
+            fn($r) => file_get_contents($r)
+        );
+        file_put_contents($outputPath,
+            $orkester . PHP_EOL .
+            $operations . PHP_EOL .
+            $services . PHP_EOL .
+            implode(PHP_EOL, $resources) . PHP_EOL
+        );
+    }
+
     public function __construct()
     {
         $this->blade = new Blade(__DIR__, sys_get_temp_dir());
+        $this->conf = require Manager::getConfPath() . '/api.php';
+
     }
 
-    protected function translateReflectionType(null|ReflectionIntersectionType|ReflectionNamedType|ReflectionUnionType $type) {
-        return match($type->getName()) {
+    protected function translateReflectionType(null|ReflectionIntersectionType|ReflectionNamedType|ReflectionUnionType $type)
+    {
+        return match ($type->getName()) {
             'string' => 'String',
             'bool' => 'Boolean',
             'int' => 'Int',
@@ -104,6 +166,11 @@ class SchemaGenerator
         return $this->blade->make('base', ['resources' => $args, 'writableResources' => $wargs, 'services' => $services])->render();
     }
 
+    protected function generateServiceDeclarations(array $services): string
+    {
+        return $this->blade->make('services', ['services' => $this->readServices($services)])->render();
+    }
+
     protected function generateResourceSchema(ResourceInterface $resource): string
     {
         $result = $this->blade->make('resource', [
@@ -111,7 +178,6 @@ class SchemaGenerator
             'attributes' => $this->getAttributes($resource->getClassMap()),
             'associations' => $this->getAssociations($resource),
             'operations' => $this->getCustomOperations($resource, 'query'),
-            'docs' => mdump($resource->getClassMap()->model::getApiDocs())
         ])->render();
         return $result;
     }
@@ -120,7 +186,7 @@ class SchemaGenerator
     {
         return $this->blade->make('writable', [
             'typename' => $resource->getName(),
-            'attributes' =>  $this->getWritableAttributes($resource->getClassMap()),
+            'attributes' => $this->getWritableAttributes($resource->getClassMap()),
             'associations' => $this->getAssociations($resource),
             'operations' => $this->getCustomOperations($resource, 'mutation')
         ]);

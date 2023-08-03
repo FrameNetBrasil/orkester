@@ -6,13 +6,15 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
-use Orkester\Resource\ResourceInterface;
+use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLInternalException;
 use Orkester\GraphQL\Argument\ConditionArgument;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Association;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Map\AssociationMap;
+use Orkester\Resource\ResourceInterface;
 
 class QueryOperation extends AbstractOperation
 {
@@ -23,9 +25,9 @@ class QueryOperation extends AbstractOperation
     protected array $forcedSelection = [];
     protected array $subQueries = [];
 
-    public function __construct(protected FieldNode $root, Context $context, protected ResourceInterface $resource)
+    public function __construct(protected FieldNode $root, protected ResourceInterface $resource)
     {
-        parent::__construct($root, $context);
+        parent::__construct($root);
         if ($this->root->name->value == "find") {
             $this->isSingle = true;
         }
@@ -37,26 +39,26 @@ class QueryOperation extends AbstractOperation
         return $this->criteria;
     }
 
-    public function getResults()
+    public function execute(Context $context)
     {
-        $rows = $this->getRawResults();
+        $rows = $this->getRawResults($context);
         $result = $this->cleanResults($rows);
         return $this->isSingle ? (empty($result) ? null : $result[0]) : $result;
     }
 
-    protected function getRawResults(): array
+    protected function getRawResults(Context $context): array
     {
         if (is_null($this->root->selectionSet)) return [];
 
-        $this->applySelection($this->root->selectionSet->selections);
+        $this->applySelection($this->root->selectionSet->selections, $context);
 
         if (empty($this->selection)) return [];
 
-        $this->applyArguments($this->root->arguments);
+        $this->applyArguments($this->root->arguments, $context);
 
         $select = array_merge(array_filter(array_values($this->selection), fn($s) => $s), $this->forcedSelection);
         $rows = $this->criteria->get($select);
-        $subResults = $this->getSubQueriesResults($rows);
+        $subResults = $this->getSubQueriesResults($rows, $context);
         if (empty($subResults)) return $rows->toArray();
 
         return $rows->map(function ($row) use ($subResults) {
@@ -72,7 +74,7 @@ class QueryOperation extends AbstractOperation
         })->toArray();
     }
 
-    public function applySelection(NodeList $selections)
+    public function applySelection(NodeList $selections, Context $context)
     {
         $classMap = $this->resource->getClassMap();
         $attributes = $classMap->getAttributesNames();
@@ -84,7 +86,7 @@ class QueryOperation extends AbstractOperation
             $name = $this->getNodeName($selectionNode);
             if ($selectionNode->arguments->count() > 0 &&
                 ($argument = $selectionNode->arguments->offsetGet(0))?->name->value == "expression") {
-                $expression = $this->context->getNodeValue($argument->value);
+                $expression = $context->getNodeValue($argument->value);
                 $this->selection[$field] = "$expression as $field";
                 continue;
             }
@@ -111,7 +113,7 @@ class QueryOperation extends AbstractOperation
                 $this->selection[$name] = '';
                 $this->forcedSelection[] = $associationMap->fromKey;
                 $this->subQueries[$this->getNodeName($selectionNode)] = [
-                    'operation' => new QueryOperation($selectionNode, $this->context, $resource),
+                    'operation' => new QueryOperation($selectionNode, $resource),
                     'map' => $associationMap,
                     'name' => $this->getNodeName($selectionNode)
                 ];
@@ -120,22 +122,30 @@ class QueryOperation extends AbstractOperation
         }
     }
 
-    protected function applyArguments(NodeList $arguments)
+    protected function applyArguments(NodeList $arguments, Context $context)
     {
         /** @var ArgumentNode $node */
         foreach ($arguments->getIterator() as $node) {
             $name = $node->name->value;
-            $value = $this->context->getNodeValue($node->value);
+            $value = $context->getNodeValue($node->value);
             if (is_null($value))
                 continue;
 
             if ($name == "where") {
-                ConditionArgument::applyArgumentWhere($this->context, $this->criteria, $value);
+                try {
+                    ConditionArgument::applyArgumentWhere($context, $this->criteria, $value);
+                } catch (EGraphQLInternalException $e) {
+                    throw new EGraphQLException($e->getMessage(), $node, "invalid_argument");
+                }
                 continue;
             }
 
             if ($name == "having") {
-                ConditionArgument::applyArgumentHaving($this->context, $this->criteria, $value);
+                try {
+                    ConditionArgument::applyArgumentHaving($context, $this->criteria, $value);
+                } catch (EGraphQLInternalException $e) {
+                    throw new EGraphQLException($e->getMessage(), $node, "invalid_argument");
+                }
                 continue;
             }
 
@@ -178,8 +188,8 @@ class QueryOperation extends AbstractOperation
             }
 
             if ($name == "join") {
-                foreach($value as $entry) {
-                    foreach($entry as $type => $association) {
+                foreach ($value as $entry) {
+                    foreach ($entry as $type => $association) {
                         $this->criteria->setAssociationType($association, Join::from($type));
                     }
                 }
@@ -192,7 +202,7 @@ class QueryOperation extends AbstractOperation
         }
     }
 
-    protected function getSubQueriesResults(\Illuminate\Support\Collection $parentRows): array
+    protected function getSubQueriesResults(\Illuminate\Support\Collection $parentRows, Context $context): array
     {
         $associatedResults = [];
         /**
@@ -224,7 +234,7 @@ class QueryOperation extends AbstractOperation
                 $groupKey = $fromClassMap->keyAttributeMap->columnName;
             }
 
-            $rows = group_by($operation->getRawResults(), $groupKey);
+            $rows = group_by($operation->getRawResults($context), $groupKey);
             $associatedResults[$name] = [
                 'operation' => $operation,
                 'rows' => $rows,

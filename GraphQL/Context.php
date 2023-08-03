@@ -21,7 +21,6 @@ class Context
 {
 
     public array $results = [];
-    public array $fragments;
     /**
      * @var (Model|string)[]
      */
@@ -30,12 +29,11 @@ class Context
     protected mixed $serviceResolver;
 
     public function __construct(
-        protected array         $variables = [],
-        FragmentDefinitionNode  ...$fragments
+        protected array  $variables = [],
+        protected array  $fragments = []
     )
     {
         $configuration = require Manager::getConfPath() . '/api.php';
-        $this->fragments = $fragments;
         $this->resources = $configuration['resources'];
         $this->namedServices = $configuration['services'];
         $this->serviceResolver = $configuration['serviceResolver'] ?? null;
@@ -81,21 +79,12 @@ class Context
         return array_find($this->fragments, fn($f) => $f->name->value == $name);
     }
 
-    public function getResource(string $name): ResourceInterface|WritableResourceInterface|AssociativeResourceInterface
+    public function getResource(string $name): ?ResourceInterface
     {
         if ($model = $this->resources[$name] ?? false) {
             return Manager::getContainer()->make($model);
         }
-        throw new EGraphQLNotFoundException($name, 'resource');
-    }
-
-    public function tryGetResource(string $name): ResourceInterface | false
-    {
-        try {
-            return $this->getResource($name);
-        } catch(EGraphQLException) {
-            return false;
-        }
+        return null;
     }
 
     public function getService(string $name, string $type): callable|false

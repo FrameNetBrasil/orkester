@@ -6,6 +6,7 @@ use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\Exception\UnknownFieldException;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Enum\Association;
@@ -15,17 +16,15 @@ use Orkester\Resource\WritableResourceInterface;
 
 abstract class AbstractWriteOperation extends AbstractOperation
 {
-    protected array $events = [];
-
-    public function __construct(protected FieldNode $root, Context $context, protected WritableResourceInterface $resource)
+    public function __construct(protected FieldNode $root, protected WritableResourceInterface $resource)
     {
-        parent::__construct($root, $context);
+        parent::__construct($root);
     }
 
     protected function writeAssociationAssociative(AssociationMap $map, array $entries, int|string $parentId)
     {
         if (!$this->resource instanceof AssociativeResourceInterface)
-            throw new EGraphQLException("Associative operations not available for resource {$this->resource->getName()}");
+            throw new EGraphQLException("Associative operations missing for resource", $this->root, "resource", details: ['resource' => $this->resource->getName()]);
 
         foreach ($entries as $mode => $content) {
             if ($mode == "append") {
@@ -42,6 +41,8 @@ abstract class AbstractWriteOperation extends AbstractOperation
                 $this->resource->replaceAssociative($map, $parentId, $content);
                 continue;
             }
+
+            throw new EGraphQLNotFoundException($mode, "association_mode", $this->root);
         }
     }
 
@@ -88,10 +89,12 @@ abstract class AbstractWriteOperation extends AbstractOperation
                 }
                 continue;
             }
+
+            throw new EGraphQLNotFoundException($mode, "association_mode", $this->root);
         }
     }
 
-    public function writeAssociations(array $associationData, int|string $parentId)
+    public function writeAssociations(array $associationData, int|string $parentId, FieldNode $root, Context $context)
     {
         foreach ($associationData as ['associationMap' => $map,
                  'associatedResourceKey' => $key,
@@ -102,24 +105,25 @@ abstract class AbstractWriteOperation extends AbstractOperation
                 return;
             }
 
-            $resource = $this->context->getResource($key);
-            if (!$resource instanceof WritableResourceInterface)
-                throw new EGraphQLException("Resource {$resource->getName()} is not writable");
+            $resource = $context->getResource($key);
+            if (!$resource instanceof WritableResourceInterface) {
+                throw new EGraphQLException("Resource {$resource->getName()} is not writable", $root, "resource_capabilities", 405);
+            }
             $this->writeAssociationChild($map, $operations, $parentId, $resource);
         }
     }
 
-    protected function executeQueryOperation(?array $ids): ?array
+    protected function executeQueryOperation(?array $ids, Context $context): ?array
     {
         $root = new FieldNode([]);
         $root->selectionSet = $this->root->selectionSet;
         $root->name = $this->root->name;
         $root->alias = $this->root->alias;
         $root->arguments = new NodeList([]);
-        $query = new QueryOperation($root, $this->context, $this->resource);
+        $query = new QueryOperation($root, $this->resource);
         $query->isSingle = $this->isSingle;
         $query->getCriteria()->where($this->resource->getClassMap()->keyAttributeName, 'IN', $ids);
-        return $query->getResults();
+        return $query->execute($context);
     }
 
     protected function readRawObject(array $rawObject): array
@@ -156,7 +160,7 @@ abstract class AbstractWriteOperation extends AbstractOperation
                 ];
                 continue;
             }
-            throw new UnknownFieldException($this->resource->getName(), [$key]);
+            throw new EGraphQLNotFoundException($key, "field", $this->root);
         }
         return $object;
     }

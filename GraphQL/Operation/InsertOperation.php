@@ -5,15 +5,18 @@ namespace Orkester\GraphQL\Operation;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
+use Orkester\Exception\EGraphQLWriteException;
+use Orkester\Exception\ValidationException;
+use Orkester\GraphQL\Context;
 
 class InsertOperation extends AbstractWriteOperation
 {
 
-    protected function readArguments(NodeList $arguments): array
+    protected function readArguments(NodeList $arguments, Context $context): array
     {
         /** @var ArgumentNode $argument */
         foreach ($arguments->getIterator() as $argument) {
-            $value = $this->context->getNodeValue($argument->value);
+            $value = $context->getNodeValue($argument->value);
             if ($argument->name->value == "object") {
                 $rawObjects = [$value];
                 $this->isSingle = true;
@@ -24,18 +27,22 @@ class InsertOperation extends AbstractWriteOperation
         return Arr::map($rawObjects ?? [], fn($o) => $this->readRawObject($o));
     }
 
-    public function getResults()
+    public function execute(Context $context)
     {
-        $objects = $this->readArguments($this->root->arguments);
+        $objects = $this->readArguments($this->root->arguments, $context);
         $ids = [];
 
         foreach ($objects as $object) {
             $data = $object['attributes'];
-            $id = $this->resource->insert($data);
-            $this->writeAssociations($object['associations'], $id);
+            try {
+                $id = $this->resource->insert($data);
+            } catch(ValidationException $e) {
+                throw new EGraphQLWriteException("insert", $this->resource->getName(), $this->root, $e);
+            }
+            $this->writeAssociations($object['associations'], $id, $this->root, $context);
             $ids[] = $id;
         }
-        return $this->executeQueryOperation($ids);
+        return $this->executeQueryOperation($ids, $context);
     }
 
 
