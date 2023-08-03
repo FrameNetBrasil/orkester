@@ -57,25 +57,26 @@ class Operand
         return $classAlias . '.' . ($this->criteria->columnName($this->criteria->classAlias[$classAlias], $attributeName) ?? $attributeName);
     }
 
-    protected function resolveJoin(Join $associationJoinType, string $leftAlias, string $leftField, string $rightAlias, string $rightField)
+    protected function resolveJoin(Join $associationJoinType, string $leftAlias, string $leftField, string $rightTable, string $rightAlias, string $rightField)
     {
         match ($associationJoinType) {
-            Join::INNER => $this->criteria->join($rightAlias, "{$leftAlias}.{$leftField}", '=', "{$rightAlias}.{$rightField}"),
-            Join::LEFT => $this->criteria->leftJoin($rightAlias, "{$leftAlias}.{$leftField}", '=', "{$rightAlias}.{$rightField}"),
-            Join::RIGHT => $this->criteria->rigthJoin($rightAlias, "{$leftAlias}.{$leftField}", '=', "{$rightAlias}.{$rightField}"),
+            Join::INNER => $this->criteria->join("{$rightTable} as {$rightAlias}", "{$leftAlias}.{$leftField}", '=', "{$rightAlias}.{$rightField}"),
+            Join::LEFT => $this->criteria->leftJoin("{$rightTable} as {$rightAlias}", "{$leftAlias}.{$leftField}", '=', "{$rightAlias}.{$rightField}"),
+            Join::RIGHT => $this->criteria->rigthJoin("{$rightTable} as {$rightAlias}", "{$leftAlias}.{$leftField}", '=', "{$rightAlias}.{$rightField}"),
         };
     }
 
-    protected function resolveAssociationJoin(AssociationMap $associationMap, Join $associationJoinType, string $leftAlias, string $rightAlias)
+    protected function resolveAssociationJoin(AssociationMap $associationMap, Join $associationJoinType, string $leftAlias, string $rightTable, string $rightAlias)
     {
         $leftField = $this->criteria->columnName($associationMap->fromClassName, $associationMap->fromKey);
         $rightField = $this->criteria->columnName($associationMap->toClassName, $associationMap->toKey);
         if ($associationMap->cardinality == Association::ASSOCIATIVE) {
-            $associativeTableAlias = $associationMap->associativeTable . ' as ' . 'a' . ++Criteria::$aliasCount;
-            $this->resolveJoin($associationJoinType, $leftAlias, $leftField, $associativeTableAlias, $leftField);
-            $this->resolveJoin($associationJoinType, $associativeTableAlias, $rightField, $rightAlias, $rightField);
+            $associativeTable = $associationMap->associativeTable;
+            $associativeAlias = 'a' . ++Criteria::$aliasCount;
+            $this->resolveJoin($associationJoinType, $leftAlias, $leftField, $associativeTable, $associativeAlias, $leftField);
+            $this->resolveJoin($associationJoinType, $associativeAlias, $rightField, $rightTable, $rightAlias, $rightField);
         } else {
-            $this->resolveJoin($associationJoinType, $leftAlias, $leftField, $rightAlias, $rightField);
+            $this->resolveJoin($associationJoinType, $leftAlias, $leftField, $rightTable, $rightAlias, $rightField);
         }
     }
 
@@ -111,6 +112,7 @@ class Operand
         //    associationName.associationName.associationName.attributeName
         //    ....
         if ($field == '') {
+            $chain = '';
             $attributeName = array_pop($parts);
             $currentClass = ''; // empty for the criteria class
             $currentAlias = $tableName;
@@ -134,8 +136,9 @@ class Operand
                     if (!isset($this->criteria->tableAlias[$chain])) {
                         $this->criteria->tableAlias[$chain] = $associationName . '_' . ++Criteria::$aliasCount;
                     }
+                    $associationTable = $this->criteria->tableName($associationMap->toClassName);
                     $associationAlias = $this->criteria->tableAlias[$chain];
-                    $this->resolveAssociationJoin($associationMap, $associationJoinType, $currentAlias, $associationAlias);
+                    $this->resolveAssociationJoin($associationMap, $associationJoinType, $currentAlias, $associationTable, $associationAlias);
                     // forward
                     $currentClass = $associationMap->toClassName;
                     $currentAlias = $associationAlias;
@@ -145,7 +148,7 @@ class Operand
             }
             // all fields from the chain
             if ($attributeName == '*') {
-                $field = $currentAlias . '.' . $parts[$n];
+                $field = $currentAlias . '.*';
             } else { // specific field from the chain
                 $attributeMap = $this->criteria->getAttributeMap($attributeName, $currentClass);
                 if ($attributeMap->reference != '') {
