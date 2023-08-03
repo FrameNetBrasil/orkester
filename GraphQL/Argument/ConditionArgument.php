@@ -4,6 +4,7 @@ namespace Orkester\GraphQL\Argument;
 
 use Illuminate\Support\Arr;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLInternalException;
 use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
@@ -12,14 +13,22 @@ use Orkester\Persistence\Map\ClassMap;
 class ConditionArgument
 {
 
-    public static function applyArgumentWhere(Context $context, Criteria $criteria, array $conditions)
+    /**
+     * @throws EGraphQLNotFoundException
+     * @throws EGraphQLInternalException
+     */
+    public static function applyArgumentWhere(Context $context, Criteria $criteria, array $conditions): void
     {
         $instance = new self('where');
         $map = $criteria->classMap;
         $instance->applyArguments($context, $criteria, $conditions, $map, "", "and");
     }
 
-    public static function applyArgumentHaving(Context $context, Criteria $criteria, array $conditions)
+    /**
+     * @throws EGraphQLNotFoundException
+     * @throws EGraphQLInternalException
+     */
+    public static function applyArgumentHaving(Context $context, Criteria $criteria, array $conditions): void
     {
         $instance = new self('having');
         $map = $criteria->classMap;
@@ -30,7 +39,11 @@ class ConditionArgument
     {
     }
 
-    protected function applyArguments(Context $context, Criteria $criteria, array $conditions, ClassMap $map, string $associationPrefix, string $and)
+    /**
+     * @throws EGraphQLNotFoundException
+     * @throws EGraphQLInternalException
+     */
+    protected function applyArguments(Context $context, Criteria $criteria, array $conditions, ClassMap $map, string $associationPrefix, string $and): void
     {
         $attributes = $map->getAttributesNames();
         $associations = $map->getAssociationsNames();
@@ -48,7 +61,7 @@ class ConditionArgument
                 $expr = $condition['expr'] ?? null;
                 $cond = $condition['where'] ?? null;
                 if (!$expr || !$cond) {
-                    throw new EGraphQLException("Invalid arguments for _condition");
+                    throw new EGraphQLInternalException("Invalid arguments for _condition");
                 }
                 self::applyCondition($context, $criteria, $expr, $prefix, $cond);
                 continue;

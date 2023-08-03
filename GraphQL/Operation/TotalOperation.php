@@ -6,7 +6,7 @@ use GraphQL\Language\AST\FieldNode;
 use Illuminate\Support\Arr;
 use Orkester\GraphQL\Context;
 
-class TotalOperation
+class TotalOperation implements GraphQLOperationInterface
 {
 
     protected string $name;
@@ -38,7 +38,7 @@ class TotalOperation
         $this->operation = $operation;
     }
 
-    public function getResults(): int
+    public function execute(Context $context): int
     {
         $criteria = $this->operation->getCriteria()->newQuery();
         $criteria->limit = null;

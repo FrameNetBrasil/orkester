@@ -1,23 +1,10 @@
-@if(array_key_exists('_class', $docs))
-"""
-{{ $docs['_class'] }}
-"""
-@endif
 type {{ $typename }} {
 @foreach ($attributes as $attribute)
-    @if(array_key_exists($attribute['name'], $docs))    """
-        {{ $docs[$attribute['name']] }}
-        """
-    @endif
-{{$attribute['name']}}: {{$attribute['type']}}@if(!$attribute['nullable'])!@endif
-
+    {{$attribute['name']}}: {{$attribute['type']}}@if(!$attribute['nullable'])!@endif
 @endforeach
+
 @foreach ($associations as $association)
-    @if(array_key_exists($association['name'], $docs))  """
-        {{ $docs[$association['name']] }}
-        """
-    @endif
-{{$association['name']}}(where: {{$association['type']}}Where pluck: String): @if ($association['cardinality'] == "one") {{ $association['type'] }}@if(!$association['nullable'])!@endif @else[{{ $association['type'] }}!]@endif
+    {{$association['name']}}(where: {{$association['type']}}Where pluck: String): @if ($association['cardinality'] == "one") {{ $association['type'] }}@if(!$association['nullable'])!@endif @else[{{ $association['type'] }}!]@endif
 @endforeach
 
 }

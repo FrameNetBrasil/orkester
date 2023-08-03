@@ -5,28 +5,29 @@ namespace Orkester\GraphQL\Operation;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
+use Orkester\GraphQL\Context;
 
 class UpsertOperation extends AbstractWriteOperation
 {
 
-    public function getResults(): ?array
+    public function execute(Context $context): ?array
     {
         $ids = [];
-        $objects = $this->readArguments($this->root->arguments);
+        $objects = $this->readArguments($this->root->arguments, $context);
         foreach ($objects as $object) {
             $attributes = $object['attributes'];
             $id = $this->resource->upsert($attributes);
-            $this->writeAssociations($object['associations'], $id);
+            $this->writeAssociations($object['associations'], $id, $this->root, $context);
             $ids[] = $id;
         }
-        return $this->executeQueryOperation($ids);
+        return $this->executeQueryOperation($ids, $context);
     }
 
-    protected function readArguments(NodeList $arguments): array
+    protected function readArguments(NodeList $arguments, Context $context): array
     {
         /** @var ArgumentNode $argument */
         foreach ($arguments->getIterator() as $argument) {
-            $value = $this->context->getNodeValue($argument->value);
+            $value = $context->getNodeValue($argument->value);
             if ($argument->name->value == "object") {
                 $rawObjects = [$value];
                 $this->isSingle = true;

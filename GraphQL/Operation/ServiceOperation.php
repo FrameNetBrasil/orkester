@@ -9,19 +9,19 @@ use Orkester\GraphQL\Context;
 class ServiceOperation extends AbstractOperation
 {
 
-    public function __construct(protected FieldNode $root, Context $context, protected $service)
+    public function __construct(protected FieldNode $root, protected $service)
     {
-        parent::__construct($root, $context);
+        parent::__construct($root);
     }
 
-    public function getResults()
+    public function execute(Context $context)
     {
         $arguments = [];
         /**
          * @var ArgumentNode $argumentNode
          */
         foreach ($this->root->arguments->getIterator() as $argumentNode) {
-            $arguments[$argumentNode->name->value] = $this->context->getNodeValue($argumentNode->value);
+            $arguments[$argumentNode->name->value] = $context->getNodeValue($argumentNode->value);
         }
         $result = ($this->service)(...$arguments);
         if (is_array($result) && $this->root->selectionSet != null) {

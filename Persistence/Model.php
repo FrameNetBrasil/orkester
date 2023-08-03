@@ -541,10 +541,4 @@ class Model
     {
         return static::getClassMap()->getAssociationMap($name);
     }
-
-    public static function getApiDocs(): array
-    {
-        return [];
-    }
-
 }

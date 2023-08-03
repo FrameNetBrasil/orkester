@@ -348,4 +348,9 @@ class Manager
     {
         return self::$data;
     }
+
+    public static function isDevelopment(): bool
+    {
+        return Manager::getConf("mode") === "development";
+    }
 }

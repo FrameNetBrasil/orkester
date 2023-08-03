@@ -5,7 +5,9 @@ namespace Orkester\GraphQL\Operation;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\NodeList;
 use Orkester\Exception\EGraphQLException;
+use Orkester\Exception\EGraphQLInternalException;
 use Orkester\GraphQL\Argument\ConditionArgument;
+use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
 
 class DeleteOperation extends AbstractWriteOperation
@@ -13,10 +15,10 @@ class DeleteOperation extends AbstractWriteOperation
 
     protected bool $valid = false;
 
-    public function getResults(): ?int
+    public function execute(Context $context): ?int
     {
         $criteria = $this->resource->getCriteria();
-        $valid = $this->readArguments($this->root->arguments, $criteria);
+        $valid = $this->readArguments($this->root->arguments, $criteria, $context);
 
         if (!$valid)
             throw new EGraphQLException("No arguments found for delete [{$this->getName()}]. Refusing to proceed.");
@@ -32,12 +34,12 @@ class DeleteOperation extends AbstractWriteOperation
         return $count;
     }
 
-    protected function readArguments(NodeList $arguments, Criteria $criteria): bool
+    protected function readArguments(NodeList $arguments, Criteria $criteria, Context $context): bool
     {
         $valid = false;
         /** @var ArgumentNode $argument */
         foreach ($arguments->getIterator() as $argument) {
-            $value = $this->context->getNodeValue($argument->value);
+            $value = $context->getNodeValue($argument->value);
             if (!$value)
                 continue;
 
@@ -49,7 +51,11 @@ class DeleteOperation extends AbstractWriteOperation
             }
 
             if ($argument->name->value == "where") {
-                ConditionArgument::applyArgumentWhere($this->context, $criteria, $value);
+                try {
+                    ConditionArgument::applyArgumentWhere($context, $criteria, $value);
+                } catch(EGraphQLInternalException $e) {
+                    throw new EGraphQLException($e->getMessage(), $argument, "invalid_argument");
+                }
                 $valid = true;
                 continue;
             }

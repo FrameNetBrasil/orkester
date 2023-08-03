@@ -3,10 +3,8 @@
 namespace Orkester\GraphQL\Operation;
 
 use GraphQL\Language\AST\FieldNode;
-use Orkester\Resource\ResourceInterface;
-use Orkester\GraphQL\Context;
 
-abstract class AbstractOperation
+abstract class AbstractOperation implements GraphQLOperationInterface
 {
     protected string $name;
     public bool $isSingle = false;
@@ -16,7 +14,7 @@ abstract class AbstractOperation
         return $node->alias?->value ?? $node->name->value;
     }
 
-    public function __construct(FieldNode $root, protected Context $context)
+    public function __construct(FieldNode $root)
     {
         $this->name = static::getNodeName($root);
     }
@@ -25,7 +23,4 @@ abstract class AbstractOperation
     {
         return $this->name;
     }
-
-    abstract public function getResults();
-
 }
