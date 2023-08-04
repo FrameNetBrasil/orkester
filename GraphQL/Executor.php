@@ -220,7 +220,7 @@ class Executor
 
             $operationGroups = $this->createOperations($operationDefinitions, $context);
 
-            if ($operationGroups[0] instanceof IntrospectionOperation) {
+            if (($operationGroups[0] ?? null) instanceof IntrospectionOperation) {
                 return [
                     'data' => $operationGroups[0]->execute($context),
                     'errors' => []
