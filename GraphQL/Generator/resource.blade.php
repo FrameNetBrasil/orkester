@@ -1,12 +1,12 @@
 type {{ $typename }} {
 @foreach ($attributes as $attribute)
     {{$attribute['name']}}: {{$attribute['type']}}@if(!$attribute['nullable'])!@endif
-@endforeach
 
+@endforeach
 @foreach ($associations as $association)
     {{$association['name']}}(where: {{$association['type']}}Where pluck: String): @if ($association['cardinality'] == "one") {{ $association['type'] }}@if(!$association['nullable'])!@endif @else[{{ $association['type'] }}!]@endif
-@endforeach
 
+@endforeach
 }
 
 input {{ $typename }}Where {

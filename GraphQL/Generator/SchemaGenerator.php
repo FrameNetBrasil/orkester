@@ -147,7 +147,7 @@ class SchemaGenerator
         ];
     }
 
-    protected function generateBaseDeclarations(array $resources, array $writableResources, array $services): string
+    protected function generateBaseDeclarations(array $resources, array $writableResources): string
     {
         $args = Arr::map(
             $resources,
@@ -163,7 +163,7 @@ class SchemaGenerator
                 'typename' => $resource->getName()
             ]
         );
-        return $this->blade->make('base', ['resources' => $args, 'writableResources' => $wargs, 'services' => $services])->render();
+        return $this->blade->make('base', ['resources' => $args, 'writableResources' => $wargs])->render();
     }
 
     protected function generateServiceDeclarations(array $services): string
