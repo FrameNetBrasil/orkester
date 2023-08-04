@@ -6,8 +6,6 @@ use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\OperationDefinitionNode;
 use GraphQL\Language\Parser;
-use GraphQL\Type\Introspection;
-use GraphQL\Utils\BuildSchema;
 use Illuminate\Support\Arr;
 use Monolog\Logger;
 use Orkester\Exception\EGraphQLException;
@@ -26,7 +24,6 @@ use Orkester\GraphQL\Operation\UpsertOperation;
 use Orkester\Manager;
 use Orkester\Persistence\PersistenceManager;
 use Orkester\Resource\CustomOperationsInterface;
-use Orkester\Resource\WritableResourceInterface;
 
 class Executor
 {
@@ -61,9 +58,6 @@ class Executor
     {
         foreach ($operationNode->selectionSet->selections as $fieldNode) {
             if ($fieldNode->name->value == '__schema') {
-                $contents = file_get_contents('schema.graphql');
-                $schema = BuildSchema::build($contents);
-                $this->introspectionResult = Introspection::fromSchema($schema);
                 $operations = [ new IntrospectionOperation() ];
                 return;
             }
@@ -84,7 +78,7 @@ class Executor
                     }
 
                     if ($service = $context->getService($serviceDefinition->name->value, 'query')) {
-                        $op = new ServiceOperation($fieldNode, $service);
+                        $op = new ServiceOperation($fieldNode, $service[0], $service[1]);
                         $operations[$key][$op->getName()] = $op;
                         continue;
                     }
@@ -111,9 +105,7 @@ class Executor
                     ($custom =  $resource->getQueries()) &&
                     array_key_exists($queryOperation->name->value, $custom)
                 ) {
-                    $op = new ServiceOperation($queryOperation,
-                        fn(...$args) => $resource->{$custom[$queryOperation->name->value]}(...$args)
-                    );
+                    $op = new ServiceOperation($queryOperation, $resource, $custom[$queryOperation->name->value]);
                     $operations[$key][$op->getName()] = $op;
                     continue;
                 }
@@ -131,7 +123,7 @@ class Executor
             if ($root->name->value == "service") {
                 foreach ($root->selectionSet->selections as $definition) {
                     if ($service = $context->getService($definition->name->value, 'mutation')) {
-                        $op = new ServiceOperation($definition, $service);
+                        $op = new ServiceOperation($definition, $service[0], $service[1]);
                         $operations[$key][$op->getName()] = $op;
                     }
                 }
@@ -139,8 +131,8 @@ class Executor
             }
 
             $resource = $context->getResource($root->name->value);
-            if (!$resource instanceof WritableResourceInterface) {
-                throw new EGraphQLException("Resource {$resource->getName()} is not writable", $root, "resource_capabilities", 405);
+            if (!$resource) {
+                throw new EGraphQLNotFoundException($root->name->value, 'resource', $root);
             }
             /** @var FieldNode $definition */
             foreach ($root->selectionSet->selections as $definition) {
@@ -164,9 +156,7 @@ class Executor
                     ($custom =  $resource->getMutations()) &&
                     array_key_exists($definition->name->value, $custom)
                 ) {
-                    $op = new ServiceOperation($definition,
-                        fn(...$args) => $resource->{$custom[$definition->name->value]}(...$args)
-                    );
+                    $op = new ServiceOperation($definition, $resource, $custom[$definition->name->value]);
                     $operations[$key][$op->getName()] = $op;
                     continue;
                 }
