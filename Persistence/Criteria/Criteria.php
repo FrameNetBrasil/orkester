@@ -4,12 +4,9 @@ namespace Orkester\Persistence\Criteria;
 
 use Closure;
 use Ds\Set;
-use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Monolog\Logger;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Grammar\MySqlGrammar;
@@ -90,9 +87,9 @@ class Criteria extends Builder
         return $this->model;
     }
 
-    public function setModel(string $model)
+    public function setModel(string|Model $model)
     {
-        $this->classMap = Model::getClassMap($model);
+        $this->classMap = $model::getClassMap();
         $this->model = $model;
         $this->maps[$this->model] = $this->classMap;
         $this->connection->table($this->tableName());
