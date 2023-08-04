@@ -228,7 +228,7 @@ class QueryOperation extends AbstractOperation
                 $associatedCriteria->where($toKey, 'IN', $fromIds);
                 $operation->forcedSelection[] = $toKey;
             } else if ($map->cardinality == Association::ASSOCIATIVE) {
-                $toClassMap->model::associationMany('_gql', model: $fromClassMap->model, keys: "$toKey:$fromKey", associativeTable: $map->associativeTable);
+                $toClassMap->associationMany('_gql', model: $fromClassMap->model, keys: "$toKey:$fromKey", associativeTable: $map->associativeTable);
                 $operation->forcedSelection[] = "_gql.$fromKey";
                 $associatedCriteria->where("_gql.$fromKey", "IN", $fromIds);
                 $groupKey = $fromClassMap->keyAttributeMap->columnName;

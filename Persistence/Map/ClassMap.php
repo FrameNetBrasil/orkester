@@ -2,17 +2,14 @@
 
 namespace Orkester\Persistence\Map;
 
-//use Orkester\Manager;
-//use Orkester\MVC\MModel;
-//use Orkester\Persistence\Criteria\DeleteCriteria;
-//use Orkester\Persistence\Criteria\RetrieveCriteria;
-//use Orkester\Persistence\PersistentObject;
-//use Orkester\Utils\MUtil;
-
 use Illuminate\Support\Arr;
 use Orkester\Persistence\Criteria\Criteria;
+use Orkester\Persistence\Enum\Association;
+use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Enum\Key;
+use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Model;
+use Orkester\Persistence\PersistenceManager;
 
 class ClassMap
 {
@@ -24,58 +21,22 @@ class ClassMap
      * @var AttributeMap[] $attributeMaps
      */
     public array $attributeMaps = [];
-    private array $updateAttributeMaps = [];
     public array $insertAttributeMaps = [];
-    private array $referenceAttributeMaps = [];
+    public array $updateAttributeMaps = [];
     /**
      * @var AssociationMap[] $associationMaps
      */
     private array $associationMaps = [];
     private bool $hasTypedAttribute = false;
     public string $tableName = '';
-//    private string $resource;
-//    private bool $compareOnUpdate;
-//    private $superClassMap = NULL;
-//    private $superAssociationMap = NULL;
     public AttributeMap $keyAttributeMap;
     public string $keyAttributeName = '';
-//    private ?HookMap $hookMap = NULL;
-//    private array $hashedAttributeMaps = [];
-//    private array $handledAttributeMaps = [];
-//    private array $conditionMaps = [];
-//    private ?string $databaseName = null;
-//    private string $tableAlias;
 
 
     public function __construct(string|Model $name)
     {
         $this->model = $name;
     }
-
-//    public function getName(): string
-//    {
-//        return $this->name;
-//    }
-
-//    public function setTableName(string $tableName)
-//    {
-//        $this->tableName = $tableName;
-//    }
-//
-//    public function getTableName(string $alias = ''): string
-//    {
-//        $tableName = $this->tableName;
-//        if (($alias != '') && ($alias != $tableName)) {
-//            $tableName .= ' ' . $alias;
-//        }
-//        return $tableName;
-//    }
-
-//    public function setSuperClassName(string $superClassName)
-//    {
-//        $this->superClassName = $superClassName;
-//        //$this->superClassMap = $this->getManager()->getClassMap($superClassName);
-//    }
 
     /**
      * @return AttributeMap[]
@@ -205,309 +166,164 @@ class ClassMap
         return $this->associationNames;
     }
 
-
-    /*
-
-    public function setDatabaseName(string $databaseName)
+    public function table(string $name): static
     {
-        $this->databaseName = $databaseName;
+        $this->tableName = $name;
+        return $this;
     }
 
-    public function getDatabaseName()
+    public function attribute(
+        string              $name,
+        string              $field = '',
+        Type                $type = Type::STRING,
+        Key                 $key = Key::NONE,
+        string              $reference = '',
+        string              $alias = '',
+        string              $default = null,
+        bool                $nullable = true,
+        bool                $virtual = false,
+    ): static
     {
-        return $this->databaseName ?? Manager::getOptions('db');
+        $attributeMap = new AttributeMap($name);
+        $attributeMap->type = $type;
+        $attributeMap->columnName = $field ?: $name;
+        $attributeMap->alias = $alias ?: $name;
+        $attributeMap->reference = $reference;
+        $attributeMap->keyType = $key;
+        $attributeMap->idGenerator = ($key == Key::PRIMARY) ? 'identity' : '';
+        $attributeMap->default = $default;
+        $attributeMap->nullable = $nullable;
+        $attributeMap->virtual = $virtual;
+
+        $this->addAttributeMap($attributeMap);
+        return $this;
     }
 
-    public function getActualDatabaseName()
+    public function associationMany(
+        string $name,
+        string $model,
+        string $keys = '',
+        Join   $join = Join::INNER,
+        string $associativeTable = '',
+        string $order = ''
+    ): static
     {
-        return $this->databaseName ? Manager::getConf('db.' . $this->databaseName)['dbname'] : '';
-    }
+        $fromClassName = $this->model;
+        $toClassName = $model;
+        $toClassMap = PersistenceManager::getClassMap($toClassName);
+        $associationMap = new AssociationMap($name);
+        $associationMap->fromClassMap = $this;
+        $associationMap->fromClassName = $fromClassName;
+        $associationMap->toClassName = $toClassName;
+        $associationMap->toClassMap = $toClassMap;
+        $associationMap->autoAssociation = (strtolower($fromClassName) == strtolower($toClassName));
 
-
-
-    public function setTableAlias(string $tableAlias)
-    {
-        $this->tableAlias = $tableAlias;
-    }
-
-    public function getTableAlias(): string
-    {
-        return $this->tableAlias;
-    }
-
-    public function setHasTypedAttribute(bool $has)
-    {
-        $this->hasTypedAttribute = $has;
-    }
-
-    public function getHasTypedAttribute(): bool
-    {
-        return $this->hasTypedAttribute;
-    }
-
-    public function getObject(): ?MModel
-    {
-        $className = $this->getName();
-        return null;//Manager::getModel($className);
-    }
-
-
-    public function getSuperClassMap(): ClassMap|null
-    {
-        return $this->superClassMap ?? null;
-    }
-
-    public function setSuperAssociationMap(AssociationMap $associationMap)
-    {
-        $this->superAssociationMap = $associationMap;
-    }
-
-    public function getSuperAssociationMap(): AssociationMap
-    {
-        return $this->superAssociationMap;
-    }
-
-    public function setHookMap(HookMap $hookMap)
-    {
-        $this->hookMap = $hookMap;
-    }
-
-    public function getHookMap(): HookMap
-    {
-        return $this->hookMap;
-    }
-
-    public function hasAttribute(string $attributeName): bool
-    {
-        return isset($this->hashedAttributeMaps[$attributeName]);
-    }
-
-    public function addCondition(array $condition = [])
-    {
-        $this->conditionMaps[] = $condition;
-    }
-
-    public function getConditions(): array
-    {
-        return $this->conditionMaps;
-    }
-
-
-    public function getAttributesMap(): array
-    {
-        return $this->attributeMaps;
-    }
-
-
-    public function attributeExists(string $path): bool
-    {
-       return $this->getAttributeMapChain($path) != null;
-    }
-
-    public function getAttributeMapChain(string $path): ?AttributeMap
-    {
-        $parts = explode('.', $path);
-        $classMap = $this;
-        for($i = 0; $i < count($parts) - 1; $i++){
-            if($associationMap = $classMap->getAssociationMap($parts[$i])) {
-                $classMap = $associationMap->getToClassMap();
-            }
-            else {
-                return null;
-            }
+        $cardinality = Association::MANY;
+        if ($associativeTable != '') {
+            $associationMap->associativeTable = $associativeTable;
+            $cardinality = Association::ASSOCIATIVE;
         }
-        return $classMap->getAttributeMap(last($parts));
-    }
-
-    public function associationExists(string $path): bool
-    {
-        $parts = explode('.', $path);
-        $classMap = $this;
-        for($i = 0; $i < count($parts) - 1; $i++){
-            if($associationMap = $classMap->getAssociationMap($parts[$i])) {
-                $classMap = $associationMap->getToClassMap();
+        $associationMap->cardinality = $cardinality;
+        $key = '';
+        if ($keys != '') {
+            if (str_contains($keys, ':')) {
+                $k = explode(':', $keys);
+                $associationMap->fromKey = $k[0];
+                $associationMap->toKey = $k[1];
+                $keyAttribute = $k[0];
+                $key = $keyAttribute;
+            } else {
+                $associationMap->fromKey = $keys;
+                $associationMap->toKey = $keys;
+                $keyAttribute = $keys;
             }
-            else {
-                return false;
-            }
-        }
-        return $classMap->getAssociationMap(last($parts)) != null;
-    }
-
-    public function getUpdateAttributeMaps(): array
-    {
-        return $this->updateAttributeMaps;
-    }
-
-    public function getUpdateAttributeMap(string $attributeName = ''): AttributeMap|null
-    {
-        return $this->updateAttributeMaps[$attributeName] ?? null;
-    }
-
-    public function getInsertAttributeMaps(): array
-    {
-        return $this->insertAttributeMaps;
-    }
-
-    public function getInsertAttributeMap(string $attributeName = ''): AttributeMap|null
-    {
-        return $this->insertAttributeMaps[$attributeName] ?? null;
-    }
-
-    public function getReferenceAttributeMap(string $attributeName = ''): AttributeMap|null
-    {
-        return $this->referenceAttributeMaps[$attributeName] ?? null;
-    }
-
-
-
-    public function getAssociationMaps(): array
-    {
-        return $this->associationMaps;
-    }
-
-    public function getSize(): int
-    {
-        return count($this->attributeMaps);
-    }
-
-    public function getReferenceSize(): int
-    {
-        return count($this->referenceAttributeMaps);
-    }
-
-    public function getAssociationSize(): int
-    {
-        return count($this->associationMaps);
-    }
-
-    public function getKeyAttributeMap(): AttributeMap
-    {
-        return $this->keyAttributeMap;
-    }
-
-    public function getUpdateSize(): int
-    {
-        return count($this->updateAttributeMaps);
-    }
-
-    public function getInsertSize(): int
-    {
-        return count($this->insertAttributeMaps);
-    }
-
-//
-//     * Se existir um campo do tipo UID no map ele é setado automaticamente aqui.
-//     * @param PersistentObject $object
-//
-
-    public function setObjectUid(object $object)
-    {
-        $field = $this->getUidField();
-        if ($field) {
-            $object->$field = MUtil::generateUID();
-        }
-    }
-
-    public function getObjectKey(object $object): int|null
-    {
-        $keyName = $this->getKeyAttributeName();
-        return $object->$keyName ?? null;
-    }
-
-
-    public function setObjectKey(object $object, ?int $value = null): void
-    {
-        $keyName = $this->getKeyAttributeName();
-        if ($value != null) {
-            $object->$keyName = $value;
         } else {
-            $keyAttributeMap = $this->keyAttributeMap;
-            if ($keyAttributeMap->getKeyType() == 'primary') {
-                $idGenerator = $keyAttributeMap->getIdGenerator();
-                if ($idGenerator != NULL) {
-                    if ($idGenerator != 'identity') {
-                        $value = $object->getNewId($keyAttributeMap->getIdGenerator());
-                    }
-                } else {
-                    $value = $object->$keyName ?? null;
-                }
-                $object->$keyName = $value;
+            $key = $this->keyAttributeMap->name;
+            $associationMap->fromKey = $key;
+            if ($cardinality == Association::ASSOCIATIVE) {
+                $associationMap->toKey = $toClassMap->keyAttributeMap->name;
+            }
+            $keyAttribute = $key;
+        }
+
+        $keyAttributeMap = $this->getAttributeMap($keyAttribute);
+        if (is_null($keyAttributeMap)) {
+            static::attribute(name: $key, type: Type::INTEGER, key: Key::FOREIGN, nullable: false);
+        } else {
+            if ($key != $this->keyAttributeMap->name && $keyAttributeMap->keyType != Key::PRIMARY) {
+                $keyAttributeMap->keyType = Key::FOREIGN;
             }
         }
+
+        if ($order != '') {
+            $arrayOrder = [];
+            $orderAttributes = explode(',', $order);
+            foreach ($orderAttributes as $orderAttr) {
+                $o = explode(' ', $orderAttr);
+                $ascend = (substr($o[1], 0, 3) == 'asc');
+                $arrayOrder[] = [$o[0], $ascend];
+            }
+            $associationMap->order = (count($arrayOrder) > 0) ? implode(',', $arrayOrder) : [];
+        }
+
+        $associationMap->joinType = $join;
+        $this->addAssociationMap($associationMap);
+        if ($cardinality == Association::ASSOCIATIVE) {
+            $name = "{$associationMap->fromClassName}_$associationMap->associativeTable";
+            $classMap = new ClassMap($name);
+            $classMap->addAttributeMap($toClassMap->getAttributeMap($associationMap->toKey));
+            $classMap->addAttributeMap($this->getAttributeMap($associationMap->fromKey));
+            $classMap->tableName = $associationMap->associativeTable;
+            PersistenceManager::registerClassMap($classMap, $name);
+        }
+        return $this;
     }
 
-    public function setPostObjectKey(object $object)
+    public function associationOne(
+        string $name,
+        string $model = '',
+        string $key = '',
+        string $base = '',
+        array  $conditions = [],
+        Join   $join = Join::INNER,
+    ): static
     {
-        $keyAttributeMap = $this->keyAttributeMap;
-        $idGenerator = $keyAttributeMap->getIdGenerator();
-        if ($idGenerator == 'identity') {
-            $value = Manager::getPersistentManager()->getPersistence()->lastInsertId();
-            $this->setObjectKey($object, $value);
+        $fromClassName = $this->model;
+        $model = $base ? $this->getAssociationMap($base)->fromClassName : $model;
+        $toClassName = $model;
+        $toClassMap = PersistenceManager::getClassMap($toClassName);
+        $associationMap = new AssociationMap($name);
+        $associationMap->fromClassMap = $this;
+        $associationMap->fromClassName = $fromClassName;
+        $associationMap->toClassName = $toClassName;
+        $associationMap->toClassMap = $toClassMap;
+        $associationMap->cardinality = Association::ONE;
+        $associationMap->autoAssociation = (strtolower($fromClassName) == strtolower($toClassName));
+        if ($key == '') {
+            $key = $toClassMap->keyAttributeMap->name;
         }
-    }
-
-    public function setObject($object, $data, $classMap = NULL)
-    {
-        if (is_null($classMap)) {
-            $classMap = $this;
+        if (str_contains($key, ':')) {
+            $k = explode(':', $key);
+            $associationMap->fromKey = $k[0];
+            $associationMap->toKey = $k[1];
+            $key = $k[0];
+        } else {
+            $associationMap->fromKey = $key;
+            $associationMap->toKey = $toClassMap->keyAttributeMap?->name ?? $key;
         }
-        foreach ($data as $field => $value) {
-            if (($attributeMap = $classMap->fieldMaps[strtoupper($field)]) || ($attributeMap = $classMap->superClassMap->fieldMaps[strtoupper($field)])) {
-                $object->setAttributeValue($attributeMap, $attributeMap->getValueFromDb($value));
+        $keyAttributeMap = $this->getAttributeMap($key);
+        if (is_null($keyAttributeMap)) {
+            self::attribute(name: $key, key: Key::FOREIGN, type: Type::INTEGER, nullable: false);
+        } else {
+            if (isset($this->keyAttributeMap) && $key != $this->keyAttributeMap->name) {
+                $keyAttributeMap->keyType = Key::FOREIGN;
             }
         }
+        $associationMap->base = $base;
+        $associationMap->conditions = $conditions;
+        $associationMap->joinType = $join;
+        $this->addAssociationMap($associationMap);
+        return $this;
     }
 
-
-    public function handleTypedAttribute($object, $operation)
-    {
-        $cmd = [];
-        foreach ($this->handledAttributeMaps as $attributeMap) {
-            $cmd[] = array($this->getPlatform(), $attributeMap, $operation, $object);
-        }
-        return $cmd;
-    }
-
-    public function getUidField()
-    {
-        foreach ($this->attributeMaps as $attributeMap) {
-            if ($attributeMap->getIdGenerator() === 'uid') {
-                return $attributeMap->getName();
-            }
-        }
-        return null;
-    }
-
-    public function getModel(): MModel
-    {
-        return new $this->model();
-    }
-
-    public function setModel(string $model)
-    {
-        $this->model = $model;
-    }
-
-
-    public function getDeleteCriteria(): DeleteCriteria
-    {
-        return Manager::getPersistentManager()->getDeleteCriteria($this);
-    }
-
-    public function saveObject(object $object): int
-    {
-        return Manager::getPersistentManager()->saveObject($this, $object);
-    }
-
-    public function compareOnUpdate(): bool
-    {
-        return $this->compareOnUpdate;
-    }
-
-    public function setCompareOnUpdate(bool $compareOnUpdate): void
-    {
-        $this->compareOnUpdate = $compareOnUpdate;
-    }
-*/
 }
