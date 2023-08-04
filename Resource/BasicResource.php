@@ -8,7 +8,7 @@ use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
 use ReflectionMethod;
 
-abstract class BasicResource implements AssociativeResourceInterface, CustomOperationsInterface
+abstract class BasicResource implements ResourceInterface, CustomOperationsInterface
 {
 
     public function __construct(protected string|Model $model)

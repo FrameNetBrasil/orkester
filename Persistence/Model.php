@@ -3,8 +3,6 @@
 namespace Orkester\Persistence;
 
 use Illuminate\Support\Arr;
-use Orkester\Exception\UnknownFieldException;
-use Orkester\Exception\ValidationException;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Map\AssociationMap;

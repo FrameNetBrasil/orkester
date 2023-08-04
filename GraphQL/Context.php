@@ -9,13 +9,9 @@ use GraphQL\Language\AST\NodeKind;
 use GraphQL\Language\AST\ObjectFieldNode;
 use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\VariableNode;
-use Orkester\Exception\EGraphQLException;
-use Orkester\Exception\EGraphQLNotFoundException;
 use Orkester\Manager;
 use Orkester\Persistence\Model;
-use Orkester\Resource\AssociativeResourceInterface;
 use Orkester\Resource\ResourceInterface;
-use Orkester\Resource\WritableResourceInterface;
 
 class Context
 {
@@ -87,17 +83,13 @@ class Context
         return null;
     }
 
-    public function getService(string $name, string $type): callable|false
+    public function getService(string $name, string $type): array|false
     {
         if ($name[0] == '_') {
             $name = substr($name, 1);
         }
         if ([$class, $method] = $this->namedServices[$type][$name] ?? false) {
-            $service = Manager::getContainer()->get($class);
-            return fn(...$args) => $service->$method(...$args);
-        }
-        if (is_callable($this->serviceResolver) && $service = ($this->serviceResolver)($name)) {
-            return $service;
+            return [$class, $method];
         }
         return false;
     }

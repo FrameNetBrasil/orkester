@@ -11,7 +11,6 @@ use Orkester\Persistence\Map\AttributeMap;
 use Orkester\Persistence\Map\ClassMap;
 use Orkester\Resource\CustomOperationsInterface;
 use Orkester\Resource\ResourceInterface;
-use Orkester\Resource\WritableResourceInterface;
 use ReflectionIntersectionType;
 use ReflectionNamedType;
 use ReflectionUnionType;
@@ -30,15 +29,13 @@ class SchemaGenerator
             $instance->conf['resources'],
             fn($resource, $key) => [$key => Manager::getContainer()->make($resource)]
         );
-        $writableResources = Arr::where($resources, fn($r) => $r instanceof WritableResourceInterface);
+        $base = $instance->generateBaseDeclarations($resources);
 
-        $services = $instance->readServices($instance->conf['services']);
+        $serviceDeclarations = $instance->readServices($instance->conf['services']);
+        $services = $instance->generateServiceDeclarations($serviceDeclarations);
+        $readSchemas = Arr::map($resources, fn($r, $k) => $instance->generateResourceSchema($r));
 
-        $base = $instance->generateBaseDeclarations($resources, $writableResources, $services);
-        $readSchemas = Arr::map($resources, fn($r, $k) => $instance->generateResourceSchema($r, $k));
-
-        $writeSchemas = Arr::map($writableResources, fn($r) => $instance->generateWritableResourceSchema($r));
-        return $base . PHP_EOL . implode(PHP_EOL, $readSchemas) . implode(PHP_EOL, $writeSchemas);
+        return $base . PHP_EOL . implode(PHP_EOL, $readSchemas) . PHP_EOL . $services;
     }
 
     public function writeAllResourceSchemas(string $outputDir)
@@ -51,9 +48,7 @@ class SchemaGenerator
     public function writeResourceSchema(string $resourceName, string $outputDir)
     {
         $resource = Manager::getContainer()->make($this->conf['resources'][$resourceName]);
-        $read = $this->generateResourceSchema($resource);
-        $write = $resource instanceof WritableResourceInterface ? $this->generateWritableResourceSchema($resource) : '';
-        $content = $read . PHP_EOL . $write;
+        $content = $this->generateResourceSchema($resource);
         if (!file_exists($outputDir)) {
             mkdir($outputDir, recursive: true);
         }
@@ -75,10 +70,8 @@ class SchemaGenerator
             $this->conf['resources'],
             fn($resource, $key) => [$key => Manager::getContainer()->make($resource)]
         );
-        $writableResources = Arr::where($resources, fn($r) => $r instanceof WritableResourceInterface);
 
-        $services = $this->readServices($this->conf['services']);
-        $content = $this->generateBaseDeclarations($resources, $writableResources, $services);
+        $content = $this->generateBaseDeclarations($resources);
         if (!file_exists($outputDir)) {
             mkdir($outputDir, recursive: true);
         }
@@ -147,7 +140,7 @@ class SchemaGenerator
         ];
     }
 
-    protected function generateBaseDeclarations(array $resources, array $writableResources): string
+    protected function generateBaseDeclarations(array $resources): string
     {
         $args = Arr::map(
             $resources,
@@ -156,14 +149,7 @@ class SchemaGenerator
                 'typename' => $resource->getName()
             ]
         );
-        $wargs = Arr::map(
-            $writableResources,
-            fn(ResourceInterface $resource, string $key) => [
-                'name' => $key,
-                'typename' => $resource->getName()
-            ]
-        );
-        return $this->blade->make('base', ['resources' => $args, 'writableResources' => $wargs])->render();
+        return $this->blade->make('base', ['resources' => $args])->render();
     }
 
     protected function generateServiceDeclarations(array $services): string
@@ -173,36 +159,25 @@ class SchemaGenerator
 
     protected function generateResourceSchema(ResourceInterface $resource): string
     {
-        $result = $this->blade->make('resource', [
-            'typename' => $resource->getName(),
-            'attributes' => $this->getAttributes($resource->getClassMap()),
-            'associations' => $this->getAssociations($resource),
-            'operations' => $this->getCustomOperations($resource, 'query'),
-        ])->render();
-        return $result;
-    }
-
-    protected function generateWritableResourceSchema(WritableResourceInterface $resource): string
-    {
-        return $this->blade->make('writable', [
+        return $this->blade->make('resource', [
+            'resource' => $resource,
             'typename' => $resource->getName(),
             'attributes' => $this->getWritableAttributes($resource->getClassMap()),
             'associations' => $this->getAssociations($resource),
-            'operations' => $this->getCustomOperations($resource, 'mutation')
+            'operations' => $this->getCustomOperations($resource)
         ]);
     }
 
-    protected function getCustomOperations($resource, string $operation)
+    protected function getCustomOperations($resource)
     {
-        if (!$resource instanceof CustomOperationsInterface) return [];
-        $methods = $operation == 'query' ?
-            $resource->getQueries() : $resource->getMutations();
-        return Arr::map($methods, fn($m, $k) => $this->readReflectionMethod($resource, $m, $k));
-    }
-
-    protected function readCustomOperation(ResourceInterface $resource, string $methodName, string $key)
-    {
-        $method = new \ReflectionMethod($resource, $methodName);
+        if (!$resource instanceof CustomOperationsInterface) return [
+            'query' => [],
+            'mutation' => []
+        ];
+        return [
+            'query' => Arr::map($resource->getQueries(), fn($m, $k) => $this->readReflectionMethod($resource, $m, $k)),
+            'mutation' => Arr::map($resource->getMutations(), fn($m, $k) => $this->readReflectionMethod($resource, $m, $k))
+        ];
     }
 
     protected function getAssociations(ResourceInterface $resource)
@@ -249,7 +224,8 @@ class SchemaGenerator
         $validAttributes = Arr::where($classMap->insertAttributeMaps, fn(AttributeMap $map) => $map->keyType != Key::FOREIGN);
         return array_map(fn(AttributeMap $map) => [
             'name' => $map->keyType == Key::PRIMARY ? 'id' : $map->name,
-            'type' => $this->translateAttributeType($map)
+            'type' => $this->translateAttributeType($map),
+            'nullable' => $map->nullable
         ], $validAttributes);
     }
 }

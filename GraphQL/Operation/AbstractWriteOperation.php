@@ -5,27 +5,26 @@ namespace Orkester\GraphQL\Operation;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
-use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLNotFoundException;
-use Orkester\Exception\UnknownFieldException;
 use Orkester\GraphQL\Context;
+use Orkester\Manager;
 use Orkester\Persistence\Enum\Association;
 use Orkester\Persistence\Map\AssociationMap;
-use Orkester\Resource\AssociativeResourceInterface;
-use Orkester\Resource\WritableResourceInterface;
+use Orkester\Resource\ResourceFacade;
+use Orkester\Resource\ResourceInterface;
 
 abstract class AbstractWriteOperation extends AbstractOperation
 {
-    public function __construct(protected FieldNode $root, protected WritableResourceInterface $resource)
+
+    protected readonly ResourceFacade $resource;
+    public function __construct(protected FieldNode $root, ResourceInterface $resource)
     {
         parent::__construct($root);
+        $this->resource = new ResourceFacade($resource, Manager::getContainer());
     }
 
     protected function writeAssociationAssociative(AssociationMap $map, array $entries, int|string $parentId)
     {
-        if (!$this->resource instanceof AssociativeResourceInterface)
-            throw new EGraphQLException("Associative operations missing for resource", $this->root, "resource", details: ['resource' => $this->resource->getName()]);
-
         foreach ($entries as $mode => $content) {
             if ($mode == "append") {
                 $this->resource->appendAssociative($map, $parentId, $content);
@@ -46,7 +45,7 @@ abstract class AbstractWriteOperation extends AbstractOperation
         }
     }
 
-    protected function writeAssociationChild(AssociationMap $map, array $entries, int|string $parentId, WritableResourceInterface $associatedResource)
+    protected function writeAssociationChild(AssociationMap $map, array $entries, int|string $parentId, ResourceFacade $associatedResource)
     {
         foreach ($entries as $mode => $content) {
             if ($mode == "upsert") {
@@ -106,10 +105,10 @@ abstract class AbstractWriteOperation extends AbstractOperation
             }
 
             $resource = $context->getResource($key);
-            if (!$resource instanceof WritableResourceInterface) {
-                throw new EGraphQLException("Resource {$resource->getName()} is not writable", $root, "resource_capabilities", 405);
+            if (!$resource) {
+                throw new EGraphQLNotFoundException($key, 'associated_resource', $root);
             }
-            $this->writeAssociationChild($map, $operations, $parentId, $resource);
+            $this->writeAssociationChild($map, $operations, $parentId, new ResourceFacade($resource, Manager::getContainer()));
         }
     }
 
@@ -120,7 +119,7 @@ abstract class AbstractWriteOperation extends AbstractOperation
         $root->name = $this->root->name;
         $root->alias = $this->root->alias;
         $root->arguments = new NodeList([]);
-        $query = new QueryOperation($root, $this->resource);
+        $query = new QueryOperation($root, $this->resource->resource);
         $query->isSingle = $this->isSingle;
         $query->getCriteria()->where($this->resource->getClassMap()->keyAttributeName, 'IN', $ids);
         return $query->execute($context);
