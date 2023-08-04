@@ -1,6 +1,6 @@
 <?php
 
-namespace orkester\GraphQL\Generator;
+namespace Orkester\GraphQL\Generator;
 
 use Illuminate\Support\Arr;
 use Orkester\Manager;
