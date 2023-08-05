@@ -2,7 +2,7 @@
 
 namespace Orkester\GraphQL;
 
-use DI\FactoryInterface;
+use DI\Container;
 use Orkester\Resource\ResourceInterface;
 
 class Configuration
@@ -12,7 +12,7 @@ class Configuration
     (
         protected array $resources,
         protected array $services,
-        public readonly FactoryInterface $factory
+        public readonly Container $factory
     )
     {
     }

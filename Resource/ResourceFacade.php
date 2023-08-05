@@ -6,7 +6,7 @@ use DI\Container;
 use DI\FactoryInterface;
 use Orkester\Exception\GraphQLArgumentTypeException;
 use Orkester\Exception\GraphQLInvalidArgumentException;
-use Orkester\Exception\InvalidResourceOperationException;
+use Orkester\Exception\GraphQLInvalidOperationException;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\ClassMap;
@@ -39,7 +39,7 @@ class ResourceFacade
 
     protected function assertMethodExists(string $method)
     {
-        if (!method_exists($this->resource, $method)) throw new InvalidResourceOperationException($this->resource->getName(), $method);
+        if (!method_exists($this->resource, $method)) throw new GraphQLInvalidOperationException($this->resource->getName(), $method);
     }
 
     protected function getDataArgumentType(string $operation): ?string

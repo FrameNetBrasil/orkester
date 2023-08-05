@@ -28,8 +28,6 @@ use Orkester\Resource\CustomOperationsInterface;
 
 class Executor
 {
-    protected Logger $logger;
-
     public function __construct(
         protected readonly string $query,
         protected readonly array  $variables,
@@ -41,7 +39,7 @@ class Executor
     /**
      * @throws SyntaxError
      */
-    protected function parse()
+    protected function parse(): array
     {
         $document = Parser::parse($this->query);
         foreach ($document->definitions as $definition) {
