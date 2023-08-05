@@ -15,6 +15,12 @@ use Monolog\Logger;
 
 return function (ContainerBuilder $containerBuilder) {
     $containerBuilder->addDefinitions([
+        'mode' => Manager::getConf('mode'),
+        \Orkester\GraphQL\Configuration::class => function(ContainerInterface $c) {
+            $data = require Manager::getConfPath() . '/api.php';
+            $factory = $c->get(\DI\FactoryInterface::class);
+            return new \Orkester\GraphQL\Configuration($data['resources'], $data['services'], $factory);
+        },
         Logger::class => function (ContainerInterface $c) {
             $lineFormat = "[%datetime%] %channel%[%level_name%]%context.tag%: %message%" . PHP_EOL;
             $dateFormat = "Y/m/d H:i:s";

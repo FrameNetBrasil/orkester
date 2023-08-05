@@ -2,6 +2,7 @@
 
 namespace Orkester\GraphQL;
 
+use DI\FactoryInterface;
 use GraphQL\Error\SyntaxError;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentDefinitionNode;
@@ -30,12 +31,11 @@ class Executor
     protected Logger $logger;
 
     public function __construct(
-        protected string $query,
-        protected array  $variables = [],
-        Logger           $logger = null
+        protected readonly string $query,
+        protected readonly array  $variables,
+        protected readonly Configuration $configuration
     )
     {
-        $this->logger = $logger ?? Manager::getContainer()->get(Logger::class)->withName('graphql');
     }
 
     /**
@@ -84,7 +84,7 @@ class Executor
                     }
 
                     if ($service = $context->getService($serviceDefinition->name->value, 'query')) {
-                        $op = new ServiceOperation($serviceDefinition, $service[0], $service[1]);
+                        $op = new ServiceOperation($serviceDefinition, $service[0], $service[1], $this->configuration->factory);
                         $operations[$key][$op->getName()] = $op;
                         continue;
                     }
@@ -111,7 +111,7 @@ class Executor
                     ($custom = $resource->getQueries()) &&
                     array_key_exists($queryOperation->name->value, $custom)
                 ) {
-                    $op = new ServiceOperation($queryOperation, $resource, $custom[$queryOperation->name->value]);
+                    $op = new ServiceOperation($queryOperation, $resource, $custom[$queryOperation->name->value], $this->configuration->factory);
                     $operations[$key][$op->getName()] = $op;
                     continue;
                 }
@@ -129,7 +129,7 @@ class Executor
             if ($root->name->value == "service") {
                 foreach ($root->selectionSet->selections as $definition) {
                     if ($service = $context->getService($definition->name->value, "mutation")) {
-                        $op = new ServiceOperation($definition, $service[0], $service[1]);
+                        $op = new ServiceOperation($definition, $service[0], $service[1], $this->configuration->factory);
                         $operations[$key][$op->getName()] = $op;
                     }
                 }
@@ -152,7 +152,7 @@ class Executor
                 };
 
                 if ($class) {
-                    $op = new $class($definition, $resource);
+                    $op = new $class($definition, $resource, $this->configuration->factory);
                     $operations[$key][$op->getName()] = $op;
                     continue;
                 }
@@ -162,7 +162,7 @@ class Executor
                     ($custom = $resource->getMutations()) &&
                     array_key_exists($definition->name->value, $custom)
                 ) {
-                    $op = new ServiceOperation($definition, $resource, $custom[$definition->name->value]);
+                    $op = new ServiceOperation($definition, $resource, $custom[$definition->name->value], $this->configuration->factory);
                     $operations[$key][$op->getName()] = $op;
                     continue;
                 }
@@ -195,11 +195,13 @@ class Executor
         return $operations;
     }
 
-    protected function executeOperations(Context $context, array $operationDefinitions): ?array
+    protected function executeOperations(array $operationDefinitions, array $fragmentDefinitions): ?array
     {
         $group = "";
         $name = "";
         try {
+            $context = new Context($this->configuration, $this->variables, $fragmentDefinitions);
+
             $operationGroups = $this->createOperations($operationDefinitions, $context);
 
             if (($operationGroups[0] ?? null) instanceof IntrospectionOperation) {
@@ -215,37 +217,41 @@ class Executor
                 }
             }
             PersistenceManager::commit();
-            return null;
+            return [ 'data' => $context->results ];
         } catch (GraphQlException $e) {
             PersistenceManager::rollback();
             return [
-                "message" => $e->getMessage(),
-                "extensions" => [
-                    "operation" => $group ? "$group.$name" : "root",
-                    "code" => $e->getCode(),
-                    "type" => $e->getType(),
-                    "details" => $e->getDetails(),
-                    "trace" => $e->getTrace(),
+                "errors" => [
+                    "message" => $e->getMessage(),
+                    "extensions" => [
+                        "operation" => $group ? "$group.$name" : "root",
+                        "code" => $e->getCode(),
+                        "type" => $e->getType(),
+                        "details" => $e->getDetails(),
+                        "trace" => $e->getTrace(),
+                    ]
                 ]
             ];
         } catch (\Exception|\Error $e) {
             PersistenceManager::rollback();
-            $isDev = Manager::isDevelopment();
+            $isDev = $this->configuration->factory->make('mode') === "development";
             return [
-                "message" => $isDev ? $e->getMessage() : "Internal Server Error",
-                "extensions" => [
-                    "operation" => "$group.$name",
-                    "code" => $e->getCode(),
-                    "type" => $isDev ? get_class($e) : "internal",
-                    "trace" => $e->getTrace()
+                "errors" => [
+                    "message" => $isDev ? $e->getMessage() : "Internal Server Error",
+                    "extensions" => [
+                        "operation" => "$group.$name",
+                        "code" => $e->getCode(),
+                        "type" => $isDev ? get_class($e) : "internal",
+                        "trace" => $e->getTrace()
+                    ]
                 ]
             ];
         }
     }
 
-    public static function run(string $query, $variables = []): array
+    public static function run(string $query, array $variables, Configuration $configuration): array
     {
-        $executor = new Executor($query, $variables);
+        $executor = new Executor($query, $variables, $configuration);
         return $executor->execute();
     }
 
@@ -270,16 +276,18 @@ class Executor
             ]];
         }
 
-        $context = new Context($this->variables, $fragmentDefinitions);
+        $results = $this->executeOperations($operationDefinitions, $fragmentDefinitions);
 
-        $errors = $this->executeOperations($context, $operationDefinitions);
-        if ($errors) {
-            if (!Manager::isDevelopment()) {
-                unset($errors["extensions"]["trace"]);
-            }
-            return ['errors' => [$errors]];
+        if (array_key_exists('data', $results)) {
+            return $results;
         }
-        return ['data' => $context->results];
+
+        $errors = $results['errors'];
+        if (!Manager::isDevelopment()) {
+            unset($errors["extensions"]["trace"]);
+        }
+        return ['errors' => [$errors]];
+
 
     }
 }

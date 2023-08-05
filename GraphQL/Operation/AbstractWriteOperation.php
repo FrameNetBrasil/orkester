@@ -2,13 +2,13 @@
 
 namespace Orkester\GraphQL\Operation;
 
+use DI\FactoryInterface;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
 use Orkester\Exception\GraphQLInvalidArgumentException;
 use Orkester\Exception\GraphQLNotFoundException;
 use Orkester\GraphQL\Context;
-use Orkester\Manager;
 use Orkester\Persistence\Enum\Association;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Resource\ResourceFacade;
@@ -18,10 +18,14 @@ abstract class AbstractWriteOperation extends AbstractOperation
 {
 
     protected readonly ResourceFacade $resource;
-    public function __construct(protected FieldNode $root, ResourceInterface $resource)
+    public function __construct(
+        protected FieldNode $root,
+        ResourceInterface $resource,
+        protected FactoryInterface $factory
+    )
     {
         parent::__construct($root);
-        $this->resource = new ResourceFacade($resource, Manager::getContainer());
+        $this->resource = new ResourceFacade($resource, $factory);
     }
 
     /**
@@ -119,7 +123,7 @@ abstract class AbstractWriteOperation extends AbstractOperation
             if (!$resource) {
                 throw new GraphQLNotFoundException($key, "association");
             }
-            $this->writeAssociationChild($map, $operations, $parentId, new ResourceFacade($resource, Manager::getContainer()));
+            $this->writeAssociationChild($map, $operations, $parentId, new ResourceFacade($resource, $this->factory));
         }
     }
 

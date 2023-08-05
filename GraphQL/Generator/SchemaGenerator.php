@@ -2,8 +2,8 @@
 
 namespace Orkester\GraphQL\Generator;
 
+use DI\FactoryInterface;
 use Illuminate\Support\Arr;
-use Orkester\Manager;
 use Orkester\Persistence\Enum\Key;
 use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Map\AssociationMap;
@@ -20,14 +20,13 @@ class SchemaGenerator
 {
 
     protected Blade $blade;
-    protected array $conf;
 
-    public static function generateAll(): string
+    public static function generateAll(array $conf, FactoryInterface $factory): string
     {
-        $instance = new self();
+        $instance = new self($conf, $factory);
         $resources = Arr::mapWithKeys(
             $instance->conf['resources'],
-            fn($resource, $key) => [$key => Manager::getContainer()->make($resource)]
+            fn($resource, $key) => [$key => $factory->make($resource)]
         );
         $base = $instance->generateBaseDeclarations($resources);
 
@@ -47,7 +46,7 @@ class SchemaGenerator
 
     public function writeResourceSchema(string $resourceName, string $outputDir)
     {
-        $resource = Manager::getContainer()->make($this->conf['resources'][$resourceName]);
+        $resource = $this->factory->make($this->conf['resources'][$resourceName]);
         $content = $this->generateResourceSchema($resource);
         if (!file_exists($outputDir)) {
             mkdir($outputDir, recursive: true);
@@ -68,7 +67,7 @@ class SchemaGenerator
     {
         $resources = Arr::mapWithKeys(
             $this->conf['resources'],
-            fn($resource, $key) => [$key => Manager::getContainer()->make($resource)]
+            fn($resource, $key) => [$key => $this->factory->make($resource)]
         );
 
         $content = $this->generateBaseDeclarations($resources);
@@ -95,11 +94,9 @@ class SchemaGenerator
         );
     }
 
-    public function __construct()
+    public function __construct(protected array $conf, protected readonly FactoryInterface $factory)
     {
         $this->blade = new Blade(__DIR__, sys_get_temp_dir());
-        $this->conf = require Manager::getConfPath() . '/api.php';
-
     }
 
     protected function translateReflectionType(null|ReflectionIntersectionType|ReflectionNamedType|ReflectionUnionType $type)

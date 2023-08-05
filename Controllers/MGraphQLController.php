@@ -26,7 +26,10 @@ class MGraphQLController
 
     public function execute(): array
     {
-        $executor = new Executor($this->query, $this->variables);
+        $executor = Manager::getContainer()->make(Executor::class, [
+            'query' => $this->query,
+            'variables' => $this->variables
+        ]);
         return $executor->execute();
     }
 

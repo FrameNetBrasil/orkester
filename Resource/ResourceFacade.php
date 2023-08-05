@@ -3,6 +3,7 @@
 namespace Orkester\Resource;
 
 use DI\Container;
+use DI\FactoryInterface;
 use Orkester\Exception\GraphQLArgumentTypeException;
 use Orkester\Exception\GraphQLInvalidArgumentException;
 use Orkester\Exception\InvalidResourceOperationException;
@@ -16,7 +17,7 @@ class ResourceFacade
     protected array $arguments = [];
     public function __construct(
         public readonly ResourceInterface $resource,
-        protected readonly Container $container
+        protected readonly FactoryInterface $container
     )
     {
     }
