@@ -2,26 +2,30 @@
 
 namespace Orkester\GraphQL\Operation;
 
+use DI\FactoryInterface;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use Orkester\Exception\GraphQLArgumentTypeException;
 use Orkester\Exception\GraphQLInvalidArgumentException;
 use Orkester\Exception\GraphQLMissingArgumentException;
 use Orkester\GraphQL\Context;
-use Orkester\Manager;
 use Orkester\Resource\ResourceInterface;
 
 class ServiceOperation extends AbstractOperation
 {
 
-    public function __construct(protected FieldNode $root, protected readonly ResourceInterface|string $service, protected readonly string $method)
+    public function __construct(
+        protected FieldNode $root,
+        protected readonly ResourceInterface|string $service,
+        protected readonly string $method,
+        protected readonly FactoryInterface $factory
+    )
     {
         parent::__construct($root);
     }
 
     public function execute(Context $context): mixed
     {
-        $container = Manager::getContainer();
         $reflectionMethod = new \ReflectionMethod($this->service, $this->method);
         $parameters = [];
         foreach ($reflectionMethod->getParameters() as $reflectionParameter) {
@@ -47,7 +51,7 @@ class ServiceOperation extends AbstractOperation
                     ->getParameters()[0]
                     ->getName();
 
-                    $arguments[$argumentNode->name->value] = $container->make(
+                    $arguments[$argumentNode->name->value] = $this->factory->make(
                         $parameters[$argumentNode->name->value],
                         [$targetParameter => $value]
                     );
@@ -64,7 +68,7 @@ class ServiceOperation extends AbstractOperation
             throw new GraphQLMissingArgumentException($missing);
         }
 
-        $result = Manager::getContainer()->call([$this->service, $this->method], $arguments);
+        $result = $this->factory->call([$this->service, $this->method], $arguments);
 
         if (is_array($result) && $this->root->selectionSet != null) {
             $return = [];

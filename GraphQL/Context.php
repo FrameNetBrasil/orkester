@@ -9,30 +9,18 @@ use GraphQL\Language\AST\NodeKind;
 use GraphQL\Language\AST\ObjectFieldNode;
 use GraphQL\Language\AST\ObjectValueNode;
 use GraphQL\Language\AST\VariableNode;
-use Orkester\Manager;
-use Orkester\Persistence\Model;
 use Orkester\Resource\ResourceInterface;
 
 class Context
 {
-
     public array $results = [];
-    /**
-     * @var (Model|string)[]
-     */
-    protected array $resources;
-    protected ?array $namedServices = [];
-    protected mixed $serviceResolver;
 
     public function __construct(
+        protected Configuration $configuration,
         protected array  $variables = [],
         protected array  $fragments = []
     )
     {
-        $configuration = require Manager::getConfPath() . '/api.php';
-        $this->resources = $configuration['resources'];
-        $this->namedServices = $configuration['services'];
-        $this->serviceResolver = $configuration['serviceResolver'] ?? null;
     }
 
     public function getNodeValue(?Node $node): mixed
@@ -77,20 +65,11 @@ class Context
 
     public function getResource(string $name): ?ResourceInterface
     {
-        if ($model = $this->resources[$name] ?? false) {
-            return Manager::getContainer()->make($model);
-        }
-        return null;
+        return $this->configuration->getResource($name);
     }
 
     public function getService(string $name, string $type): array|false
     {
-        if ($name[0] == '_') {
-            $name = substr($name, 1);
-        }
-        if ([$class, $method] = $this->namedServices[$type][$name] ?? false) {
-            return [$class, $method];
-        }
-        return false;
+        return $this->configuration->getService($name, $type);
     }
 }
