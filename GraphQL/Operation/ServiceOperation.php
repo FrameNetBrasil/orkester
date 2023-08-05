@@ -2,7 +2,7 @@
 
 namespace Orkester\GraphQL\Operation;
 
-use DI\FactoryInterface;
+use DI\Container;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use Orkester\Exception\GraphQLArgumentTypeException;
@@ -18,7 +18,7 @@ class ServiceOperation extends AbstractOperation
         protected FieldNode $root,
         protected readonly ResourceInterface|string $service,
         protected readonly string $method,
-        protected readonly FactoryInterface $factory
+        protected readonly Container $container
     )
     {
         parent::__construct($root);
@@ -51,7 +51,7 @@ class ServiceOperation extends AbstractOperation
                     ->getParameters()[0]
                     ->getName();
 
-                    $arguments[$argumentNode->name->value] = $this->factory->make(
+                    $arguments[$argumentNode->name->value] = $this->container->make(
                         $parameters[$argumentNode->name->value],
                         [$targetParameter => $value]
                     );
@@ -68,7 +68,7 @@ class ServiceOperation extends AbstractOperation
             throw new GraphQLMissingArgumentException($missing);
         }
 
-        $result = $this->factory->call([$this->service, $this->method], $arguments);
+        $result = $this->container->call([$this->service, $this->method], $arguments);
 
         if (is_array($result) && $this->root->selectionSet != null) {
             $return = [];

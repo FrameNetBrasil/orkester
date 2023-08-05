@@ -2,7 +2,7 @@
 
 namespace Orkester\Exception;
 
-class InvalidResourceOperationException extends \Exception implements GraphQLException
+class GraphQLInvalidOperationException extends \Exception implements GraphQLException
 {
 
     public function __construct(protected string $resource, protected string $operation, $code = 406)
