@@ -6,6 +6,8 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\NodeList;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLInternalException;
+use Orkester\Exception\GraphQLMissingArgumentException;
+use Orkester\Exception\GraphQLNotFoundException;
 use Orkester\GraphQL\Argument\ConditionArgument;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
@@ -21,7 +23,7 @@ class UpdateOperation extends AbstractWriteOperation
         $valid = $this->readArguments($this->root->arguments, $criteria, $context);
 
         if (!$valid)
-            throw new EGraphQLException("No arguments found for update [{$this->getName()}]. Refusing to proceed.");
+            throw new GraphQLMissingArgumentException(["id", "where"]);
 
         $ids = [];
 
@@ -34,12 +36,16 @@ class UpdateOperation extends AbstractWriteOperation
             if (!empty($attributes)) {
                 $this->resource->update($attributes, $id);
             }
-            $this->writeAssociations($this->setObject['associations'], $id, $this->root, $context);
+            $this->writeAssociations($this->setObject['associations'], $id, $context);
             $ids[] = $id;
         }
         return $this->executeQueryOperation($ids, $context);
     }
 
+    /**
+     * @throws GraphQLMissingArgumentException
+     * @throws GraphQLNotFoundException
+     */
     protected function readArguments(NodeList $arguments, Criteria $criteria, Context $context): bool
     {
         $valid = false;
@@ -52,11 +58,7 @@ class UpdateOperation extends AbstractWriteOperation
                 $this->isSingle = true;
                 $valid = true;
             } else if ($argument->name->value == "where") {
-                try {
-                    ConditionArgument::applyArgumentWhere($context, $criteria, $value);
-                } catch (EGraphQLInternalException $e) {
-                    throw new EGraphQLException($e->getMessage(), $argument, "invalid_argument");
-                }
+                ConditionArgument::applyArgumentWhere($context, $criteria, $value);
                 $valid = true;
             } else if ($argument->name->value == "set") {
                 $this->setObject = $this->readRawObject($value);

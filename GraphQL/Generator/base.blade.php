@@ -6,7 +6,7 @@ type Query {
 }
 
 type Mutation {
-@foreach ($writableResources ?? [] as $resource)
+@foreach ($resources ?? [] as $resource)
     {{ $resource['name'] }}: {{ $resource['typename'] }}Mutation
 @endforeach
     service: ServiceMutation

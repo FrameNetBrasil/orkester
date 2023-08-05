@@ -5,7 +5,8 @@ namespace Orkester\GraphQL\Operation;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
-use Orkester\Exception\EGraphQLNotFoundException;
+use Orkester\Exception\GraphQLInvalidArgumentException;
+use Orkester\Exception\GraphQLNotFoundException;
 use Orkester\GraphQL\Context;
 use Orkester\Manager;
 use Orkester\Persistence\Enum\Association;
@@ -23,7 +24,10 @@ abstract class AbstractWriteOperation extends AbstractOperation
         $this->resource = new ResourceFacade($resource, Manager::getContainer());
     }
 
-    protected function writeAssociationAssociative(AssociationMap $map, array $entries, int|string $parentId)
+    /**
+     * @throws GraphQLInvalidArgumentException
+     */
+    protected function writeAssociationAssociative(AssociationMap $map, array $entries, int|string $parentId): void
     {
         foreach ($entries as $mode => $content) {
             if ($mode == "append") {
@@ -41,11 +45,14 @@ abstract class AbstractWriteOperation extends AbstractOperation
                 continue;
             }
 
-            throw new EGraphQLNotFoundException($mode, "association_mode", $this->root);
+            throw new GraphQLInvalidArgumentException(["append", "delete", "replace"], $mode);
         }
     }
 
-    protected function writeAssociationChild(AssociationMap $map, array $entries, int|string $parentId, ResourceFacade $associatedResource)
+    /**
+     * @throws GraphQLInvalidArgumentException
+     */
+    protected function writeAssociationChild(AssociationMap $map, array $entries, int|string $parentId, ResourceFacade $associatedResource): void
     {
         foreach ($entries as $mode => $content) {
             if ($mode == "upsert") {
@@ -89,11 +96,15 @@ abstract class AbstractWriteOperation extends AbstractOperation
                 continue;
             }
 
-            throw new EGraphQLNotFoundException($mode, "association_mode", $this->root);
+            throw new GraphQLInvalidArgumentException(["insert", "delete", "update", "upsert"], $mode);
         }
     }
 
-    public function writeAssociations(array $associationData, int|string $parentId, FieldNode $root, Context $context)
+    /**
+     * @throws GraphQLNotFoundException
+     * @throws GraphQLInvalidArgumentException
+     */
+    public function writeAssociations(array $associationData, int|string $parentId, Context $context): void
     {
         foreach ($associationData as ['associationMap' => $map,
                  'associatedResourceKey' => $key,
@@ -106,7 +117,7 @@ abstract class AbstractWriteOperation extends AbstractOperation
 
             $resource = $context->getResource($key);
             if (!$resource) {
-                throw new EGraphQLNotFoundException($key, 'associated_resource', $root);
+                throw new GraphQLNotFoundException($key, "association");
             }
             $this->writeAssociationChild($map, $operations, $parentId, new ResourceFacade($resource, Manager::getContainer()));
         }
@@ -125,6 +136,9 @@ abstract class AbstractWriteOperation extends AbstractOperation
         return $query->execute($context);
     }
 
+    /**
+     * @throws GraphQLNotFoundException
+     */
     protected function readRawObject(array $rawObject): array
     {
         $classMap = $this->resource->getClassMap();
@@ -159,7 +173,7 @@ abstract class AbstractWriteOperation extends AbstractOperation
                 ];
                 continue;
             }
-            throw new EGraphQLNotFoundException($key, "field", $this->root);
+            throw new GraphQLNotFoundException($key, "field");
         }
         return $object;
     }

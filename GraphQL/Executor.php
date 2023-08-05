@@ -2,15 +2,15 @@
 
 namespace Orkester\GraphQL;
 
+use GraphQL\Error\SyntaxError;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\OperationDefinitionNode;
 use GraphQL\Language\Parser;
 use Illuminate\Support\Arr;
 use Monolog\Logger;
-use Orkester\Exception\EGraphQLException;
-use Orkester\Exception\EGraphQLNotFoundException;
-use Orkester\Exception\GraphQLErrorInterface;
+use Orkester\Exception\GraphQLException;
+use Orkester\Exception\GraphQLNotFoundException;
 use Orkester\GraphQL\Operation\AbstractOperation;
 use Orkester\GraphQL\Operation\DeleteOperation;
 use Orkester\GraphQL\Operation\GraphQLOperationInterface;
@@ -38,6 +38,9 @@ class Executor
         $this->logger = $logger ?? Manager::getContainer()->get(Logger::class)->withName('graphql');
     }
 
+    /**
+     * @throws SyntaxError
+     */
     protected function parse()
     {
         $document = Parser::parse($this->query);
@@ -54,11 +57,14 @@ class Executor
         ];
     }
 
+    /**
+     * @throws GraphQLNotFoundException
+     */
     protected function createQueries(OperationDefinitionNode $operationNode, Context $context, array &$operations)
     {
         foreach ($operationNode->selectionSet->selections as $fieldNode) {
             if ($fieldNode->name->value == '__schema') {
-                $operations = [ new IntrospectionOperation() ];
+                $operations = [new IntrospectionOperation()];
                 return;
             }
 
@@ -71,26 +77,26 @@ class Executor
                         $name = $operation->getQueryName();
                         $queryOperation = Arr::get($operations, $name);
                         if (!$queryOperation)
-                            throw new EGraphQLNotFoundException($name, "operation", $serviceDefinition);
+                            throw new GraphQLNotFoundException($name, "operation");
                         $operation->setQueryOperation($queryOperation);
                         $operations[$key]['_total'] = $operation;
                         continue;
                     }
 
                     if ($service = $context->getService($serviceDefinition->name->value, 'query')) {
-                        $op = new ServiceOperation($fieldNode, $service[0], $service[1]);
+                        $op = new ServiceOperation($serviceDefinition, $service[0], $service[1]);
                         $operations[$key][$op->getName()] = $op;
                         continue;
                     }
 
-                    throw new EGraphQLNotFoundException($serviceDefinition->name->value, 'service', $fieldNode);
+                    throw new GraphQLNotFoundException($serviceDefinition->name->value, 'service');
                 }
                 continue;
             }
 
             $resource = $context->getResource($fieldNode->name->value);
             if (!$resource) {
-                throw new EGraphQLNotFoundException($fieldNode->name->value, 'resource', $fieldNode);
+                throw new GraphQLNotFoundException($fieldNode->name->value, "resources");
             }
 
             foreach ($fieldNode->selectionSet->selections as $queryOperation) {
@@ -102,7 +108,7 @@ class Executor
 
                 if (
                     $resource instanceof CustomOperationsInterface &&
-                    ($custom =  $resource->getQueries()) &&
+                    ($custom = $resource->getQueries()) &&
                     array_key_exists($queryOperation->name->value, $custom)
                 ) {
                     $op = new ServiceOperation($queryOperation, $resource, $custom[$queryOperation->name->value]);
@@ -110,19 +116,19 @@ class Executor
                     continue;
                 }
 
-                throw new EGraphQLNotFoundException($queryOperation->name->value, "operation", $queryOperation);
+                throw new GraphQLNotFoundException($queryOperation->name->value, "operation");
             }
         }
     }
 
-    protected function createMutations(OperationDefinitionNode $operationNode, Context $context, &$operations)
+    protected function createMutations(OperationDefinitionNode $operationNode, Context $context, &$operations): void
     {
         foreach ($operationNode->selectionSet->selections as $root) {
             $key = AbstractOperation::getNodeName($root);
 
             if ($root->name->value == "service") {
                 foreach ($root->selectionSet->selections as $definition) {
-                    if ($service = $context->getService($definition->name->value, 'mutation')) {
+                    if ($service = $context->getService($definition->name->value, "mutation")) {
                         $op = new ServiceOperation($definition, $service[0], $service[1]);
                         $operations[$key][$op->getName()] = $op;
                     }
@@ -132,7 +138,7 @@ class Executor
 
             $resource = $context->getResource($root->name->value);
             if (!$resource) {
-                throw new EGraphQLNotFoundException($root->name->value, 'resource', $root);
+                throw new GraphQLNotFoundException($root->name->value, "resources");
             }
             /** @var FieldNode $definition */
             foreach ($root->selectionSet->selections as $definition) {
@@ -153,7 +159,7 @@ class Executor
 
                 if (
                     $resource instanceof CustomOperationsInterface &&
-                    ($custom =  $resource->getMutations()) &&
+                    ($custom = $resource->getMutations()) &&
                     array_key_exists($definition->name->value, $custom)
                 ) {
                     $op = new ServiceOperation($definition, $resource, $custom[$definition->name->value]);
@@ -161,16 +167,13 @@ class Executor
                     continue;
                 }
 
-                throw new EGraphQLNotFoundException($definition->name->value, "resource", $definition);
+                throw new GraphQLNotFoundException($definition->name->value, "resources");
             }
         }
     }
 
     /**
-     * @param array $operationNodes
-     * @param Context $context
-     * @return AbstractOperation[]
-     * @throws EGraphQLNotFoundException|EGraphQLException
+     * @throws GraphQLNotFoundException
      */
     protected function createOperations(array $operationNodes, Context $context): array
     {
@@ -187,9 +190,57 @@ class Executor
                 continue;
             }
 
-            throw new EGraphQLNotFoundException($operationNode->operation, 'operation', $operationNode);
+            throw new GraphQLNotFoundException($operationNode->operation, 'operation');
         }
         return $operations;
+    }
+
+    protected function executeOperations(Context $context, array $operationDefinitions): ?array
+    {
+        $group = "";
+        $name = "";
+        try {
+            $operationGroups = $this->createOperations($operationDefinitions, $context);
+
+            if (($operationGroups[0] ?? null) instanceof IntrospectionOperation) {
+                return ['data' => $operationGroups[0]->execute($context)];
+            }
+            PersistenceManager::beginTransaction();
+            foreach ($operationGroups as $group => $operations) {
+                /**
+                 * @var $operation GraphQLOperationInterface
+                 */
+                foreach ($operations as $name => $operation) {
+                    $context->results[$group][$name] = $operation->execute($context);
+                }
+            }
+            PersistenceManager::commit();
+            return null;
+        } catch (GraphQlException $e) {
+            PersistenceManager::rollback();
+            return [
+                "message" => $e->getMessage(),
+                "extensions" => [
+                    "operation" => $group ? "$group.$name" : "root",
+                    "code" => $e->getCode(),
+                    "type" => $e->getType(),
+                    "details" => $e->getDetails(),
+                    "trace" => $e->getTrace(),
+                ]
+            ];
+        } catch (\Exception|\Error $e) {
+            PersistenceManager::rollback();
+            $isDev = Manager::isDevelopment();
+            return [
+                "message" => $isDev ? $e->getMessage() : "Internal Server Error",
+                "extensions" => [
+                    "operation" => "$group.$name",
+                    "code" => $e->getCode(),
+                    "type" => $isDev ? get_class($e) : "internal",
+                    "trace" => $e->getTrace()
+                ]
+            ];
+        }
     }
 
     public static function run(string $query, $variables = []): array
@@ -205,62 +256,30 @@ class Executor
                 'operations' => $operationDefinitions,
                 'fragments' => $fragmentDefinitions
             ] = $this->parse();
-
-            $context = new Context($this->variables, $fragmentDefinitions);
-
-            $operationGroups = $this->createOperations($operationDefinitions, $context);
-
-            if (($operationGroups[0] ?? null) instanceof IntrospectionOperation) {
-                return [
-                    'data' => $operationGroups[0]->execute($context),
-                    'errors' => []
-                ];
-            }
-
-            PersistenceManager::beginTransaction();
-
-            foreach($operationGroups as $group => $operations) {
-                /**
-                 * @var $operation GraphQLOperationInterface
-                 */
-                foreach($operations as $name => $operation) {
-                    $context->results[$group][$name] = $operation->execute($context);
-                }
-            }
-            $data = $context->results;
-            PersistenceManager::commit();
-        } catch(GraphQLErrorInterface $e) {
-            $node = $e->getNode();
-            $errors = [
-                "message" => $e->getMessage(),
-                "location" => [
-                    "line" => $node->loc->startToken->line,
-                    "column" => $node->loc->startToken->column
-                ],
-                "extensions" => [
-                    "code" => $e->getCode(),
-                    "type" => $e->getType(),
-                    "node" => $node->name->value,
-                    "details" => $e->getDetails(),
-                    "trace" => $e->getTrace()
+        } catch (SyntaxError $e) {
+            return ['errors' => [
+                [
+                    "message" => $e->getMessage(),
+                    "locations" => $e->getLocations(),
+                    "extensions" => [
+                        "operation" => "root",
+                        "code" => $e->getCode(),
+                        "type" => "syntax"
+                    ]
                 ]
-            ];
-        } catch(\Exception|\Error $e) {
-            $errors = [
-                "message" => Manager::isDevelopment() ? $e->getMessage() : "Internal Server Error",
-                "extensions" => [
-                    "code" => $e->getCode(),
-                    "type" => "internal",
-                    "trace" => $e->getTrace()
-                ]
-            ];
+            ]];
         }
-        if (isset($errors) && !Manager::isDevelopment()) {
-            unset($errors[0]["extensions"]["trace"]);
+
+        $context = new Context($this->variables, $fragmentDefinitions);
+
+        $errors = $this->executeOperations($context, $operationDefinitions);
+        if ($errors) {
+            if (!Manager::isDevelopment()) {
+                unset($errors["extensions"]["trace"]);
+            }
+            return ['errors' => [$errors]];
         }
-        return [
-            'data' => $data ?? [],
-            'errors' => $errors ?? []
-        ];
+        return ['data' => $context->results];
+
     }
 }

@@ -59,13 +59,6 @@ return function (ContainerBuilder $containerBuilder) {
             $logger = new Logger($conf['channel'] ?? null);
             $logger->pushHandler($groupHandler);
             return $logger;
-        },
-        'SqlLogger' => function (ContainerInterface $c) {
-            if (Manager::getConf('logs.sql') === false) {
-                return new Logger('sql');
-            } else {
-                return $c->get(Logger::class)->withName('sql');
-            }
         }
     ]);
 };

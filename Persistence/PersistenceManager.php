@@ -159,10 +159,7 @@ class PersistenceManager
 
     public static function transaction(callable $closure, ?string $databaseName = null): mixed
     {
-        $cb = fn(Connection $connection) => $closure(
-            static::getCriteria($databaseName),
-            $connection
-        );
+        $cb = fn(Connection $connection) => $closure($connection);
         return static::getConnection($databaseName)->transaction($cb);
     }
 }

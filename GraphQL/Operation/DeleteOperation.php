@@ -6,6 +6,8 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\NodeList;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLInternalException;
+use Orkester\Exception\GraphQLMissingArgumentException;
+use Orkester\Exception\GraphQLNotFoundException;
 use Orkester\GraphQL\Argument\ConditionArgument;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
@@ -21,7 +23,7 @@ class DeleteOperation extends AbstractWriteOperation
         $valid = $this->readArguments($this->root->arguments, $criteria, $context);
 
         if (!$valid)
-            throw new EGraphQLException("No arguments found for delete [{$this->getName()}]. Refusing to proceed.");
+            throw new GraphQLMissingArgumentException(["id", "where"]);
 
         $ids = $criteria->pluck($this->resource->getClassMap()->keyAttributeName);
 
@@ -34,6 +36,10 @@ class DeleteOperation extends AbstractWriteOperation
         return $count;
     }
 
+    /**
+     * @throws GraphQLMissingArgumentException
+     * @throws GraphQLNotFoundException
+     */
     protected function readArguments(NodeList $arguments, Criteria $criteria, Context $context): bool
     {
         $valid = false;
@@ -51,11 +57,7 @@ class DeleteOperation extends AbstractWriteOperation
             }
 
             if ($argument->name->value == "where") {
-                try {
-                    ConditionArgument::applyArgumentWhere($context, $criteria, $value);
-                } catch(EGraphQLInternalException $e) {
-                    throw new EGraphQLException($e->getMessage(), $argument, "invalid_argument");
-                }
+                ConditionArgument::applyArgumentWhere($context, $criteria, $value);
                 $valid = true;
                 continue;
             }
