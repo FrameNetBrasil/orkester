@@ -3,6 +3,9 @@
 namespace Orkester\Resource;
 
 use DI\Container;
+use Orkester\Exception\GraphQLArgumentTypeException;
+use Orkester\Exception\GraphQLInvalidArgumentException;
+use Orkester\Exception\InvalidResourceOperationException;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\ClassMap;
@@ -35,7 +38,7 @@ class ResourceFacade
 
     protected function assertMethodExists(string $method)
     {
-        if (!method_exists($this->resource, $method)) throw new \InvalidArgumentException();
+        if (!method_exists($this->resource, $method)) throw new InvalidResourceOperationException($this->resource->getName(), $method);
     }
 
     protected function getDataArgumentType(string $operation): ?string
@@ -53,7 +56,11 @@ class ResourceFacade
     {
         $this->assertMethodExists($operation);
         $type = $this->getDataArgumentType($operation);
-        return $type === "array" ? $data : $this->container->make($type, ['data' => $data, 'id' => $id]);
+        try {
+            return $type === "array" ? $data : $this->container->make($type, ['data' => $data, 'id' => $id]);
+        } catch(\TypeError) {
+            throw new GraphQLArgumentTypeException('data');
+        }
     }
 
     public function insert(array $data): int|string

@@ -49,7 +49,7 @@ class JsonApi extends MController
         } catch (ValidationException $e) {
             $code = 409; //Conflict
             $es = [];
-            foreach ($e->errors as $key => $value) {
+            foreach ($e->getErrors() as $key => $value) {
                 array_push($es, static::createError($code, $key, $value));
             }
             $content = static::createErrorResponse($es);

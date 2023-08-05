@@ -6,6 +6,9 @@ use Illuminate\Support\Arr;
 use Orkester\Exception\EGraphQLException;
 use Orkester\Exception\EGraphQLInternalException;
 use Orkester\Exception\EGraphQLNotFoundException;
+use Orkester\Exception\GraphQLInvalidArgumentException;
+use Orkester\Exception\GraphQLMissingArgumentException;
+use Orkester\Exception\GraphQLNotFoundException;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Map\ClassMap;
@@ -14,8 +17,8 @@ class ConditionArgument
 {
 
     /**
-     * @throws EGraphQLNotFoundException
-     * @throws EGraphQLInternalException
+     * @throws GraphQLMissingArgumentException
+     * @throws GraphQLNotFoundException
      */
     public static function applyArgumentWhere(Context $context, Criteria $criteria, array $conditions): void
     {
@@ -25,8 +28,8 @@ class ConditionArgument
     }
 
     /**
-     * @throws EGraphQLNotFoundException
-     * @throws EGraphQLInternalException
+     * @throws GraphQLMissingArgumentException
+     * @throws GraphQLNotFoundException
      */
     public static function applyArgumentHaving(Context $context, Criteria $criteria, array $conditions): void
     {
@@ -40,8 +43,8 @@ class ConditionArgument
     }
 
     /**
-     * @throws EGraphQLNotFoundException
-     * @throws EGraphQLInternalException
+     * @throws GraphQLNotFoundException
+     * @throws GraphQLMissingArgumentException
      */
     protected function applyArguments(Context $context, Criteria $criteria, array $conditions, ClassMap $map, string $associationPrefix, string $and): void
     {
@@ -59,9 +62,12 @@ class ConditionArgument
 
             if ($key == "_condition") {
                 $expr = $condition['expr'] ?? null;
+                if (!$expr) {
+                    throw new GraphQLMissingArgumentException("expr");
+                }
                 $cond = $condition['where'] ?? null;
-                if (!$expr || !$cond) {
-                    throw new EGraphQLInternalException("Invalid arguments for _condition");
+                if (!$cond) {
+                    throw new GraphQLMissingArgumentException("where");
                 }
                 self::applyCondition($context, $criteria, $expr, $prefix, $cond);
                 continue;
@@ -80,6 +86,9 @@ class ConditionArgument
         }
     }
 
+    /**
+     * @throws GraphQLMissingArgumentException
+     */
     protected function applyArgumentsArray(Context $context, Criteria $criteria, array $conditions, ClassMap $map, string $associationPrefix, string $and)
     {
         foreach ($conditions as $condition) {
@@ -87,7 +96,7 @@ class ConditionArgument
         }
     }
 
-    protected function applyCondition(Context $context, Criteria $criteria, string|array $field, string $prefix, array $condition, string $and = 'and')
+    protected function applyCondition(Context $context, Criteria $criteria, string|array $field, string $prefix, array $condition, string $and = 'and'): void
     {
         $operator = array_key_first($condition);
         $value = $condition[$operator];
@@ -106,7 +115,7 @@ class ConditionArgument
             $column = substr($columnDot, 1);
             $results = Arr::get($context->results, $key);
             if (is_null($results)) {
-                throw new EGraphQLNotFoundException($value, 'result');
+                throw new GraphQLNotFoundException($value, 'result');
             }
             $values = Arr::pluck($results, $column);
 

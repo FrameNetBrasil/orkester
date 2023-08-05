@@ -6,8 +6,6 @@ use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
-use Orkester\Exception\EGraphQLException;
-use Orkester\Exception\EGraphQLInternalException;
 use Orkester\GraphQL\Argument\ConditionArgument;
 use Orkester\GraphQL\Context;
 use Orkester\Persistence\Criteria\Criteria;
@@ -39,7 +37,7 @@ class QueryOperation extends AbstractOperation
         return $this->criteria;
     }
 
-    public function execute(Context $context)
+    public function execute(Context $context): mixed
     {
         $rows = $this->getRawResults($context);
         $result = $this->cleanResults($rows);
@@ -132,20 +130,12 @@ class QueryOperation extends AbstractOperation
                 continue;
 
             if ($name == "where") {
-                try {
-                    ConditionArgument::applyArgumentWhere($context, $this->criteria, $value);
-                } catch (EGraphQLInternalException $e) {
-                    throw new EGraphQLException($e->getMessage(), $node, "invalid_argument");
-                }
+                ConditionArgument::applyArgumentWhere($context, $this->criteria, $value);
                 continue;
             }
 
             if ($name == "having") {
-                try {
-                    ConditionArgument::applyArgumentHaving($context, $this->criteria, $value);
-                } catch (EGraphQLInternalException $e) {
-                    throw new EGraphQLException($e->getMessage(), $node, "invalid_argument");
-                }
+                ConditionArgument::applyArgumentHaving($context, $this->criteria, $value);
                 continue;
             }
 

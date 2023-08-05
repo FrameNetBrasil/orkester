@@ -2,15 +2,8 @@
 
 namespace Orkester\Persistence\Grammar;
 
-use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
-use Illuminate\Database\Query\Grammars\Grammar;
-use Illuminate\Database\Query\Grammars\MySqlGrammar;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
-use Monolog\Logger;
-use Orkester\Manager;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Criteria\Operand;
 use PHPSQLParser\PHPSQLParser;
@@ -19,8 +12,6 @@ trait OrkesterGrammarTrait
 {
     protected bool $appendTablePrefix = false;
     public string $context = '';
-    private bool $isLogging;
-    public Logger $logger;
 
     /**
      * The components that make up a select clause.
@@ -44,8 +35,6 @@ trait OrkesterGrammarTrait
 
     public function __construct(public Criteria $criteria)
     {
-        $this->isLogging = !(Manager::getConf('logs.sql') === false);
-        $this->logger = Manager::getContainer()->get('SqlLogger');
     }
 
     protected function parseNode(Criteria $criteria, array $node, string $raw = '', bool $ignoreAlias = false): string
@@ -55,8 +44,8 @@ trait OrkesterGrammarTrait
             $resolved = $op->resolveOperand();
             if ($resolved instanceof Expression) {
                 $parser = new PHPSQLParser();
-                $parsed = $parser->parse("select " . $resolved->getValue());
-                return $this->parseNode($criteria, $parsed['SELECT'][0], $resolved->getValue(), $ignoreAlias);
+                $parsed = $parser->parse("select " . $resolved->getValue($this->criteria->grammar));
+                return $this->parseNode($criteria, $parsed['SELECT'][0], $resolved->getValue($this->criteria->grammar), $ignoreAlias);
             }
             if ($resolved == '*') {
                 $result = $resolved;
@@ -172,50 +161,4 @@ trait OrkesterGrammarTrait
         $this->criteria = $original;
         return $result;
     }
-
-//    public function logSql(string $query, $values): string
-//    {
-//        if (!$this->isLogging) return $query;
-//        $sql = $query;
-//        $bindings = Arr::flatten($values, 1);
-//        foreach ($bindings as $binding) {
-//            $sql = Str::replaceFirst('?', (is_numeric($binding) ? $binding : sprintf('\'%s\'', $binding)), $sql);
-//        }
-//        $this->logger->info($sql);
-//        return $query;
-//    }
-//
-//    public function compileSelect(Builder $query): string
-//    {
-//        $this->appendTablePrefix = true;
-//        return $this->logSql(parent::compileSelect($query), $this->criteria->getBindings());
-//    }
-//
-//    public function compileUpdate(Builder $query, array $values): string
-//    {
-//        $this->appendTablePrefix = false;
-//        return $this->logSql(parent::compileUpdate($query, $values), $values);
-//    }
-//
-//    public function compileDelete(Builder $query): string
-//    {
-//        $this->appendTablePrefix = false;
-//        return $this->logSql(parent::compileDelete($query), $this->criteria->getBindings());
-//    }
-//
-//    public function compileUpsert(Builder $query, array $values, array $uniqueBy, array $update): string
-//    {
-//        $this->appendTablePrefix = false;
-//        $wasLogging = $this->isLogging;
-//        $this->isLogging = false;
-//        $sql = parent::compileUpsert($query, $values, $uniqueBy, $update);
-//        $this->isLogging = $wasLogging;
-//        return $this->logSql($sql, $values);
-//    }
-//
-//    public function compileInsert(Builder $query, array $values): string
-//    {
-//        $this->appendTablePrefix = false;
-//        return $this->logSql(parent::compileInsert($query, $values), $values) ;
-//    }
 }

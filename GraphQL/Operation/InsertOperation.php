@@ -27,7 +27,7 @@ class InsertOperation extends AbstractWriteOperation
         return Arr::map($rawObjects ?? [], fn($o) => $this->readRawObject($o));
     }
 
-    public function execute(Context $context)
+    public function execute(Context $context): ?array
     {
         $objects = $this->readArguments($this->root->arguments, $context);
         $ids = [];
@@ -39,7 +39,7 @@ class InsertOperation extends AbstractWriteOperation
             } catch(ValidationException $e) {
                 throw new EGraphQLWriteException("insert", $this->resource->getName(), $this->root, $e);
             }
-            $this->writeAssociations($object['associations'], $id, $this->root, $context);
+            $this->writeAssociations($object['associations'], $id, $context);
             $ids[] = $id;
         }
         return $this->executeQueryOperation($ids, $context);

@@ -5,6 +5,7 @@ namespace Orkester\GraphQL\Operation;
 use GraphQL\Language\AST\ArgumentNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
+use Orkester\Exception\GraphQLInvalidArgumentException;
 use Orkester\GraphQL\Context;
 
 class UpsertOperation extends AbstractWriteOperation
@@ -17,7 +18,7 @@ class UpsertOperation extends AbstractWriteOperation
         foreach ($objects as $object) {
             $attributes = $object['attributes'];
             $id = $this->resource->upsert($attributes);
-            $this->writeAssociations($object['associations'], $id, $this->root, $context);
+            $this->writeAssociations($object['associations'], $id, $context);
             $ids[] = $id;
         }
         return $this->executeQueryOperation($ids, $context);
@@ -38,6 +39,8 @@ class UpsertOperation extends AbstractWriteOperation
                 $rawObjects = $value;
                 continue;
             }
+
+            throw new GraphQLInvalidArgumentException(["object", "objects"], $argument->name->value);
         }
         return Arr::map($rawObjects ?? [], fn($o) => $this->readRawObject($o));
     }
