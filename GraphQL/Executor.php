@@ -2,14 +2,12 @@
 
 namespace Orkester\GraphQL;
 
-use DI\FactoryInterface;
 use GraphQL\Error\SyntaxError;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\OperationDefinitionNode;
 use GraphQL\Language\Parser;
 use Illuminate\Support\Arr;
-use Monolog\Logger;
 use Orkester\Exception\GraphQLException;
 use Orkester\Exception\GraphQLNotFoundException;
 use Orkester\GraphQL\Operation\AbstractOperation;
@@ -29,9 +27,8 @@ use Orkester\Resource\CustomOperationsInterface;
 class Executor
 {
     public function __construct(
-        protected readonly string $query,
-        protected readonly array  $variables,
-        protected readonly Configuration $configuration
+        protected readonly GraphQLConfiguration $configuration,
+        protected readonly PersistenceManager $persistenceManager
     )
     {
     }
@@ -39,9 +36,9 @@ class Executor
     /**
      * @throws SyntaxError
      */
-    protected function parse(): array
+    protected function parse(string $query): array
     {
-        $document = Parser::parse($this->query);
+        $document = Parser::parse($query);
         foreach ($document->definitions as $definition) {
             if ($definition instanceof FragmentDefinitionNode) {
                 $fragmentNodes[] = $definition;
@@ -193,19 +190,19 @@ class Executor
         return $operations;
     }
 
-    protected function executeOperations(array $operationDefinitions, array $fragmentDefinitions): ?array
+    protected function executeOperations(array $operationDefinitions, array $fragmentDefinitions, array $variables): ?array
     {
         $group = "";
         $name = "";
         try {
-            $context = new Context($this->configuration, $this->variables, $fragmentDefinitions);
+            $context = new Context($this->configuration, $variables, $fragmentDefinitions);
 
             $operationGroups = $this->createOperations($operationDefinitions, $context);
 
             if (($operationGroups[0] ?? null) instanceof IntrospectionOperation) {
                 return ['data' => $operationGroups[0]->execute($context)];
             }
-            PersistenceManager::beginTransaction();
+            $this->persistenceManager::beginTransaction();
             foreach ($operationGroups as $group => $operations) {
                 /**
                  * @var $operation GraphQLOperationInterface
@@ -214,10 +211,10 @@ class Executor
                     $context->results[$group][$name] = $operation->execute($context);
                 }
             }
-            PersistenceManager::commit();
+            $this->persistenceManager::commit();
             return [ 'data' => $context->results ];
         } catch (GraphQlException $e) {
-            PersistenceManager::rollback();
+            $this->persistenceManager::rollback();
             return [
                 "errors" => [
                     "message" => $e->getMessage(),
@@ -231,7 +228,7 @@ class Executor
                 ]
             ];
         } catch (\Exception|\Error $e) {
-            PersistenceManager::rollback();
+            $this->persistenceManager::rollback();
             $isDev = $this->configuration->factory->make('mode') === "development";
             return [
                 "errors" => [
@@ -247,19 +244,19 @@ class Executor
         }
     }
 
-    public static function run(string $query, array $variables, Configuration $configuration): array
+    public static function run(string $query, array $variables, GraphQLConfiguration $configuration, PersistenceManager $pm): array
     {
-        $executor = new Executor($query, $variables, $configuration);
-        return $executor->execute();
+        $executor = new Executor($query, $variables, $configuration, $pm);
+        return $executor->execute($query, $variables);
     }
 
-    public function execute(): array
+    public function execute(string $query, array $variables): array
     {
         try {
             [
                 'operations' => $operationDefinitions,
                 'fragments' => $fragmentDefinitions
-            ] = $this->parse();
+            ] = $this->parse($query);
         } catch (SyntaxError $e) {
             return ['errors' => [
                 [
@@ -274,7 +271,7 @@ class Executor
             ]];
         }
 
-        $results = $this->executeOperations($operationDefinitions, $fragmentDefinitions);
+        $results = $this->executeOperations($operationDefinitions, $fragmentDefinitions, $variables);
 
         if (array_key_exists('data', $results)) {
             return $results;
