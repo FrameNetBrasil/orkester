@@ -10,7 +10,6 @@ use Illuminate\Events\Dispatcher;
 use Monolog\Logger;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Map\ClassMap;
-use Persistence\DatabaseConfiguration;
 use Phpfastcache\Helper\Psr16Adapter;
 
 class PersistenceManager

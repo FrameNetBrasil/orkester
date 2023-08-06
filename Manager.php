@@ -9,13 +9,13 @@ use Illuminate\Support\Facades\Facade;
 use Monolog\Logger;
 use Orkester\Handlers\HttpErrorHandler;
 use Orkester\Handlers\ShutdownHandler;
+use Orkester\Persistence\DatabaseConfiguration;
 use Orkester\Persistence\Model;
 use Orkester\Persistence\PersistenceManager;
 use Orkester\Services\MCacheFast;
 use Orkester\Services\MLog;
 
 use Orkester\Services\MSession;
-use Persistence\DatabaseConfiguration;
 use Phpfastcache\Helper\Psr16Adapter;
 use Psr\Http\Message\RequestInterface;
 use Slim\Factory\AppFactory;

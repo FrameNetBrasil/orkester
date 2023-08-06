@@ -16,9 +16,9 @@ class Context
     public array $results = [];
 
     public function __construct(
-        protected Configuration $configuration,
-        protected array  $variables = [],
-        protected array  $fragments = []
+        protected GraphQLConfiguration $configuration,
+        protected array                $variables = [],
+        protected array                $fragments = []
     )
     {
     }
