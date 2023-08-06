@@ -5,7 +5,7 @@ namespace Orkester\GraphQL;
 use DI\Container;
 use Orkester\Resource\ResourceInterface;
 
-class Configuration
+class GraphQLConfiguration
 {
 
     public function __construct

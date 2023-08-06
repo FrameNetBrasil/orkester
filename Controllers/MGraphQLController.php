@@ -26,11 +26,8 @@ class MGraphQLController
 
     public function execute(): array
     {
-        $executor = Manager::getContainer()->make(Executor::class, [
-            'query' => $this->query,
-            'variables' => $this->variables
-        ]);
-        return $executor->execute();
+        $executor = Manager::getContainer()->get(Executor::class);
+        return $executor->execute($this->query, $this->variables);
     }
 
     public function send(mixed $content, int $httpCode): Response

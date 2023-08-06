@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Facade;
 use Monolog\Logger;
 use Orkester\Handlers\HttpErrorHandler;
 use Orkester\Handlers\ShutdownHandler;
+use Orkester\Persistence\DatabaseConfiguration;
 use Orkester\Persistence\Model;
 use Orkester\Persistence\PersistenceManager;
 use Orkester\Services\MCacheFast;
@@ -140,9 +141,10 @@ class Manager
 
         self::$log->log(Logger::INFO, "INIT");
 
-        $dbConf = self::getConf('db');
-        $fetchStyle = self::getOptions('fetchStyle');
-        PersistenceManager::init($dbConf, $fetchStyle);
+        PersistenceManager::init(
+            self::$container->get(DatabaseConfiguration::class),
+            self::$container->get(Logger::class)
+        );
     }
 
     /**

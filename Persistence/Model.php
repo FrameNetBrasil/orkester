@@ -10,6 +10,12 @@ use Orkester\Persistence\Map\ClassMap;
 
 abstract class Model
 {
+
+    public function __construct(PersistenceManager $persistenceManager)
+    {
+
+    }
+
     public static abstract function map(ClassMap $classMap);
 
     public static function getCriteria(string $databaseName = null): Criteria
