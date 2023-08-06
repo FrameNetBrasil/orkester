@@ -108,12 +108,13 @@ class PersistenceManager
     {
         $key = self::getSignature($name);
         self::$cachedClassMaps->set($key, $classMap);
+        self::$localClassMaps[$name] = $classMap;
     }
 
     public static function getConnection(string $databaseName = null): Connection
     {
         $databaseName ??= Manager::getOptions('db');
-        
+
         $connection = self::$capsule->getConnection($databaseName);
         $connection->enableQueryLog();
 
