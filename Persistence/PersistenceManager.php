@@ -26,19 +26,19 @@ class PersistenceManager
     protected static Logger $logger;
     protected static string $defaultDb;
 
-    public function __construct(DatabaseConfiguration $configuration, Psr16Adapter $cache, Logger $logger)
+    public function __construct(DatabaseConfiguration $configuration, Logger $logger)
     {
-        static::init($configuration, $cache, $logger);
+        static::init($configuration, $logger);
     }
 
-    public static function init(DatabaseConfiguration $configuration, Psr16Adapter $cache, Logger $logger): void
+    public static function init(DatabaseConfiguration $configuration, Logger $logger): void
     {
 
         if (self::$initialized) return;
         static::$initialized = true;
         static::$logger = $logger;
         static::$defaultDb = $configuration->default;
-        static::$cachedClassMaps = $cache;
+        static::$cachedClassMaps = new Psr16Adapter('apcu');
         static::$capsule = new Capsule();
         static::$fetchStyle = $configuration->fetchStyle;
         static::$capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));

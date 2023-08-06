@@ -27,8 +27,6 @@ use Orkester\Resource\CustomOperationsInterface;
 class Executor
 {
     public function __construct(
-        protected readonly string $query,
-        protected readonly array  $variables,
         protected readonly GraphQLConfiguration $configuration,
         protected readonly PersistenceManager $persistenceManager
     )
@@ -38,9 +36,9 @@ class Executor
     /**
      * @throws SyntaxError
      */
-    protected function parse(): array
+    protected function parse(string $query): array
     {
-        $document = Parser::parse($this->query);
+        $document = Parser::parse($query);
         foreach ($document->definitions as $definition) {
             if ($definition instanceof FragmentDefinitionNode) {
                 $fragmentNodes[] = $definition;
@@ -192,12 +190,12 @@ class Executor
         return $operations;
     }
 
-    protected function executeOperations(array $operationDefinitions, array $fragmentDefinitions): ?array
+    protected function executeOperations(array $operationDefinitions, array $fragmentDefinitions, array $variables): ?array
     {
         $group = "";
         $name = "";
         try {
-            $context = new Context($this->configuration, $this->variables, $fragmentDefinitions);
+            $context = new Context($this->configuration, $variables, $fragmentDefinitions);
 
             $operationGroups = $this->createOperations($operationDefinitions, $context);
 
@@ -249,16 +247,16 @@ class Executor
     public static function run(string $query, array $variables, GraphQLConfiguration $configuration, PersistenceManager $pm): array
     {
         $executor = new Executor($query, $variables, $configuration, $pm);
-        return $executor->execute();
+        return $executor->execute($query, $variables);
     }
 
-    public function execute(): array
+    public function execute(string $query, array $variables): array
     {
         try {
             [
                 'operations' => $operationDefinitions,
                 'fragments' => $fragmentDefinitions
-            ] = $this->parse();
+            ] = $this->parse($query);
         } catch (SyntaxError $e) {
             return ['errors' => [
                 [
@@ -273,7 +271,7 @@ class Executor
             ]];
         }
 
-        $results = $this->executeOperations($operationDefinitions, $fragmentDefinitions);
+        $results = $this->executeOperations($operationDefinitions, $fragmentDefinitions, $variables);
 
         if (array_key_exists('data', $results)) {
             return $results;
