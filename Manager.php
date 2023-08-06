@@ -15,6 +15,7 @@ use Orkester\Services\MCacheFast;
 use Orkester\Services\MLog;
 
 use Orkester\Services\MSession;
+use Persistence\DatabaseConfiguration;
 use Phpfastcache\Helper\Psr16Adapter;
 use Psr\Http\Message\RequestInterface;
 use Slim\Factory\AppFactory;
@@ -140,9 +141,11 @@ class Manager
 
         self::$log->log(Logger::INFO, "INIT");
 
-        $dbConf = self::getConf('db');
-        $fetchStyle = self::getOptions('fetchStyle');
-        PersistenceManager::init($dbConf, $fetchStyle);
+        PersistenceManager::init(
+            self::$container->get(DatabaseConfiguration::class),
+            self::$container->get(Psr16Adapter::class),
+            self::$container->get(Logger::class)
+        );
     }
 
     /**

@@ -2,17 +2,15 @@
 
 namespace Orkester\Persistence;
 
-use Closure;
 use Illuminate\Container\Container as LaravelContainer;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Events\QueryExecuted;
-use Illuminate\Database\Events\StatementPrepared;
 use Illuminate\Events\Dispatcher;
 use Monolog\Logger;
-use Orkester\Manager;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Map\ClassMap;
+use Persistence\DatabaseConfiguration;
 use Phpfastcache\Helper\Psr16Adapter;
 
 class PersistenceManager
@@ -25,17 +23,30 @@ class PersistenceManager
     public static Psr16Adapter $cachedClassMaps;
     public static array $localClassMaps = [];
     protected static \SplObjectStorage $connectionCache;
+    protected static bool $initialized = false;
+    protected static Logger $logger;
+    protected static string $defaultDb;
 
-    public static function init(array $dbConfigurations, int $fetchStyle): void
+    public function __construct(DatabaseConfiguration $configuration, Psr16Adapter $cache, Logger $logger)
     {
-        self::$cachedClassMaps = Manager::getCache();
-        self::$capsule = new Capsule();
-        self::$fetchStyle = $fetchStyle;
-        self::$capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
-        self::$capsule->setAsGlobal();
-        self::$capsule->setFetchMode($fetchStyle);
-        self::$connectionCache = new \SplObjectStorage();
-        foreach ($dbConfigurations as $name => $conf) {
+        static::init($configuration, $cache, $logger);
+    }
+
+    public static function init(DatabaseConfiguration $configuration, Psr16Adapter $cache, Logger $logger): void
+    {
+
+        if (self::$initialized) return;
+        static::$initialized = true;
+        static::$logger = $logger;
+        static::$defaultDb = $configuration->default;
+        static::$cachedClassMaps = $cache;
+        static::$capsule = new Capsule();
+        static::$fetchStyle = $configuration->fetchStyle;
+        static::$capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
+        static::$capsule->setAsGlobal();
+        static::$capsule->setFetchMode(static::$fetchStyle);
+        static::$connectionCache = new \SplObjectStorage();
+        foreach ($configuration->databases as $name => $conf) {
             self::$capsule->addConnection([
                 'driver' => $conf['db'] ?? 'mysql',
                 'host' => $conf['host'] ?? 'localhost',
@@ -59,13 +70,8 @@ class PersistenceManager
     public static function getCriteriaForClassMap(ClassMap $classMap, string $databaseName = null)
     {
         $connection = static::getConnection($databaseName);
-        $container = Manager::getContainer();
-        return $container->call(
-            function (Logger $logger) use ($connection, $classMap) {
-                $criteria = new Criteria($connection, $logger->withName('criteria'));
-                return $criteria->setClassMap($classMap);
-            }
-        );
+        $criteria = new Criteria($connection, static::$logger);
+        return $criteria->setClassMap($classMap);
     }
 
     public static function getFileName(string $className): string|false
@@ -77,7 +83,7 @@ class PersistenceManager
 
     private static function getSignature(string $className): string
     {
-        $fileName = self::getFileName($className);
+        $fileName = static::getFileName($className);
         if ($fileName) {
             $stat = stat($fileName);
             $lastModification = $stat['mtime'];
@@ -87,50 +93,50 @@ class PersistenceManager
 
     public static function getClassMap(string|Model $model): ClassMap
     {
-        $key = self::getSignature($model);
+        $key = static::getSignature($model);
         if (array_key_exists($model, static::$localClassMaps)) {
-            self::$cachedClassMaps->set($key, static::$localClassMaps[$model]);
+            static::$cachedClassMaps->set($key, static::$localClassMaps[$model]);
             return static::$localClassMaps[$model];
         }
 
-        if ($classMap = self::$cachedClassMaps->get($key)) {
-            self::$localClassMaps[$model] = $classMap;
+        if ($classMap = static::$cachedClassMaps->get($key)) {
+            static::$localClassMaps[$model] = $classMap;
             return $classMap;
         }
 
         $classMap = new ClassMap($model);
-        self::$localClassMaps[$model] = $classMap;
+        static::$localClassMaps[$model] = $classMap;
         $model::map($classMap);
         return $classMap;
     }
 
     public static function registerClassMap(ClassMap $classMap, string $name)
     {
-        $key = self::getSignature($name);
-        self::$cachedClassMaps->set($key, $classMap);
-        self::$localClassMaps[$name] = $classMap;
+        $key = static::getSignature($name);
+        static::$cachedClassMaps->set($key, $classMap);
+        static::$localClassMaps[$name] = $classMap;
     }
 
     public static function getConnection(string $databaseName = null): Connection
     {
-        $databaseName ??= Manager::getOptions('db');
+        $databaseName ??= static::$defaultDb;
 
-        $connection = self::$capsule->getConnection($databaseName);
+        $connection = static::$capsule->getConnection($databaseName);
         $connection->enableQueryLog();
 
-        if (!self::$connectionCache->contains($connection)) {
+        if (!static::$connectionCache->contains($connection)) {
             $connection->listen(function(QueryExecuted $event) use($connection) {
                 $rawSql = $connection->getQueryGrammar()->substituteBindingsIntoRawSql(
                     $event->sql,
                     $event->bindings
                 );
-                mdump($rawSql);
+                static::$logger->debug($rawSql);
             });
 
-            self::$connectionCache->attach($connection);
+            static::$connectionCache->attach($connection);
         }
         (new \ReflectionClass(get_class($connection)))
-            ->getProperty('fetchMode')->setValue($connection, self::$fetchStyle);
+            ->getProperty('fetchMode')->setValue($connection, static::$fetchStyle);
         return $connection;
     }
 
@@ -138,7 +144,7 @@ class PersistenceManager
     {
         $connection = static::getConnection($databaseName);
         if ($connection->transactionLevel() == 0) {
-            minfo("BEGIN TRANSACTION");
+            static::$logger->info("BEGIN TRANSACTION");
         }
         $connection->beginTransaction();
     }
@@ -147,14 +153,14 @@ class PersistenceManager
     {
         $connection = static::getConnection($databaseName);
         if ($connection->transactionLevel() == 1) {
-            minfo("COMMIT");
+            static::$logger->info("COMMIT");
         }
         $connection->commit();
     }
 
     public static function rollback(?string $databaseName = null)
     {
-        minfo("ROLLBACK");
+        static::$logger->info("ROLLBACK");
         static::getConnection($databaseName)->rollBack();
     }
 
