@@ -5,18 +5,18 @@ namespace Orkester\Persistence;
 use Illuminate\Support\Arr;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Enum\Join;
+use Orkester\Persistence\Enum\Key;
+use Orkester\Persistence\Enum\Type;
 use Orkester\Persistence\Map\AssociationMap;
 use Orkester\Persistence\Map\ClassMap;
 
 abstract class Model
 {
-
-    public function __construct(PersistenceManager $persistenceManager)
-    {
-
-    }
-
     public static abstract function map(ClassMap $classMap);
+
+    public function __construct(PersistenceManager $pm)
+    {
+    }
 
     public static function getCriteria(string $databaseName = null): Criteria
     {
@@ -202,9 +202,9 @@ abstract class Model
     {
         $association = static::getManyToManyAssociation($associationName);
         $columns = array_map(fn($aId) => [
-                $association->toKey => $aId,
-                $association->fromKey => $id
-            ],
+            $association->toKey => $aId,
+            $association->fromKey => $id
+        ],
             $associatedIds
         );
         $classMap = PersistenceManager::getClassMap("{$association->fromClassName}_$association->associativeTable");
@@ -242,6 +242,19 @@ abstract class Model
     public static function table(string $name)
     {
         static::getClassMap()->table($name);
+    }
+
+    public static function attribute(string              $name,
+                                     string              $field = '',
+                                     Type                $type = Type::STRING,
+                                     Key                 $key = Key::NONE,
+                                     string              $reference = '',
+                                     string              $alias = '',
+                                     string              $default = null,
+                                     bool                $nullable = true,
+                                     bool                $virtual = false)
+    {
+        static::getClassMap()->attribute($name, $field, $type, $key, $reference, $alias, $default, $nullable, $virtual);
     }
 
     public static function associationMany(string $name,
