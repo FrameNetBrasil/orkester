@@ -20,7 +20,7 @@ class PersistenceManager
      * @var ClassMap[]
      */
     public static Psr16Adapter $cachedClassMaps;
-    public static array $localClassMaps = [];
+    public static array $classMaps = [];
     protected static \SplObjectStorage $connectionCache;
     protected static bool $initialized = false;
     protected static Logger $logger;
@@ -90,30 +90,27 @@ class PersistenceManager
         return md5($className . ($lastModification ?? ''));
     }
 
-    public static function getClassMap(string|Model $model): ClassMap
+    public static function getClassMap(string|Model $className = null): ClassMap
     {
-        $key = static::getSignature($model);
-        if (array_key_exists($model, static::$localClassMaps)) {
-            static::$cachedClassMaps->set($key, static::$localClassMaps[$model]);
-            return static::$localClassMaps[$model];
+        $className ??= static::class;
+        if (!isset(self::$classMaps[$className])) {
+            $key = self::getSignature($className);
+            if (self::$cachedClassMaps->has($key)) {
+                self::$classMaps[$className] = self::$cachedClassMaps->get($key);
+            } else {
+                self::$classMaps[$className] = new ClassMap($className);
+                $className::map(self::$classMaps[$className]);
+                self::$cachedClassMaps->set($key, self::$classMaps[$className], 300);
+            }
         }
-
-        if ($classMap = static::$cachedClassMaps->get($key)) {
-            static::$localClassMaps[$model] = $classMap;
-            return $classMap;
-        }
-
-        $classMap = new ClassMap($model);
-        static::$localClassMaps[$model] = $classMap;
-        $model::map($classMap);
-        return $classMap;
+        return self::$classMaps[$className];
     }
 
     public static function registerClassMap(ClassMap $classMap, string $name)
     {
         $key = static::getSignature($name);
         static::$cachedClassMaps->set($key, $classMap);
-        static::$localClassMaps[$name] = $classMap;
+        static::$classMaps[$name] = $classMap;
     }
 
     public static function getConnection(string $databaseName = null): Connection

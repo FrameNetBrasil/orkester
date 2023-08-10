@@ -8,7 +8,7 @@ use Orkester\Persistence\Map\ClassMap;
 use Orkester\Persistence\Model;
 use ReflectionMethod;
 
-abstract class BasicResource implements ResourceInterface, CustomOperationsInterface
+class BasicResource implements ResourceInterface, CustomOperationsInterface
 {
 
     public function __construct(protected string|Model $model)
@@ -95,5 +95,10 @@ abstract class BasicResource implements ResourceInterface, CustomOperationsInter
     public function getMutations(): array
     {
         return $this->getCustomOperations('mutation');
+    }
+
+    public function getAssociatedResource(string $association): ?ResourceInterface
+    {
+        return null;
     }
 }
