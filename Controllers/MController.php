@@ -232,7 +232,7 @@ class MController
         }
     }
 
-    public function redirect($url)
+    public function redirect($url): Response
     {
         $this->result = new MRedirect($url);
         return $this->result->apply($this->request, $this->response);
