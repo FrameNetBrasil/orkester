@@ -14,7 +14,7 @@ abstract class Model
 {
     public static abstract function map(ClassMap $classMap);
 
-    public function __construct(PersistenceManager $pm)
+    public function __construct(PersistenceManager $pm = null)
     {
     }
 
