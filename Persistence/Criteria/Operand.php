@@ -83,53 +83,76 @@ class Operand
 
     public function resolveOperandPath()
     {
+        //mdump('=== resolveOperandPath : ' . $this->field,$this->criteria->associationAlias);
         $field = '';
-        // $this->>field = "x.y"
-        // $parts[0] = "x"
+        // build 'real' chain - expanding reference, if necessary
+        $realChain = '';
+        $currentClass = ''; // empty for the criteria class
         $parts = explode('.', $this->field);
+        foreach ($parts as $i => $part) {
+            $first = ($i == 0);
+            $attributeMap = $this->criteria->getAttributeMap($part, $currentClass);
+            if (!is_null($attributeMap)) {
+                if ($attributeMap->reference != '') {
+                    $realChain .= ($first ? '' : '.') . $attributeMap->reference;
+                } else {
+                    $realChain .= ($first ? '' : '.') . $part;
+                }
+            } else {
+                $associationMap = $this->criteria->getAssociationMap($part, $currentClass);
+                // associationMap MUST exist
+                if (is_null($associationMap)) {
+                    throw new \InvalidArgumentException("Association not found: $chain");
+                }
+                $realChain .= ($first ? '' : '.') . $part;
+                $currentClass = $associationMap->toClassName;
+            }
+        }
+//        mdump('  realChain = ' . $realChain);
         // tableName = table name or table alias
         $tableName = $this->criteria->aliasTable() ?? $this->criteria->tableName();
-        // if x == table
-        if ($parts[0] == $tableName) {
-            $field = $this->reasolveFieldForMainTable($tableName, $parts[1]);
-        } else
-            // if x = alias for a class, get the column name referent to that class
-            if (isset($this->criteria->classAlias[$parts[0]])) {
-                $field = $this->reasolveFieldForClass($parts[0], $parts[1]);
+        $parts = explode('.', $realChain);
+        if (count($parts) == 2) {
+            // if x == table
+            if ($parts[0] == $tableName) {
+                $field = $this->reasolveFieldForMainTable($tableName, $parts[1]);
             } else
-                // if x = alias for another criteria, keep field = "x.y"
-                if (isset($this->criteria->criteriaAlias[$parts[0]])) {
-                    $field = "{$parts[0]}.{$parts[1]}";
+                // if x = alias for a class, get the column name referent to that class
+                if (isset($this->criteria->classAlias[$parts[0]])) {
+                    $field = $this->reasolveFieldForClass($parts[0], $parts[1]);
                 } else
-                    // if x has an alias artificially generated, field = "alias.y"
-                    if (isset($this->criteria->tableAlias[$parts[0]])) {
-                        $alias = $this->criteria->tableAlias[$parts[0]];
-                        $field = "{$alias}.{$parts[1]}";
-                    }
+                    // if x = alias for another criteria, keep field = "x.y"
+                    if (isset($this->criteria->criteriaAlias[$parts[0]])) {
+                        $field = "{$parts[0]}.{$parts[1]}";
+                    } else
+                        // if x has an alias artificially generated (or set), field = "alias.y"
+                        if (isset($this->criteria->associationAlias[$parts[0]])) {
+                            $alias = $this->criteria->associationAlias[$parts[0]];
+                            $field = "{$alias}.{$parts[1]}";
+                        }
+        }
         // if field still "", field is an association chain:
         //    associationName.attributeName
         //    associationName.associationName.attributeName
         //    associationName.associationName.associationName.attributeName
         //    ....
         if ($field == '') {
-            $chain = '';
+            // last element of realChain is the attributeName
             $attributeName = array_pop($parts);
-            $currentClass = ''; // empty for the criteria class
+            $associations = $parts;
+            $currentClass = '';
             $currentAlias = $tableName;
-            foreach ($parts as $i => $associationName) {
+            $chain = ''; // built incrementally
+            foreach ($associations as $i => $associationName) {
                 if ($i == 0) {
                     $chain = $associationName;
                 } else {
                     $chain .= '.' . $associationName;
                 }
-                // just create the join for this chain if it wasn't set yet
-                if (!isset($this->criteria->listJoin[$chain])) {
+                // just create the join for this chain if the alias wasn't set yet
+                if (!isset($this->criteria->associationAlias[$chain])) {
                     // get the associationMap based on current Class
                     $associationMap = $this->criteria->getAssociationMap($associationName, $currentClass);
-                    // associationMap MUST exist
-                    if (is_null($associationMap)) {
-                        throw new \InvalidArgumentException("Association not found: $chain");
-                    }
                     // join type for this chain otherwise INNER
                     $associationJoinType = $associationMap->joinType ?? $this->criteria->associationJoin[$chain] ?? Join::INNER;
                     // is there an alias for this chain? If so, use it; if no, create one
@@ -143,7 +166,7 @@ class Operand
                     $currentClass = $associationMap->toClassName;
                     $currentAlias = $associationAlias;
                     // register this chain
-                    $this->criteria->listJoin[$chain] = $chain;
+                    $this->criteria->associationAlias[$chain] = $associationAlias;
                 }
             }
             // all fields from the chain
@@ -151,15 +174,9 @@ class Operand
                 $field = $currentAlias . '.*';
             } else { // specific field from the chain
                 $attributeMap = $this->criteria->getAttributeMap($attributeName, $currentClass);
-                if ($attributeMap->reference != '') {
-                    // field is a reference for another chain - resolve recursively
-                    $this->field = str_replace($attributeName, $attributeMap->reference, $this->field);
-                    $field = $this->resolveOperand();
-                } else {
-                    $field = $currentAlias . '.' . $this->criteria->columnName($currentClass, $attributeName);
-                    if ($attributeName == 'id') {
-                        $field .= " id";
-                    }
+                $field = $this->criteria->associationAlias[$chain] . '.' . $this->criteria->columnName($currentClass, $attributeName);
+                if ($attributeName == 'id') {
+                    $field .= " id";
                 }
             }
         }
