@@ -26,8 +26,8 @@ class Criteria extends Builder
     public Set $generatedAliases;
     public $classAlias = [];
     public $criteriaAlias = [];
-    public $listJoin = [];
     public $associationJoin = [];
+    public $associationAlias = [];
     static public $aliasCount = 0;
     public $parameters = [];
     public $aliasTable = NULL;
@@ -137,6 +137,12 @@ class Criteria extends Builder
     public function setAssociationType(string $associationName, Join $type): Criteria
     {
         $this->associationJoin[$associationName] = $type;
+        return $this;
+    }
+
+    public function setAssociationAlias(string $associationName, string $alias): Criteria
+    {
+        $this->associationAlias[$associationName] = $alias;
         return $this;
     }
 
