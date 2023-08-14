@@ -127,7 +127,8 @@ class MController
         }
     }
 
-    public function notify(string $type, string $message, array $actions = []) {
+    public function notify(string $type, string $message, array $actions = [])
+    {
         $this->data->notification = (object)[
             'type' => $type,
             'message' => $message,
@@ -246,6 +247,14 @@ class MController
     public function setResponse(Response $response)
     {
         $this->response = $response;
+    }
+
+    public function render(string $view): Response
+    {
+        $page = new MPage();
+        $content = $page->renderView($view, false);
+        $this->result = new MRenderPage($content);
+        return $this->result->apply($this->request, $this->response);
     }
 
 }

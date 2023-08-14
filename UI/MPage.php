@@ -35,6 +35,16 @@ class MPage
         return $this->content;
     }
 
+    public function renderView(string $view, bool $fragment = false)
+    {
+        $viewPath = Manager::getAppPath("UI/Views/{$view}");
+        $path = dirname($viewPath);
+        $view = basename($viewPath);
+        $template = new MBlade([$path]);
+        $this->content = $template->fetch($view);
+        return $this->content;
+    }
+
     public function renderInertia(object $inertia)
     {
         $page = htmlspecialchars(

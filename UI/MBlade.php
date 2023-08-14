@@ -3,9 +3,10 @@
 namespace Orkester\UI;
 
 use Orkester\Manager;
-use RyanChandler\Blade\Blade;
+//use RyanChandler\Blade\Blade;
+use Orkester\UI\Blade\Blade;
 
-class MBlade
+class MBlade extends Blade
 {
 
     private Blade $engine;
@@ -29,10 +30,11 @@ class MBlade
             mb_internal_charset('UTF-8');
         }
         $this->context = [];
-
         $this->engine->directive('p2j', fn($expression) => "<?php echo MUtil::php2js($expression); ?>");
-
+        $componentsPath = Manager::getAppPath("UI/Component");
+        $this->engine->anonymousComponentPath($componentsPath, "wt");
     }
+
 
     public function setPath($path)
     {
