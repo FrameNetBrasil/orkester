@@ -22,7 +22,7 @@ class PersistenceManager
      */
     public static Psr16Adapter $cachedClassMaps;
     public static array $classMaps = [];
-    protected static \SplObjectStorage $connectionCache;
+    protected static ?\SplObjectStorage $connectionCache = null;
     protected static bool $initialized = false;
     protected static LoggerInterface $logger;
     protected static string $defaultDb;
@@ -51,6 +51,7 @@ class PersistenceManager
         $capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
         $manager = $capsule->getDatabaseManager();
         $manager->setDefaultConnection($configuration->default);
+        static::$connectionCache = new \SplObjectStorage();
         return $manager;
     }
 
@@ -60,7 +61,6 @@ class PersistenceManager
         static::$initialized = true;
         static::$logger = $logger;
         static::$capsule = $manager;
-        static::$connectionCache = new \SplObjectStorage();
         static::$cachedClassMaps = new Psr16Adapter('apcu');
     }
 
@@ -124,13 +124,13 @@ class PersistenceManager
         $connection = static::$capsule->connection($databaseName);
         $connection->enableQueryLog();
 
-        if (!static::$connectionCache->contains($connection)) {
+        if (static::$connectionCache && !static::$connectionCache->contains($connection)) {
             $connection->listen(function(QueryExecuted $event) use($connection) {
-                $rawSql = $connection->getQueryGrammar()->substituteBindingsIntoRawSql(
-                    $event->sql,
-                    $event->bindings
-                );
-                static::$logger->debug($rawSql);
+//                $rawSql = $connection->getQueryGrammar()->substituteBindingsIntoRawSql(
+//                    $event->sql,
+//                    $event->bindings
+//                );
+//                static::$logger->debug($rawSql);
             });
 
             static::$connectionCache->attach($connection);
