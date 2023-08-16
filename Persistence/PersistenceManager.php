@@ -126,11 +126,11 @@ class PersistenceManager
 
         if (static::$connectionCache && !static::$connectionCache->contains($connection)) {
             $connection->listen(function(QueryExecuted $event) use($connection) {
-//                $rawSql = $connection->getQueryGrammar()->substituteBindingsIntoRawSql(
-//                    $event->sql,
-//                    $event->bindings
-//                );
-//                static::$logger->debug($rawSql);
+                $rawSql = $connection->getQueryGrammar()->substituteBindingsIntoRawSql(
+                    $event->sql,
+                    $event->bindings
+                );
+                static::$logger->debug($rawSql);
             });
 
             static::$connectionCache->attach($connection);
