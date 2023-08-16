@@ -2,7 +2,6 @@
 
 namespace Orkester\GraphQL\Operation;
 
-use DI\FactoryInterface;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\NodeList;
 use Illuminate\Support\Arr;
@@ -21,7 +20,7 @@ abstract class AbstractWriteOperation extends AbstractOperation
     public function __construct(
         protected FieldNode $root,
         ResourceInterface $resource,
-        protected FactoryInterface $factory
+        protected $factory
     )
     {
         parent::__construct($root);

@@ -229,7 +229,7 @@ class Executor
             ];
         } catch (\Exception|\Error $e) {
             $this->persistenceManager::rollback();
-            $isDev = $this->configuration->factory->make('mode') === "development";
+            $isDev = $this->configuration->debug;
             return [
                 "errors" => [
                     "message" => $isDev ? $e->getMessage() : "Internal Server Error",
@@ -246,7 +246,7 @@ class Executor
 
     public static function run(string $query, array $variables, GraphQLConfiguration $configuration, PersistenceManager $pm): array
     {
-        $executor = new Executor($query, $variables, $configuration, $pm);
+        $executor = new Executor($configuration, $pm);
         return $executor->execute($query, $variables);
     }
 
@@ -278,7 +278,7 @@ class Executor
         }
 
         $errors = $results['errors'];
-        if (!Manager::isDevelopment()) {
+        if (!$this->configuration->debug) {
             unset($errors["extensions"]["trace"]);
         }
         return ['errors' => [$errors]];
