@@ -12,7 +12,8 @@ class GraphQLConfiguration
     (
         protected array $resources,
         protected array $services,
-        public readonly Container $factory
+        public $factory,
+        public readonly bool $debug = false
     )
     {
     }
