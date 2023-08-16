@@ -5,16 +5,18 @@ namespace Orkester\Persistence;
 use Illuminate\Container\Container as LaravelContainer;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Connection;
+use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Events\Dispatcher;
 use Monolog\Logger;
 use Orkester\Persistence\Criteria\Criteria;
 use Orkester\Persistence\Map\ClassMap;
 use Phpfastcache\Helper\Psr16Adapter;
+use Psr\Log\LoggerInterface;
 
 class PersistenceManager
 {
-    public static Capsule $capsule;
+    public static DatabaseManager $capsule;
     public static int $fetchStyle;
     /**
      * @var ClassMap[]
@@ -23,30 +25,23 @@ class PersistenceManager
     public static array $classMaps = [];
     protected static \SplObjectStorage $connectionCache;
     protected static bool $initialized = false;
-    protected static Logger $logger;
+    protected static LoggerInterface $logger;
     protected static string $defaultDb;
 
-    public function __construct(DatabaseConfiguration $configuration, Logger $logger)
+    public function __construct(DatabaseManager $manager, LoggerInterface $logger)
     {
-        static::init($configuration, $logger);
+        static::init($manager, $logger);
     }
 
-    public static function init(DatabaseConfiguration $configuration, Logger $logger): void
+    public static function buildDatabaseManager(DatabaseConfiguration $configuration): DatabaseManager
     {
-
-        if (self::$initialized) return;
-        static::$initialized = true;
-        static::$logger = $logger;
-        static::$defaultDb = $configuration->default;
-        static::$cachedClassMaps = new Psr16Adapter('apcu');
-        static::$capsule = new Capsule();
         static::$fetchStyle = $configuration->fetchStyle;
-        static::$capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
-        static::$capsule->setAsGlobal();
-        static::$capsule->setFetchMode(static::$fetchStyle);
+
+        $capsule = new Capsule();
+
         static::$connectionCache = new \SplObjectStorage();
         foreach ($configuration->databases as $name => $conf) {
-            self::$capsule->addConnection([
+            $capsule->addConnection([
                 'driver' => $conf['db'] ?? 'mysql',
                 'host' => $conf['host'] ?? 'localhost',
                 'database' => $conf['dbname'] ?? 'database',
@@ -58,6 +53,19 @@ class PersistenceManager
                 'options' => $conf['options'] ?? [],
             ], $name);
         }
+        $capsule->setEventDispatcher(new Dispatcher(new LaravelContainer));
+        $manager = $capsule->getDatabaseManager();
+        $manager->setDefaultConnection($configuration->default);
+        return $manager;
+    }
+
+    public static function init(DatabaseManager $manager, LoggerInterface $logger): void
+    {
+        if (self::$initialized) return;
+        static::$initialized = true;
+        static::$logger = $logger;
+        static::$capsule = $manager;
+        static::$cachedClassMaps = new Psr16Adapter('apcu');
     }
 
     public static function getCriteria(string $databaseName = null, string|Model $model = null): Criteria
@@ -69,7 +77,7 @@ class PersistenceManager
     public static function getCriteriaForClassMap(ClassMap $classMap, string $databaseName = null)
     {
         $connection = static::getConnection($databaseName);
-        $criteria = new Criteria($connection, static::$logger);
+        $criteria = new Criteria($connection);
         return $criteria->setClassMap($classMap);
     }
 
@@ -115,9 +123,9 @@ class PersistenceManager
 
     public static function getConnection(string $databaseName = null): Connection
     {
-        $databaseName ??= static::$defaultDb;
+        $databaseName ??= static::$capsule->getDefaultConnection();
 
-        $connection = static::$capsule->getConnection($databaseName);
+        $connection = static::$capsule->connection($databaseName);
         $connection->enableQueryLog();
 
         if (!static::$connectionCache->contains($connection)) {

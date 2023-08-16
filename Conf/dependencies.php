@@ -3,18 +3,37 @@ declare(strict_types=1);
 
 use Carbon\Carbon;
 use DI\ContainerBuilder;
+use Illuminate\Database\DatabaseManager;
 use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\SocketHandler;
 use Monolog\Handler\WhatFailureGroupHandler;
+use Orkester\GraphQL\GraphQLConfiguration;
 use Orkester\Manager;
+use Orkester\Persistence\DatabaseConfiguration;
+use Orkester\Persistence\PersistenceManager;
 use Orkester\Services\OTraceFormatter;
 use Psr\Container\ContainerInterface;
 
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
+use Psr\Log\LoggerInterface;
 
 return function (ContainerBuilder $containerBuilder) {
     $containerBuilder->addDefinitions([
+        'mode' => Manager::getConf('mode'),
+        GraphQLConfiguration::class => function(ContainerInterface $c) {
+            $data = require Manager::getConfPath() . '/api.php';
+            $factory = $c->get(\DI\FactoryInterface::class);
+            return new GraphQLConfiguration($data['resources'], $data['services'], $factory);
+        },
+        DatabaseConfiguration::class => fn() => new DatabaseConfiguration(
+            Manager::getConf('db'),
+            Manager::getOptions('db'),
+            Manager::getOptions('fetchStyle')
+        ),
+        DatabaseManager::class =>
+            fn(ContainerInterface $c) => PersistenceManager::buildDatabaseManager($c->get(DatabaseConfiguration::class)),
+        LoggerInterface::class => fn(ContainerInterface $c) => $c->get(Logger::class),
         Logger::class => function (ContainerInterface $c) {
             $lineFormat = "[%datetime%] %channel%[%level_name%]%context.tag%: %message%" . PHP_EOL;
             $dateFormat = "Y/m/d H:i:s";
