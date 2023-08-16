@@ -17,7 +17,6 @@ use Psr\Log\LoggerInterface;
 class PersistenceManager
 {
     public static DatabaseManager $capsule;
-    public static int $fetchStyle;
     /**
      * @var ClassMap[]
      */
@@ -35,8 +34,6 @@ class PersistenceManager
 
     public static function buildDatabaseManager(DatabaseConfiguration $configuration): DatabaseManager
     {
-        static::$fetchStyle = $configuration->fetchStyle;
-
         $capsule = new Capsule();
         foreach ($configuration->databases as $name => $conf) {
             $capsule->addConnection([
@@ -139,7 +136,7 @@ class PersistenceManager
             static::$connectionCache->attach($connection);
         }
         (new \ReflectionClass(get_class($connection)))
-            ->getProperty('fetchMode')->setValue($connection, static::$fetchStyle);
+            ->getProperty('fetchMode')->setValue($connection, \PDO::FETCH_ASSOC);
         return $connection;
     }
 
