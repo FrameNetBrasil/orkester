@@ -38,8 +38,6 @@ class PersistenceManager
         static::$fetchStyle = $configuration->fetchStyle;
 
         $capsule = new Capsule();
-
-        static::$connectionCache = new \SplObjectStorage();
         foreach ($configuration->databases as $name => $conf) {
             $capsule->addConnection([
                 'driver' => $conf['db'] ?? 'mysql',
@@ -65,6 +63,7 @@ class PersistenceManager
         static::$initialized = true;
         static::$logger = $logger;
         static::$capsule = $manager;
+        static::$connectionCache = new \SplObjectStorage();
         static::$cachedClassMaps = new Psr16Adapter('apcu');
     }
 
