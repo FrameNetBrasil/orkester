@@ -20,11 +20,10 @@ use Psr\Log\LoggerInterface;
 
 return function (ContainerBuilder $containerBuilder) {
     $containerBuilder->addDefinitions([
-        'mode' => Manager::getConf('mode'),
         GraphQLConfiguration::class => function(ContainerInterface $c) {
             $data = require Manager::getConfPath() . '/api.php';
             $factory = $c->get(\DI\FactoryInterface::class);
-            return new GraphQLConfiguration($data['resources'], $data['services'], $factory);
+            return new GraphQLConfiguration($data['resources'], $data['services'], $factory, Manager::isDevelopment());
         },
         DatabaseConfiguration::class => fn() => new DatabaseConfiguration(
             Manager::getConf('db'),
