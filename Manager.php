@@ -140,9 +140,10 @@ class Manager
         Manager::$data = (object)[];
 
         self::$log->log(Logger::INFO, "INIT");
+        $capsule = PersistenceManager::buildDatabaseManager(self::$container->get(DatabaseConfiguration::class));
 
         PersistenceManager::init(
-            self::$container->get(DatabaseConfiguration::class),
+            $capsule,
             self::$container->get(Logger::class)
         );
     }

@@ -7,7 +7,6 @@ use Ds\Set;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Arr;
-use Monolog\Logger;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Grammar\MySqlGrammar;
 use Orkester\Persistence\Grammar\SQLiteGrammar;
@@ -36,7 +35,7 @@ class Criteria extends Builder
      */
     private array $maps;
 
-    public function __construct(ConnectionInterface $connection, protected Logger $logger)
+    public function __construct(ConnectionInterface $connection)
     {
         $grammar = match (get_class($connection->getQueryGrammar())) {
             \Illuminate\Database\Query\Grammars\MySqlGrammar::class => new MySqlGrammar($this),
@@ -99,7 +98,7 @@ class Criteria extends Builder
 
     public function newQuery()
     {
-        return (new static($this->connection, $this->logger))->setModel($this->model);
+        return (new static($this->connection))->setModel($this->model);
     }
 
     public function columnName(string $className, string $attribute)
