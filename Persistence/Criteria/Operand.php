@@ -91,21 +91,25 @@ class Operand
         $parts = explode('.', $this->field);
         foreach ($parts as $i => $part) {
             $first = ($i == 0);
-            $attributeMap = $this->criteria->getAttributeMap($part, $currentClass);
-            if (!is_null($attributeMap)) {
-                if ($attributeMap->reference != '') {
-                    $realChain .= ($first ? '' : '.') . $attributeMap->reference;
+            if ($part != '*') {
+                $attributeMap = $this->criteria->getAttributeMap($part, $currentClass);
+                if (!is_null($attributeMap)) {
+                    if ($attributeMap->reference != '') {
+                        $realChain .= ($first ? '' : '.') . $attributeMap->reference;
+                    } else {
+                        $realChain .= ($first ? '' : '.') . $part;
+                    }
                 } else {
+                    $associationMap = $this->criteria->getAssociationMap($part, $currentClass);
+                    // associationMap MUST exist
+                    if (is_null($associationMap)) {
+                        throw new \InvalidArgumentException("Association not found: $realChain");
+                    }
                     $realChain .= ($first ? '' : '.') . $part;
+                    $currentClass = $associationMap->toClassName;
                 }
             } else {
-                $associationMap = $this->criteria->getAssociationMap($part, $currentClass);
-                // associationMap MUST exist
-                if (is_null($associationMap)) {
-                    throw new \InvalidArgumentException("Association not found: $realChain");
-                }
                 $realChain .= ($first ? '' : '.') . $part;
-                $currentClass = $associationMap->toClassName;
             }
         }
 //        mdump('  realChain = ' . $realChain);
