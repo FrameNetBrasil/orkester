@@ -139,7 +139,7 @@ class MModel
     {
     }
 
-    public static function afterSave(object $object, int $pk)
+    public static function afterSave(object $object, ?int $pk)
     {
     }
 
