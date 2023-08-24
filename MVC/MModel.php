@@ -91,7 +91,7 @@ class MModel
         return $object;
     }
 
-    public static function save(object $object, ClassMap $classMap = null, bool $upsert = false): int
+    public static function save(object $object, ClassMap $classMap = null, bool $upsert = false): ?int
     {
         $classMap = $classMap ?? static::getClassMap();
         $errors = [];
@@ -139,7 +139,7 @@ class MModel
     {
     }
 
-    public static function afterSave(object $object, int $pk)
+    public static function afterSave(object $object, ?int $pk)
     {
     }
 
