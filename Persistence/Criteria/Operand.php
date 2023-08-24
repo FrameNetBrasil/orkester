@@ -158,7 +158,7 @@ class Operand
                     // get the associationMap based on current Class
                     $associationMap = $this->criteria->getAssociationMap($associationName, $currentClass);
                     // join type for this chain otherwise INNER
-                    $associationJoinType = $associationMap->joinType ?? $this->criteria->associationJoin[$chain] ?? Join::INNER;
+                    $associationJoinType = $this->criteria->associationJoin[$chain] ?? $associationMap->joinType ??  Join::INNER;
                     // is there an alias for this chain? If so, use it; if no, create one
                     if (!isset($this->criteria->tableAlias[$chain])) {
                         $this->criteria->tableAlias[$chain] = $associationName . '_' . ++Criteria::$aliasCount;
