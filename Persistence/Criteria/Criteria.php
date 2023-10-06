@@ -27,6 +27,7 @@ class Criteria extends Builder
     public $criteriaAlias = [];
     public $associationJoin = [];
     public $associationAlias = [];
+    public $associationClass = [];
     static public $aliasCount = 0;
     public $parameters = [];
     public $aliasTable = NULL;
