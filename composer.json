@@ -34,8 +34,6 @@
         "greenlion/php-sql-parser": "^4.5",
         "guzzlehttp/guzzle": "^7.4",
         "vlucas/phpdotenv": "^5.4",
-        "ryangjchandler/standalone-blade": "^0",
-        "illuminate/view": "^10",
         "psr/container": "^1.1"
     },
     "autoload": {
