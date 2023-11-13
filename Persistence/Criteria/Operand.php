@@ -103,7 +103,7 @@ class Operand
                     $associationMap = $this->criteria->getAssociationMap($part, $currentClass);
                     // associationMap MUST exist
                     if (is_null($associationMap)) {
-                        throw new \InvalidArgumentException("Association not found: $realChain");
+                        throw new \InvalidArgumentException("Association not found: [{$part}] [{$this->field}]");
                     }
                     $realChain .= ($first ? '' : '.') . $part;
                     $currentClass = $associationMap->toClassName;
