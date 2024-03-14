@@ -6,6 +6,7 @@ use Closure;
 use Ds\Set;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\Query\Grammars\MariaDbGrammar;
 use Illuminate\Support\Arr;
 use Orkester\Persistence\Enum\Join;
 use Orkester\Persistence\Grammar\MySqlGrammar;
@@ -39,7 +40,7 @@ class Criteria extends Builder
     public function __construct(ConnectionInterface $connection)
     {
         $grammar = match (get_class($connection->getQueryGrammar())) {
-            \Illuminate\Database\Query\Grammars\MySqlGrammar::class => new MySqlGrammar($this),
+            \Illuminate\Database\Query\Grammars\MySqlGrammar::class, MariaDbGrammar::class => new MySqlGrammar($this),
             \Illuminate\Database\Query\Grammars\SQLiteGrammar::class => new SQLiteGrammar($this),
             default => throw new \InvalidArgumentException("Unknown database grammar")
         };
