@@ -347,6 +347,9 @@ class MModel
         $transaction = static::beginTransaction();
         try {
             $classMap = static::getClassMap();
+            if (!empty($id)) {
+                static::deleteFromCache($id);
+            }
             $oldEntity = empty($id) ? null : static::getById($id);
             $entity = is_null($oldEntity) ? [] : (array)$oldEntity;
             /** @var AttributeMap $attributeMap */
